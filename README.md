@@ -130,3 +130,22 @@ README.md       # setup, schema, safety/architecture boundaries
 | [Nuclei](https://github.com/projectdiscovery/nuclei) | Vulnerability template research and cautiously scoped security checks | Do **not** launch arbitrary active templates unattended. Only authorized, rate-limited, reviewed templates; passive-first alternatives are preferable. |
 
 The entries above are integration **candidates**, not installed or approved components. Before adoption, review the actual project/license at the selected version, monitor resource cost and maintenance, and test that the process cannot mutate repository or infrastructure state. Research agents should have a disposable sandbox and zero secrets except specifically scoped read-only tokens.
+
+## Free, self-hosted code-review bots (experimental)
+
+An optional local-only QA pipeline has been added on this review branch. It includes a verified-release installer for reviewdog, Betterleaks and Trivy; deterministic code checks; Playwright browser smoke tests; and an opt-in PR-Agent reviewer using local Ollama. No external bots have been installed on your server and no browser or security scan has been executed yet.
+
+Full guide: [Code review bot setup](docs/REVIEW_BOTS.md) · [Current verified/blocked checks](docs/REVIEW_VALIDATION.md)
+
+In a branch checkout on your private machine, the starting commands are:
+
+```bash
+python3 scripts/bootstrap-review-bots.py
+python3 -m venv .review-tools/qa-venv
+source .review-tools/qa-venv/bin/activate
+python -m pip install "playwright==1.65.2"
+python -m playwright install chromium
+bash scripts/run-review.sh --full
+```
+
+**Important:** All report files remain under the local gitignored `.review-tools/`. Deployed Headquarters employees continue to be read-only. See the guide for setting up optional private model review.
