@@ -39,10 +39,10 @@ In the dashboard, select **Product intelligence → Import scan report** to view
 To run the collector repeatedly under a founder-managed supervisor:
 
 ```bash
-python3 intelligence/run_pipeline.py --base-url https://yorphives.com --loop --interval-minutes 60 --research-every 6 --compare-every 24
+python3 intelligence/run_pipeline.py --base-url https://yorphives.com --loop --interval-minutes 60 --research-every 6 --compare-every 24 --browser-discovery --browser-every 6
 ```
 
-The loop runs YorpHives discovery hourly, public research every six scans and allowlisted competitor comparison every twenty-four scans. This does **not** start a remote server process or schedule itself by virtue of being committed to GitHub. A founder-owned host/service manager must start and supervise it.
+The loop runs YorpHives discovery hourly, public research every six scans, a browser link inventory every six scans, and allowlisted competitor comparison every twenty-four scans. Browser scanning requires an additional local Playwright install: `python3 -m pip install playwright && python3 -m playwright install chromium`. If Playwright is not installed, omit `--browser-discovery --browser-every 6` to run the fully standard-library HTTP collector. This does **not** start a remote server process or schedule itself by virtue of being committed to GitHub. A founder-owned host/service manager must start and supervise it.
 
 ## How a newly added tool gets enrolled
 
@@ -54,7 +54,7 @@ The loop runs YorpHives discovery hourly, public research every six scans and al
 6. Visible UI control changes, repeated HTTP errors, and absence across two completed discoveries create review records.
 7. Headquarters displays evidence and recommendations. **No AI or detector edits code or performs remediation.**
 
-If the website is rendered exclusively through client-side JavaScript and exposes no server-rendered links, sitemap or manifest, HTTP-only discovery cannot find all tools. A **browser-based read-only discovery adapter** can be added later. A reliable machine-readable manifest is the most scalable solution, but adding it to the public website would require a separate, founder-approved change.
+If the website is rendered exclusively through client-side JavaScript and exposes no server-rendered links, sitemap or manifest, HTTP-only discovery cannot find all tools. An **optional Playwright-based read-only browser adapter is now included**: it observes JavaScript-rendered links without submitting forms or clicking controls. It aborts off-origin requests and mutating methods. A machine-readable manifest is still more complete and scalable, but adding one to the public website requires a separate founder-approved change.
 
 ### Optional product manifest (not installed on public website)
 
@@ -119,12 +119,12 @@ The example above is a **format example only**: it is not in the default config 
 
 ## Important limitations and next milestones
 
-- No JavaScript execution or synthetic flow testing in the discovery worker. An HTTP 200 can still serve a broken tool.
+- The core HTTP scanner does not execute JavaScript. The optional browser adapter reads links rendered by JavaScript but does not click through workflows or prove functionality. An HTTP 200 can still serve a broken tool.
 - UI controls are surface fingerprints, not proof that a feature works.
 - Website status, sitemap completeness and deployment state have not been verified live yet.
 - Source matching is heuristic, not a validated assessment of market demand.
 - The competitor watchlist starts empty. **No live competitor gaps have been validated.**
-- The process does not watch unlinked/unlisted client-side-only SPA routes until a manifest or browser adapter is available.
+- Even the browser adapter cannot discover completely unlinked/unlisted routes. These require an owner-published manifest or explicit inventory feed.
 - No persistent server or scheduler has been installed, and no collector is currently running.
 - The next production phase should add independent Playwright checks on newly discovered routes, a self-hosted authenticated evidence API, private alerts, and periodic result verification.
 
@@ -133,6 +133,7 @@ The example above is a **format example only**: it is not in the default config 
 | File | Purpose |
 | --- | --- |
 | `intelligence/discover.py` | Same-origin tool detection, SQLite inventory, state transitions, health observations |
+| `intelligence/browser_discover.py` | Optional safe browser detection of tools rendered by JavaScript |
 | `intelligence/research.py` | Public RSS discovery, de-duplication and limited-confidence triage |
 | `intelligence/compare.py` | Allowlisted robots-aware text feature comparison |
 | `intelligence/run_pipeline.py` | Combines periodic observations into one founder-readable JSON report |
