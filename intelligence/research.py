@@ -158,20 +158,29 @@ def run(storage: Path, config_path: Path) -> dict:
                                   VALUES(?,?,?,?,?,?,?)""", (entry["url"], entry["title"], entry["summary"],
                                     now, now, len(entry["feeds"]), entry["published"]))
         output = []
-        for entry in observed.values():
-            score, signals = source_score(entry["title"], entry["summary"], entry["published"], len(entry["feeds"]))
-            existing, similarity = similar(entry["title"], product_names)
+        # Keep relevant past discoveries in a long-term memory, but label old
+        # records plainly and never present cached signals as newly observed.
+        historical = db.execute("""SELECT url,title,summary,first_seen,last_seen,feed_count,published
+                                  FROM leads ORDER BY last_seen DESC LIMIT 200""").fetchall()
+        for row in historical:
+            recent = observed.get(row["url"])
+            score, signals = source_score(row["title"], row["summary"], row["published"], row["feed_count"])
+            existing, similarity = similar(row["title"], product_names)
             kind = "possible-existing-product" if existing else "potential-missing-product"
+            if not recent:
+                signals.append("Historical lead; not observed in the latest feed scan")
             output.append({
-                "id": hashlib.sha256(entry["url"].encode()).hexdigest()[:16],
-                "title": entry["title"][:160], "category": "product",
-                "confidence": "Unvalidated research lead", "description": entry["summary"] or "Public source mention; product value is unknown.",
+                "id": hashlib.sha256(row["url"].encode()).hexdigest()[:16],
+                "title": row["title"][:160], "category": "product",
+                "confidence": "Unvalidated research lead" if recent else "Historical lead — refresh required",
+                "description": row["summary"] or "Public source mention; product value is unknown.",
                 "recommendation": ("Compare this candidate's features against " + existing + " using source-backed evidence." if existing
                                    else "Validate audience need, alternatives, licensing, differentiation and potential organic traffic."),
-                "evidence": [entry["url"]], "observedAt": now,
+                "evidence": [row["url"]], "observedAt": row["last_seen"],
+                "firstSeen": row["first_seen"], "lastSeen": row["last_seen"],
                 "kind": kind, "relatedProduct": existing, "similarity": similarity,
                 "researchScore": score, "scoreMeaning": "research triage only; not search demand, traffic, or revenue",
-                "signals": signals, "sourceFeeds": sorted(entry["feeds"])
+                "signals": signals, "sourceFeeds": sorted(recent["feeds"]) if recent else []
             })
         output.sort(key=lambda lead: (-lead["researchScore"], lead["title"]))
         report = {
