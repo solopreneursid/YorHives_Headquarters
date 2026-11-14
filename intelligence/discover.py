@@ -169,24 +169,38 @@ class SafeFetcher:
                 if not ip.is_global:
                     raise ValueError("Refusing private/non-public resolved address for " + parsed.hostname)
 
-    def get(self, url: str) -> tuple[int, bytes, str]:
+    def get(self, url: str, preserve_query: bool = False) -> tuple[int, bytes, str]:
         target = canonical(url, self.origin)
         if target is None:
             raise ValueError("Refused off-origin URL")
-        request = Request(target, headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xml,application/json;q=0.9,*/*;q=0.1"})
-        start = time.monotonic()
-        try:
-            with self.opener.open(request, timeout=self.timeout) as response:
-                status = response.status
-                body = response.read(MAX_DOCUMENT_BYTES + 1)
-                kind = response.headers.get_content_type()
-        except HTTPError as exc:
-            status = exc.code
-            # Cross-origin redirects are not followed, never POST or write.
-            return status, b"", f"HTTP {status} in {round((time.monotonic()-start)*1000)}ms"
-        if len(body) > MAX_DOCUMENT_BYTES:
-            raise ValueError("Page exceeded 1 MB response limit")
-        return status, body, kind
+        if preserve_query:
+            # RSS feeds can use query parameters; product identity intentionally cannot.
+            target_parts, supplied = urlsplit(target), urlsplit(url)
+            target = urlunsplit((target_parts.scheme, target_parts.netloc, target_parts.path, supplied.query, ""))
+        visited = set()
+        for _ in range(4):
+            if target in visited:
+                raise ValueError("Refusing redirect loop")
+            visited.add(target)
+            request = Request(target, headers={
+                "User-Agent": USER_AGENT,
+                "Accept": "text/html,application/xml,application/json;q=0.9,*/*;q=0.1"
+            })
+            try:
+                with self.opener.open(request, timeout=self.timeout) as response:
+                    body = response.read(MAX_DOCUMENT_BYTES + 1)
+                    if len(body) > MAX_DOCUMENT_BYTES:
+                        raise ValueError("Page exceeded 1 MB response limit")
+                    return response.status, body, response.headers.get_content_type()
+            except HTTPError as exc:
+                if 300 <= exc.code < 400 and exc.headers.get("Location"):
+                    destination = canonical(urljoin(target, exc.headers["Location"]), self.origin)
+                    if destination is None:
+                        return exc.code, b"", "Cross-origin redirect refused"
+                    target = destination
+                    continue
+                return exc.code, b"", "HTTP " + str(exc.code)
+        return 508, b"", "Too many redirects"
 
 
 def decode_html(raw: bytes) -> PageParser:
@@ -290,10 +304,13 @@ def discover(fetcher: SafeFetcher) -> tuple[dict[str, dict], list[str], bool]:
         except (URLError, OSError, ValueError) as exc:
             notes.append("Hub unavailable (" + path + "): " + trimmed(exc, 160))
     inspected = len(found)
+    truncated = inspected >= MAX_URLS
+    if truncated:
+        notes.append("Inventory limit reached; absence-based removals suppressed")
     if inspected == 0:
         notes.append("No products discovered; no removal decisions will be made")
     # Preserve old inventory if discovery sources fail or website has no discoverable tools.
-    complete = trusted_sources > 0 and inspected > 0
+    complete = trusted_sources > 0 and inspected > 0 and not truncated
     return dict(sorted(found.items())[:MAX_URLS]), notes, complete
 
 
