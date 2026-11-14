@@ -149,3 +149,18 @@ bash scripts/run-review.sh --full
 ```
 
 **Important:** All report files remain under the local gitignored `.review-tools/`. Deployed Headquarters employees continue to be read-only. See the guide for setting up optional private model review.
+
+## Product & Growth Intelligence (new feature branch)
+
+A new **Product intelligence** page has been implemented with an automatically enrolled inventory, product-change feed, cautious competitive feature comparisons and the founder-provided cyan/teal/blue logo.
+
+The read-only collector lives in `intelligence/`. It discovers tools published on your website from sitemaps, hub links and an optional manifest, optionally using Playwright to observe JavaScript-rendered links. Every newly discovered tool enters private SQLite monitoring and receives a GET health check immediately. Other scan cycles track reported changes, HTTP failures, and absence confirmed across consecutive successful discoveries.
+
+```bash
+python3 tests/test_intelligence.py
+python3 intelligence/run_pipeline.py --base-url https://yorphives.com
+```
+
+For optional browser link discovery, install Playwright and the Chromium runtime on your **own server**, then use `--browser-discovery`. To run recurring checks under a founder-managed process supervisor, add `--loop --interval-minutes 60`. Reports are written only in the external private evidence directory (`~/.local/state/yorphives-hq` by default). Import `headquarters-report.json` through the dashboard. None of these collectors is installed or running just because its source exists in GitHub.
+
+**Architecture and test instructions:** [Product intelligence documentation](intelligence/README.md). This does not edit YorpHives website files or Headquarters project files during monitoring. The UI preview data remains clearly labelled as illustrative; imported report data remains unverified until an authenticated evidence pipeline is added.
