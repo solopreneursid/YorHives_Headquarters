@@ -118,3 +118,15 @@ styles.css      # responsive dark design system, no third-party assets
 dashboard.js    # interactive local-first view, demo data, JSON import
 README.md       # setup, schema, safety/architecture boundaries
 ```
+
+## Initial open-source bot/monitor candidates (research only; not installed)
+
+| Candidate | Role in HQ | Current operating boundary |
+| --- | --- | --- |
+| [Uptime Kuma](https://github.com/louislam/uptime-kuma) | Independent HTTP/TLS/DNS availability monitoring | Self-hosted, read-only probes; no site administration credentials. |
+| [Trivy](https://github.com/aquasecurity/trivy) | Dependency, vulnerability, secret, license and misconfiguration findings | Scan read-only repository snapshots and redact any detected secret values before storing evidence. |
+| [Playwright](https://github.com/microsoft/playwright) | Browser journey and regression verification | Isolated test accounts, read-only flows where possible, low request rates. |
+| [Renovate OSS](https://github.com/renovatebot/renovate) | Outdated dependency and available-upgrade intelligence | **Do not run the default write-capable bot inside HQ.** Evaluate only its `dryRun: "lookup"` read-only reporting mode, with repository read-only credentials, isolated from every deployment mechanism. Its OSS license is AGPL-3.0-only. |
+| [Nuclei](https://github.com/projectdiscovery/nuclei) | Vulnerability template research and cautiously scoped security checks | Do **not** launch arbitrary active templates unattended. Only authorized, rate-limited, reviewed templates; passive-first alternatives are preferable. |
+
+The entries above are integration **candidates**, not installed or approved components. Before adoption, review the actual project/license at the selected version, monitor resource cost and maintenance, and test that the process cannot mutate repository or infrastructure state. Research agents should have a disposable sandbox and zero secrets except specifically scoped read-only tokens.
