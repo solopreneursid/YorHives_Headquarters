@@ -1,35 +1,48 @@
-# Product Intelligence — validation record (2026-11-14)
+# YorpHives Headquarters — Product Intelligence validation
 
-## Implemented
-- Separate read-only product monitor: public sitemap, tool/product hubs, optional manifest, persistent SQLite inventory, newly discovered tool enrollment, HTTP health status and surface fingerprints.
-- False-alarm rules: 2 consecutive failed health checks; 2 complete discovery omissions before declaring a tool no longer discoverable; do not infer removals on failed or capped inventories; browser-only inventory needs fresh browser evidence.
-- Optional non-destructive Playwright catalog observer for links rendered by JavaScript.
-- Public RSS/Atom research leads, persisted with first/last observation timestamps and confidence limitations.
-- Allowlisted, robots-aware competitor page text comparison with source URLs.
-- Private `headquarters-report.json` merger and a new Product Intelligence dashboard, with founder's image used as the HQ emblem.
+Verification date: 2026-11-14. This document records checks on the **draft review branch**, not on any deployed production service.
 
-## Verified during this editing session
-- The complete updated `dashboard.js` parsed successfully in the available V8 runtime.
-- The existing deterministic reviewer (evaluated in an in-memory emulation of its Node file access) reported **0 errors, 0 warnings** on the checked-in HTML, dashboard JavaScript and CSS.
-- All hardcoded JavaScript DOM references mapped to HTML IDs, with **0 duplicate IDs** and **0 broken navigation targets**.
-- The submitted code updates were accepted by GitHub on the dedicated review branch.
+## Implemented in source
 
-## Not verified / blocked
-- No real GET observation against `https://yorphives.com` succeeded from this session. **No real product inventory has been created.**
-- Python unit tests in `tests/test_intelligence.py` have been authored but **not executed** in a Python process using the checked-in code.
-- The actual Playwright/Chromium browser regression suite has **not executed**.
-- No market demand, revenue, competitor functionality or product traffic has been verified.
-- No live scheduler, persistent server, private authenticated report ingestion or AI model has been connected.
-- Static checks are not a complete security or functional audit.
-- No software or credentials were installed on the founder's server, and no running website or production HQ was changed.
+- Automatically inventory tools/apps from same-origin sitemap, catalog links, optional product manifest, and optional read-only JavaScript-rendered browser catalog.
+- Enroll new tools into a private external SQLite inventory and check their HTTP responses immediately.
+- Watch repeated failures, visible feature-control changes, recovery and possible product removal. Avoid false disappearance on incomplete scans or expired browser evidence.
+- Research candidate products from configured public feeds and preserve source, freshness and uncertainty. Compare only owner-allowlisted competitor pages, respecting robots rules and avoiding unsupported claims.
+- Headquarters Product Intelligence dashboard with catalog, change feed, potential feature gaps, and founder-supplied Y logo.
+- Authenticated, **localhost-only** read-only report viewer using Python standard library. It serves only three frontend files and a fresh combined evidence report, with no write endpoints.
+- Dashboard polls the viewer's fixed same-origin `/api/report` endpoint, only when a compatible authenticated local viewer is present. Static previews remain examples.
 
-## Verification required before deployment
-1. On an owner-controlled unprivileged Linux host, clone the **review branch** and run `python3 tests/test_intelligence.py`.
-2. Confirm the website exposes discoverable product routes via sitemap/hubs; if client-only, enable the optional browser observer or publish a product manifest through an independently reviewed website change.
-3. Run `python3 intelligence/run_pipeline.py --base-url https://yorphives.com` and inspect the scanner-generated `headquarters-report.json` outside the repo.
-4. Optionally install Playwright to run the existing browser tests and dynamic catalog discovery.
-5. Run one scan before and one scan after a controlled addition of a harmless test tool; verify exactly one `new-product` event and that the route receives a health check automatically.
-6. Inspect false-positive and stale-evidence behavior, then connect authenticated evidence delivery and independent monitoring.
-7. Keep deployed workers read-only at the operating-system/API permissions level. All findings stay outside source directories.
+## Automated test evidence — PASSED
 
-**Release status: DRAFT. No proof of production readiness.**
+GitHub Actions workflow: `Headquarters read-only intelligence tests`  
+Run: https://github.com/solopreneursid/YorHives_Headquarters/actions/runs/43625813371
+
+- **19 Python intelligence tests passed**, including new product enrollment, continued monitoring, feature changes, outage/recovery, omission safeguards, read-only browser source inventory, RSS lead classification, and robots.txt restrictions.
+- **8 Python viewer tests passed**: fixed loopback binding, authentication, permitted read-only report endpoint, stale-report rejection, blocked write methods, closed file allowlist, and minimum password length.
+- **5 JavaScript deterministic reviewer tests passed**; the dashboard's actual static checker reported **0 errors, 0 warnings**.
+- **Real Chromium browser smoke test passed**: dashboard navigation, filtering, mobile layout, importing malicious input as safe text, unsafe URL rejection, private viewer auto-import and manual refresh.
+- Python AST parsing, frontend JavaScript syntax validation, and shell-script syntax validation passed.
+
+The tests used controlled synthetic assets, fake discovery responses and temporary local HTTP servers. **None validates the live yorphives.com product catalog or public availability.** The browser checks use Playwright's isolated Chromium environment; they are not evidence that your production website was tested.
+
+## Not installed, tested or operational yet
+
+- **Live site discovery:** No successful observation against `https://yorphives.com` was achieved from this session; there is no verified real product inventory.
+- **Persistent operation:** No collector, browser process, authenticated viewer or scheduler has been installed on the founder's server.
+- **Actual competitors:** The competitor watchlist starts empty. No real competitor products or missing features have been validated.
+- **Market demand:** No search volume, traffic, conversion, advertising revenue or willingness-to-pay evidence is verified.
+- **Full QA:** A responding HTTP page is not proof that its interactive tool works. Non-destructive Playwright user journeys for every discovered tool are a later phase.
+- **Production security:** HTTP Basic auth is restricted to localhost. Signed evidence, stronger authentication, role isolation, server hardening and independent incident alerting are still required.
+- **Private model inference:** No Ollama model/server or self-hosted AI review agent was started by this workflow.
+- **External security audits:** A passing unit/browser workflow is not a full vulnerability or penetration test.
+
+## Release gate
+
+1. Founder or delegated owner reviews the draft PR and permission boundaries.
+2. Owner-controlled isolated host starts the read-only product collector from the review branch using restricted credentials and external private evidence storage.
+3. Capture the first successful public YorpHives discovery and manually verify the product inventory against the actual website, including SPA-only tools.
+4. Exercise new-product detection using a deliberately staged, authorized test tool; verify that it becomes monitored without any write token.
+5. Start the authenticated loopback viewer under a separate non-root account; verify fresh report auto-refresh and independent monitoring alerts.
+6. Only consider merging/deploying Headquarters after a founder review and security hardening. Do not give deployed workers source-write or deployment capabilities.
+
+**Current decision:** UI and intelligence components tested in a branch; live site deployment remains **blocked on founder-controlled server access and real-world evidence**.
