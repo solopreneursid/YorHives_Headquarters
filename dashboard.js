@@ -19,6 +19,17 @@
       { id: "o2", title: "Productized technical health reports", category: "revenue", confidence: "Research needed", description: "Explore paid, evidence-based website health reports as a potential service or product line. These are illustrative business ideas, not verified demand or income forecasts.", recommendation: "Research competition and pricing, clarify scope and legal obligations, and test whether customers will pay before offering it.", evidence: [], observedAt: "" },
       { id: "o3", title: "Self-hostable open-source bot candidates", category: "technology", confidence: "License review needed", description: "Evaluate free tools for dependency review, uptime detection, vulnerability scans, and browser checks. Candidates for further research include Renovate, Uptime Kuma, Trivy, and Playwright.", recommendation: "Independently verify each project's current license, maintenance, operating cost, security model, and suitability for self-hosting.", evidence: [], observedAt: "" }
     ],
+    products: [
+      { id: "demo-p1", name: "Example: Image Compressor", url: "", source: "sample", status: "unknown", features: ["Upload image", "Adjust quality"], firstSeen: "", lastChecked: "", active: true },
+      { id: "demo-p2", name: "Example: Word Counter", url: "", source: "sample", status: "unknown", features: ["Count words"], firstSeen: "", lastChecked: "", active: true }
+    ],
+    changes: [
+      { id: "demo-c1", url: "", kind: "new-product", severity: "info", summary: "Example: a newly published tool is detected and enrolled automatically.", occurredAt: "" },
+      { id: "demo-c2", url: "", kind: "feature-surface-change", severity: "info", summary: "Example: a product's visible controls have changed and should be reviewed.", occurredAt: "" }
+    ],
+    comparisons: [
+      { id: "demo-gap", product: "Example: Image Compressor", competitor: "Hypothetical competitor", missingFeatures: ["Batch processing", "AVIF support"], evidence: [], confidence: "Illustrative only", recommendation: "Validate competitor claims and user demand before prioritizing." }
+    ],
     agents: [
       { id: "a1", name: "Engineering & Operations", responsibility: "System health, incidents, performance, maintainability, and safe architecture recommendations.", status: "not_connected" },
       { id: "a2", name: "Security & Independent QA", responsibility: "Vulnerabilities, regression evidence, independent testing, and trust boundaries.", status: "not_connected" },
@@ -84,7 +95,7 @@
   }
 
   function showView(view) {
-    if (!["overview", "monitoring", "opportunities", "workforce", "activity", "governance"].includes(view)) view = "overview";
+    if (!["overview", "monitoring", "opportunities", "products", "workforce", "activity", "governance"].includes(view)) view = "overview";
     state.view = view;
     document.querySelectorAll(".view").forEach(el => {
       const active = el.id === "view-" + view;
@@ -98,7 +109,7 @@
       else button.removeAttribute("aria-current");
     });
     $("breadcrumb-current").textContent = ({
-      overview: "Overview", monitoring: "Monitoring", opportunities: "Opportunities",
+      overview: "Overview", monitoring: "Monitoring", opportunities: "Opportunities", products: "Product intelligence",
       workforce: "AI workforce", activity: "Activity & evidence", governance: "Governance"
     })[view];
     document.body.classList.remove("nav-open");
@@ -295,6 +306,76 @@
     });
   }
 
+
+  function renderProducts() {
+    const products = state.data.products || [];
+    const changes = state.data.changes || [];
+    const comparisons = state.data.comparisons || [];
+    const imported = state.origin !== "preview";
+    const verifiedScan = imported && state.data.verification?.complete;
+    $("product-total").textContent = products.length;
+    $("product-new").textContent = changes.filter(item => item.kind === "new-product").length;
+    $("product-changes-total").textContent = changes.length;
+    $("product-comparisons-total").textContent = comparisons.length;
+    $("catalog-kind").textContent = imported ? "IMPORTED" : "EXAMPLE";
+    $("discovery-status").textContent = !imported ? "Preview — not connected"
+      : verifiedScan ? "Imported successful discovery" : "Imported scan — incomplete or not independently confirmed";
+    $("discovery-explainer").textContent = !imported
+      ? "These are illustrative records. Actual monitoring begins after the scanner is installed on your server."
+      : "Imported report" + (state.data.verification?.generatedAt ? " · " + (cleanDate(state.data.verification.generatedAt) || "undated") : "") +
+        " · No live connection is established in this browser.";
+
+    const inventory = $("product-catalog"); inventory.replaceChildren();
+    if (!products.length) inventory.append(emptyState("No products in this report", "The discovery worker will enroll new tools from your sitemap, catalog links and optional manifest."));
+    products.forEach(p => {
+      const row = node("div", "product-record");
+      const symbol = node("span", "product-record-icon"); symbol.append(icon("layers"));
+      const main = node("div", "product-record-main");
+      append(main, node("strong", "", p.name), node("small", "", (p.source || "Source unspecified") + " · " + (p.features.length ? p.features.length + " observed control(s)" : "No controls recorded")));
+      const info = node("span", "product-record-info");
+      info.append(node("span", "product-state " + (p.status === "healthy" && p.active ? "product-state-reachable" : ""), p.active ? (
+        p.status === "healthy" ? "Reported reachable" : p.status === "degraded" ? "Reported degraded" : "Status unknown"
+      ) : "No longer discoverable"));
+      if (p.url) {
+        const link = node("a", "product-url-link", "Open"); link.href = p.url; link.target = "_blank"; link.rel = "noopener noreferrer";
+        link.append(icon("external")); info.append(link);
+      }
+      append(row, symbol, main, info);
+      inventory.append(row);
+    });
+
+    const feed = $("product-change-feed"); feed.replaceChildren();
+    if (!changes.length) feed.append(emptyState("No recorded changes", "No change reports have been imported. That does not prove nothing changed."));
+    changes.slice(0, 20).forEach(c => {
+      const row = node("div", "product-change-record");
+      const symbol = node("span", "product-change-mark " + (c.severity === "high" ? "urgent" : ""));
+      symbol.append(icon(c.severity === "high" ? "shield" : c.kind === "new-product" ? "plus" : "refresh"));
+      const main = node("div", "product-change-copy");
+      append(main, node("strong", "", c.summary), node("small", "", label(c.kind) + " · " + (cleanDate(c.occurredAt) || originLabel())));
+      append(row, symbol, main);
+      feed.append(row);
+    });
+
+    const gaps = $("product-feature-gaps"); gaps.replaceChildren();
+    if (!comparisons.length) gaps.append(emptyState("No verified competitor comparisons", "Growth research can collect leads now. Source-backed, feature-by-feature evaluation requires a documented competitor and matching product."));
+    comparisons.forEach(c => {
+      const card = node("article", "feature-gap-card");
+      const top = node("div", "feature-gap-top");
+      append(top, node("strong", "", (c.product || "YorpHives product") + " → " + (c.competitor || "Competitor")),
+        node("span", "outline-pill", c.confidence || "Unverified"));
+      const text = node("p", "", c.missingFeatures.length ? "Potential missing features: " + c.missingFeatures.join(" · ") : "No feature details supplied.");
+      const next = node("p", "gap-next", c.recommendation || "Verify with direct evidence before considering changes.");
+      append(card, top, text, next);
+      const links = node("div", "gap-evidence");
+      c.evidence.forEach(source => {
+        const a = node("a", "", "Evidence source"); a.href = source; a.target = "_blank"; a.rel = "noopener noreferrer"; links.append(a);
+      });
+      if (!c.evidence.length) links.append(node("small", "", "No independent evidence supplied"));
+      card.append(links);
+      gaps.append(card);
+    });
+  }
+
   function renderAll() {
     renderMetrics();
     renderBrief();
@@ -303,6 +384,7 @@
     renderOpportunityPreview();
     renderFindings();
     renderOpportunities();
+    renderProducts();
     renderWorkforce();
     renderActivity();
   }
@@ -340,7 +422,7 @@
 
   function normalizeData(raw) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("The JSON root must be an object.");
-    const arrays = ["assets", "findings", "opportunities", "agents", "activity"];
+    const arrays = ["assets", "findings", "opportunities", "products", "changes", "comparisons", "agents", "activity"];
     for (const key of arrays) if (raw[key] !== undefined && !Array.isArray(raw[key])) throw new Error("'" + key + "' must be an array.");
     const items = (key) => (raw[key] || []).filter(x => x && typeof x === "object" && !Array.isArray(x)).slice(0, 200);
     const evidence = (item) => Array.isArray(item.evidence) ? item.evidence.slice(0, 10).map(safeUrl).filter(Boolean) : [];
@@ -364,6 +446,25 @@
         description: cleanText(o.description, 3000), recommendation: cleanText(o.recommendation, 3000),
         observedAt: cleanText(o.observedAt, 45), evidence: evidence(o)
       })),
+      products: items("products").map((p, i) => ({
+        id: cleanText(p.id, 80) || "product" + i, name: cleanText(p.name, 160) || "Unnamed product",
+        url: safeUrl(p.url) || "", source: cleanText(p.source, 80),
+        status: ["healthy", "degraded", "unknown", "not_discoverable"].includes(p.status) ? p.status : "unknown",
+        active: p.active !== false, firstSeen: cleanText(p.firstSeen, 45), lastChecked: cleanText(p.lastChecked, 45),
+        features: Array.isArray(p.features) ? p.features.slice(0, 60).map(x => cleanText(x, 120)).filter(Boolean) : []
+      })),
+      changes: items("changes").map((c, i) => ({
+        id: cleanText(c.id, 80) || "change" + i, kind: cleanText(c.kind, 80),
+        summary: cleanText(c.summary, 600), url: safeUrl(c.url) || "",
+        severity: cleanText(c.severity, 30), occurredAt: cleanText(c.occurredAt, 45)
+      })),
+      comparisons: items("comparisons").map((c, i) => ({
+        id: cleanText(c.id, 80) || "gap" + i, product: cleanText(c.product, 160),
+        competitor: cleanText(c.competitor, 160),
+        missingFeatures: Array.isArray(c.missingFeatures) ? c.missingFeatures.slice(0, 40).map(x => cleanText(x, 130)).filter(Boolean) : [],
+        confidence: cleanText(c.confidence, 100), recommendation: cleanText(c.recommendation, 800),
+        evidence: evidence(c)
+      })),
       agents: items("agents").map((a, i) => ({
         id: cleanText(a.id, 80) || "agent" + i, name: cleanText(a.name, 160) || "Unnamed department",
         responsibility: cleanText(a.responsibility, 1000),
@@ -375,7 +476,13 @@
         occurredAt: cleanText(a.occurredAt, 45)
       }))
     };
-    if (Object.values(normal).every(x => x.length === 0)) throw new Error("The report contains no dashboard records.");
+    normal.verification = {
+      complete: raw.pipeline?.products?.complete === true || raw.verification?.complete === true,
+      generatedAt: cleanText(raw.pipeline?.generatedAt || raw.generatedAt, 45),
+      method: cleanText(raw.pipeline?.products?.method || raw.verification?.method, 100),
+      notes: Array.isArray(raw.pipeline?.errors) ? raw.pipeline.errors.slice(0, 5).map(x => cleanText(x, 200)) : []
+    };
+    if (arrays.every(key => normal[key].length === 0)) throw new Error("The report contains no dashboard records.");
     return normal;
   }
 
@@ -415,7 +522,8 @@
     const categories = [
       ...state.data.findings.map(item => ({ item, type: "finding", hint: "Monitoring · " + item.asset })),
       ...state.data.opportunities.map(item => ({ item, type: "opportunity", hint: "Opportunity · " + label(item.category) })),
-      ...state.data.agents.map(item => ({ item, type: "agent", hint: "AI workforce" }))
+      ...state.data.agents.map(item => ({ item, type: "agent", hint: "AI workforce" })),
+      ...state.data.products.map(item => ({ item, type: "product", hint: "Product inventory" }))
     ];
     const results = categories.filter(({ item }) =>
       !term || [item.title, item.name, item.description, item.responsibility, item.asset].some(value => typeof value === "string" && value.toLowerCase().includes(term))
@@ -427,6 +535,7 @@
       button.addEventListener("click", () => {
         $("search-dialog").close();
         if (type === "agent") showView("workforce");
+        else if (type === "product") showView("products");
         else { showView(type === "finding" ? "monitoring" : "opportunities"); showDetail(item, type); }
       });
       target.append(button);
@@ -458,6 +567,7 @@
     });
     $("import-trigger").addEventListener("click", () => $("report-upload").click());
     $("report-upload").addEventListener("change", (event) => importFile(event.target.files?.[0]));
+    $("product-import-trigger").addEventListener("click", () => $("report-upload").click());
     $("how-trigger").addEventListener("click", () => $("help-dialog").showModal());
     $("help-close").addEventListener("click", () => $("help-dialog").close());
     $("help-done").addEventListener("click", () => $("help-dialog").close());
