@@ -160,6 +160,36 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual(len(report["products"]), 2)
         self.assertTrue(any(p["url"].endswith("/image-resizer") for p in report["products"]))
 
+    def test_browser_inventory_enrolls_js_only_tool(self):
+        from discover import utcnow
+        self.fetcher.serve(["/tools/a"])
+        (self.storage / "browser-discovery.json").write_text(json.dumps({
+            "origin": ORIGIN, "generatedAt": utcnow(), "successfulHubs": 2,
+            "products": [{"url": ORIGIN + "/resize-images", "name": "Resize Images", "source": "playwright-browser"}]
+        }))
+        self.fetcher.routes[ORIGIN + "/resize-images"] = (200, page("Resize images", "Resize"), "text/html")
+        report = self.run_scan()
+        self.assertEqual(len(report["products"]), 2)
+        self.assertTrue(report["verification"]["browserDiscoveryAvailable"])
+        self.assertTrue(any(p["url"].endswith("/resize-images") and p["status"] == "healthy" for p in report["products"]))
+
+    def test_missing_browser_cache_does_not_remove_browser_only_product(self):
+        from discover import utcnow
+        self.fetcher.serve(["/tools/a"])
+        cache = self.storage / "browser-discovery.json"
+        cache.write_text(json.dumps({
+            "origin": ORIGIN, "generatedAt": utcnow(), "successfulHubs": 2,
+            "products": [{"url": ORIGIN + "/resize-images", "name": "Resize Images"}]
+        }))
+        self.fetcher.routes[ORIGIN + "/resize-images"] = (200, page("Resize images", "Resize"), "text/html")
+        self.run_scan()
+        cache.unlink()
+        self.run_scan()
+        report = self.run_scan()
+        old = [p for p in report["products"] if p["url"].endswith("/resize-images")][0]
+        self.assertTrue(old["active"])
+        self.assertEqual(old["missingStreak"], 0)
+
     def test_rejects_cross_origin_and_query_variants(self):
         self.assertIsNone(canonical("https://not-yorphives.example/tools/trap", ORIGIN))
         self.assertEqual(canonical("/tools/a?ref=promo#main", ORIGIN), ORIGIN + "/tools/a")
