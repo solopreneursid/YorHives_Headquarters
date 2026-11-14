@@ -45,7 +45,6 @@ export CONFIG__GIT_PROVIDER=local
 export CONFIG__MODEL="ollama/qwen2.5-coder:7b"
 export CONFIG__FALLBACK_MODELS="[]"
 export CONFIG__CUSTOM_MODEL_MAX_TOKENS=8192
-export CONFIG__PUBLISH_OUTPUT=false
 export CONFIG__PROPAGATE_COMMAND_ERRORS=true
 export OLLAMA__API_BASE="http://127.0.0.1:11434"
 "$VENV/bin/python" -m pr_agent.cli --pr_url main \
