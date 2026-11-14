@@ -496,26 +496,57 @@
     return normal;
   }
 
+  function applyReport(raw, origin) {
+    const normal = normalizeData(raw);
+    state.data = normal;
+    state.origin = origin;
+    state.findingFilter = "all";
+    state.opportunityFilter = "all";
+    document.querySelectorAll("[data-finding-filter], [data-opportunity-filter]").forEach(button => {
+      button.classList.toggle("is-selected", button.dataset.findingFilter === "all" || button.dataset.opportunityFilter === "all");
+    });
+    renderAll();
+  }
+
   async function importFile(file) {
     if (!file) return;
     if (file.size > 2_000_000) return showToast("That report is larger than the 2 MB limit.");
     try {
       const raw = JSON.parse(await file.text());
-      const normal = normalizeData(raw);
-      state.data = normal;
-      state.origin = "imported";
-      state.findingFilter = "all";
-      state.opportunityFilter = "all";
-      document.querySelectorAll("[data-finding-filter], [data-opportunity-filter]").forEach(button => {
-        button.classList.toggle("is-selected", button.dataset.findingFilter === "all" || button.dataset.opportunityFilter === "all");
-      });
-      renderAll();
+      applyReport(raw, "imported");
       showView("overview");
       showToast("Report opened locally. Data is not independently verified.");
     } catch (error) {
       showToast("Could not open report: " + cleanText(error.message, 110));
     } finally {
       $("report-upload").value = "";
+    }
+  }
+
+  async function loadLocalReport(notify = false) {
+    if (!["http:", "https:"].includes(location.protocol)) {
+      if (notify) showToast("Private evidence viewer is not connected in this preview.");
+      return false;
+    }
+    try {
+      const response = await fetch("/api/report", { credentials: "same-origin", cache: "no-store" });
+      if (response.status !== 200 || response.headers.get("X-YorpHives-HQ-Evidence") !== "readonly-local") {
+        if (notify) showToast("No fresh, authenticated private report is available.");
+        return false;
+      }
+      const raw = await response.json();
+      if (raw.schemaVersion !== "yorphives.hq-intelligence.v1" ||
+          raw.pipeline?.readOnly !== true || !raw.pipeline?.generatedAt) {
+        if (notify) showToast("Local evidence contract is invalid; no report applied.");
+        return false;
+      }
+      if (state.origin === "imported" && !notify) return true;
+      applyReport(raw, "local");
+      if (notify) showToast("Private evidence refreshed. Check timestamps and sources.");
+      return true;
+    } catch (error) {
+      if (notify) showToast("Private evidence unavailable: " + cleanText(error.message, 90));
+      return false;
     }
   }
 
@@ -578,6 +609,7 @@
     $("import-trigger").addEventListener("click", () => $("report-upload").click());
     $("report-upload").addEventListener("change", (event) => importFile(event.target.files?.[0]));
     $("product-import-trigger").addEventListener("click", () => $("report-upload").click());
+    $("product-refresh-trigger").addEventListener("click", () => loadLocalReport(true));
     $("how-trigger").addEventListener("click", () => $("help-dialog").showModal());
     $("help-close").addEventListener("click", () => $("help-dialog").close());
     $("help-done").addEventListener("click", () => $("help-dialog").close());
@@ -614,6 +646,13 @@
     }));
     renderAll();
     showView(location.hash.slice(1) || "overview");
+    // Read from the private same-origin viewer only; a static preview returns
+    // 404 and does not enable periodic polling or contact a third party.
+    loadLocalReport(false).then(available => {
+      if (available) setInterval(() => {
+        if (state.origin !== "imported") loadLocalReport(false);
+      }, 60_000);
+    });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initialize, { once: true });
