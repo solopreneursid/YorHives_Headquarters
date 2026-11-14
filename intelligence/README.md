@@ -10,7 +10,7 @@
 - **False-alarm protections:** no mass removal when discovery fails or the inventory reaches its safety cap. Two consecutive HTTP failures are needed for a health incident. A 3xx redirect is followed only when it stays on the configured YorpHives origin.
 - **Research leads:** fetch owner-configured public RSS/Atom sources for tool and software mentions and compare to known YorpHives product names; classify leads as *potentially missing* or *possibly existing* with limited-confidence scores, not traffic predictions.
 - **Competitor watch:** compare **explicitly allowlisted** competitor pages against an enrolled YorpHives product using simple visible-text signals, check robots.txt, and produce *unverified feature hypotheses*, never claims that features work or that our product is inferior.
-- **New Headquarters UI:** Product Intelligence screen with discovered catalog, monitoring enrollment indicators, change feed and possible feature gaps. Import `headquarters-report.json` in the existing dashboard.
+- **New Headquarters UI:** Product Intelligence screen with discovered catalog, monitoring enrollment indicators, change feed and possible feature gaps. Import JSON manually, or use the optional **authenticated, localhost-only evidence viewer** to refresh reports automatically from your private machine.
 - **Brand:** the founder's cyan/teal/blue geometric Y logo has been embedded in the HQ styles to avoid any external asset dependency.
 
 The current YorpHives website was not accessible for a live audit from this execution environment, so **no current product list, traffic count, competitor measurement or successful scan is claimed**.
@@ -34,7 +34,7 @@ After a successful run, the private report is written to:
 ~/.local/state/yorphives-hq/headquarters-report.json
 ```
 
-In the dashboard, select **Product intelligence → Import scan report** to view the product inventory, discovery changes and growth opportunities. Importing is browser-local. It does not make the frontend a trusted authenticated live dashboard.
+In the dashboard, select **Product intelligence → Import report** to review the product inventory, discovery changes and growth opportunities. Importing is browser-local. The separate private evidence viewer below supports read-only automatic refresh.
 
 To run the collector repeatedly under a founder-managed supervisor:
 
@@ -43,6 +43,29 @@ python3 intelligence/run_pipeline.py --base-url https://yorphives.com --loop --i
 ```
 
 The loop runs YorpHives discovery hourly, public research every six scans, a browser link inventory every six scans, and allowlisted competitor comparison every twenty-four scans. Browser scanning requires an additional local Playwright install: `python3 -m pip install playwright && python3 -m playwright install chromium`. If Playwright is not installed, omit `--browser-discovery --browser-every 6` to run the fully standard-library HTTP collector. This does **not** start a remote server process or schedule itself by virtue of being committed to GitHub. A founder-owned host/service manager must start and supervise it.
+
+
+## Private read-only evidence viewer (optional)
+
+`intelligence/viewer.py` serves the three static frontend assets and the most recent combined report, using only the Python standard library. The viewer **always binds to 127.0.0.1**, requires HTTP Basic authentication on GET/HEAD routes, and rejects POST/PUT/PATCH/DELETE. It has no installation, repository mutation, scanner execution, or deployment endpoints.
+
+The private report must have the expected schema, `pipeline.readOnly: true`, and a timestamp no more than three hours old. It is labelled **local evidence — unverified** rather than a guaranteed live health result.
+
+From your own private machine, after starting the collector and obtaining a report:
+
+```bash
+read -r -p "Private HQ username: " HQ_VIEW_USER
+read -r -s -p "Private HQ password (16+ chars): " HQ_VIEW_PASSWORD
+echo
+export HQ_VIEW_USER HQ_VIEW_PASSWORD
+python3 intelligence/viewer.py --state-dir ~/.local/state/yorphives-hq --port 8765
+```
+
+Open `http://127.0.0.1:8765` on **that same machine** and authenticate with your chosen credentials. The browser will then request `/api/report` from the same origin and, once connected, refresh the private evidence every 60 seconds. A static or GitHub-hosted preview **does not** connect to this private API.
+
+For off-machine access, use an authenticated SSH tunnel or carefully configured HTTPS reverse proxy with additional access controls. **Never publish this loopback service directly on the internet, and never place collector credentials or raw vulnerability reports in client-side JavaScript.** Treat private evidence as sensitive, avoid browser password-sharing, and run viewer with a non-root account authorized to read only the external evidence directory and the three UI assets.
+
+Do not treat HTTP Basic alone as sufficient for public deployment. The collector identity is not cryptographically signed yet; signing, stale/failure alerts, role separation and independent monitoring remain future milestones.
 
 ## How a newly added tool gets enrolled
 
@@ -115,7 +138,7 @@ The example above is a **format example only**: it is not in the default config 
 - HTML responses are capped at 1 MB; the product inventory is capped at 150 URLs per scan. A cap prevents automatic removal decisions rather than allowing false mass disappearance events.
 - Database and report files live outside all project code directories. Keep permissions at least as restrictive as `0700` on the evidence directory and `0600` on reports.
 - Production should run with filesystem-level read-only project mounts, no repository write tokens, no deployment credentials, restricted egress, and an independent watchdog.
-- The browser dashboard intentionally says **imported/unverified**. For trustworthy live reporting, add founder-authenticated ingestion, signed collector identity, report hashes, freshness checks, and audit trails.
+- The dashboard distinguishes example data, imported files and private local reports. The loopback-only viewer provides authentication, but collector identity is **not yet cryptographically verified**. Signed collector identity, evidence hashes, authentication hardening, and external watchdogs remain necessary before wider network deployment.
 
 ## Important limitations and next milestones
 
@@ -126,7 +149,7 @@ The example above is a **format example only**: it is not in the default config 
 - The competitor watchlist starts empty. **No live competitor gaps have been validated.**
 - Even the browser adapter cannot discover completely unlinked/unlisted routes. These require an owner-published manifest or explicit inventory feed.
 - No persistent server or scheduler has been installed, and no collector is currently running.
-- The next production phase should add independent Playwright checks on newly discovered routes, a self-hosted authenticated evidence API, private alerts, and periodic result verification.
+- The next production phase should add independent Playwright checks on newly discovered routes, hardened private authenticated evidence provenance, private alerts, and periodic result verification.
 
 ## Files
 
@@ -137,5 +160,7 @@ The example above is a **format example only**: it is not in the default config 
 | `intelligence/research.py` | Public RSS discovery, de-duplication and limited-confidence triage |
 | `intelligence/compare.py` | Allowlisted robots-aware text feature comparison |
 | `intelligence/run_pipeline.py` | Combines periodic observations into one founder-readable JSON report |
+| `intelligence/viewer.py` | Authenticated, loopback-only report viewer with no write endpoints |
+| `tests/test_viewer.py` | Offline tests for viewer permissions, freshness and route restrictions |
 | `intelligence/research_sources.json` | Replaceable data sources and competitor allowlist |
 | `tests/test_intelligence.py` | Offline contract tests of enrollment, changes and false-alarm safeguards |
