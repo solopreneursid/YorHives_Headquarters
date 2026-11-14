@@ -315,7 +315,13 @@ def discover(fetcher: SafeFetcher) -> tuple[dict[str, dict], list[str], bool]:
 
 
 def connect_db(storage: Path) -> sqlite3.Connection:
-    storage.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if storage.exists():
+        # Refuse a pre-existing world-readable evidence location rather than
+        # silently changing permissions on an arbitrary caller-owned directory.
+        if storage.stat().st_mode & 0o077:
+            raise ValueError("Evidence directory must be private (0700): " + str(storage))
+    else:
+        storage.mkdir(parents=True, exist_ok=True, mode=0o700)
     db = sqlite3.connect(storage / "product-intelligence.sqlite3")
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA journal_mode=WAL")
@@ -467,6 +473,9 @@ def private_storage(path: str) -> Path:
     location = Path(path).expanduser().resolve()
     if location == PROJECT_ROOT or PROJECT_ROOT in location.parents:
         raise ValueError("Refusing to write evidence inside project directory: " + str(location))
+    for ancestor in (location, *location.parents):
+        if (ancestor / ".git").exists():
+            raise ValueError("Refusing to write evidence inside a Git worktree: " + str(location))
     return location
 
 
@@ -506,6 +515,7 @@ def main() -> int:
     args = parser.parse_args()
     if args.interval_minutes < 15:
         parser.error("minimum interval is 15 minutes")
+    os.umask(0o077)
     try:
         storage = private_storage(args.state_dir)
         while True:
