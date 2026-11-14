@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """Offline contract tests for automatic tool detection and safe monitoring.
 
-Use: python3 -m unittest discover -v (from tests/) or
-     python3 -m unittest discover -v (from repository: discover.py not root)
-Best: python3 -m unittest discover -v with PYTHONPATH=intelligence:tests
+Run from the repository root:
      python3 tests/test_intelligence.py
 No network, website changes, or external dependencies.
 """
@@ -118,6 +116,19 @@ class DiscoveryTests(unittest.TestCase):
         old = [p for p in report["products"] if p["url"].endswith("/b")][0]
         self.assertFalse(old["active"])
         self.assertTrue(any(x["kind"] == "product-no-longer-discoverable" for x in report["changes"]))
+
+    def test_incomplete_scan_breaks_consecutive_absence(self):
+        self.fetcher.serve(["/tools/a", "/tools/b"])
+        self.run_scan()
+        self.fetcher.serve(["/tools/a"])
+        self.run_scan()  # first complete absence of b
+        self.fetcher.routes = {}
+        self.run_scan()  # incomplete discovery must reset absence sequence
+        self.fetcher.serve(["/tools/a"])
+        report = self.run_scan()  # first NEW complete absence of b
+        old = [p for p in report["products"] if p["url"].endswith("/b")][0]
+        self.assertTrue(old["active"])
+        self.assertEqual(old["missingStreak"], 1)
 
     def test_failed_discovery_never_flags_mass_removal(self):
         self.fetcher.serve(["/tools/a", "/tools/b"])
