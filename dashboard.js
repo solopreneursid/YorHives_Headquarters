@@ -159,14 +159,14 @@
     const { findings, opportunities, assets } = state.data;
     $("brief-summary").textContent = state.origin === "preview"
       ? "A focused daily briefing will distill thousands of signals into a handful of decisions. This is an illustrative example, not evidence of checks performed."
-      : "This is a summary of the file you imported, not a live monitoring claim. Confirm the evidence and scope before taking action.";
+      : "This is a summary of the selected evidence report, not a guarantee of real-time monitoring. Confirm sources and scope before taking action.";
     const items = [
       state.origin === "preview"
         ? "Review example monitoring signals to see how incidents are prioritized."
-        : findings.length + " observation(s) in the imported report are available for review.",
+        : findings.length + " observation(s) in the selected report are available for review.",
       state.origin === "preview"
         ? "Explore sample business leads for future product and revenue growth."
-        : opportunities.length + " growth lead(s) in the imported report may need validation.",
+        : opportunities.length + " growth lead(s) in the selected report may need validation.",
       state.origin === "preview"
         ? "Connect evidence from your own detectors before trusting status."
         : assets.length + " asset(s) are represented. Imported status alone does not confirm uptime."
@@ -271,7 +271,7 @@
       const card = node("article", "opportunity-card");
       const top = node("div", "opportunity-card-top");
       const category = node("span", "opportunity-category"); append(category, icon(categoryIcons[item.category] || "radar"), node("span", "", label(item.category)));
-      append(top, category, node("span", "outline-pill", state.origin === "preview" ? "EXAMPLE" : "IMPORTED"));
+      append(top, category, node("span", "outline-pill", state.origin === "preview" ? "EXAMPLE" : state.origin === "local" ? "LOCAL" : "IMPORTED"));
       const bottom = node("div", "card-bottom");
       const open = node("button", "", "Explore lead"); open.type = "button"; open.append(icon("arrow"));
       open.addEventListener("click", () => showDetail(item, "opportunity"));
@@ -319,18 +319,21 @@
     const changes = state.data.changes || [];
     const comparisons = state.data.comparisons || [];
     const imported = state.origin !== "preview";
+    const local = state.origin === "local";
     const verifiedScan = imported && state.data.verification?.complete;
     $("product-total").textContent = products.length;
     $("product-new").textContent = changes.filter(item => item.kind === "new-product").length;
     $("product-changes-total").textContent = changes.length;
     $("product-comparisons-total").textContent = comparisons.length;
-    $("catalog-kind").textContent = imported ? "IMPORTED" : "EXAMPLE";
+    $("catalog-kind").textContent = local ? "LOCAL REPORT" : imported ? "IMPORTED" : "EXAMPLE";
     $("discovery-status").textContent = !imported ? "Preview — not connected"
-      : verifiedScan ? "Imported successful discovery" : "Imported scan — incomplete or not independently confirmed";
+      : verifiedScan ? (local ? "Local discovery reported complete" : "Imported successful discovery")
+        : (local ? "Local discovery incomplete — check scanner" : "Imported scan — incomplete or not independently confirmed");
     $("discovery-explainer").textContent = !imported
       ? "These are illustrative records. Actual monitoring begins after the scanner is installed on your server."
-      : "Imported report" + (state.data.verification?.generatedAt ? " · " + (cleanDate(state.data.verification.generatedAt) || "undated") : "") +
-        " · No live connection is established in this browser.";
+      : (local ? "Private collector report" : "Imported report") +
+        (state.data.verification?.generatedAt ? " · " + (cleanDate(state.data.verification.generatedAt) || "undated") : "") +
+        (local ? " · Periodic refresh enabled; evidence remains reviewable." : " · No live connection is established in this browser.");
 
     const inventory = $("product-catalog"); inventory.replaceChildren();
     if (!products.length) inventory.append(emptyState("No products in this report", "The discovery worker will enroll new tools from your sitemap, catalog links and optional manifest."));
@@ -410,7 +413,7 @@
     ].forEach(value => tags.append(node("span", "detail-tag", value)));
     const evidence = $("detail-evidence"); evidence.replaceChildren();
     const date = cleanDate(item.observedAt);
-    evidence.append(node("p", "source-note", (date ? "Reported at " + date + ". " : "No observation timestamp provided. ") + (state.origin === "preview" ? "This is fictitious demonstration content." : "This record was supplied by an imported file and has not been independently verified.")));
+    evidence.append(node("p", "source-note", (date ? "Reported at " + date + ". " : "No observation timestamp provided. ") + (state.origin === "preview" ? "This is fictitious demonstration content." : "This record was supplied by a local or imported report and has not been independently verified.")));
     if (item.evidence.length) {
       item.evidence.forEach(url => {
         const link = node("a", "", url); link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer"; evidence.append(link, document.createElement("br"));
