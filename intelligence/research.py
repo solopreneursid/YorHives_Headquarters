@@ -130,7 +130,7 @@ def run(storage: Path, config_path: Path) -> dict:
             try:
                 origin = parsed.scheme + "://" + parsed.netloc
                 client = SafeFetcher(origin)
-                status, data, _ = client.get(feed_url)
+                status, data, _ = client.get(feed_url, preserve_query=True)
                 if status != 200:
                     notes.append("Feed HTTP " + str(status) + ": " + parsed.hostname)
                     continue
