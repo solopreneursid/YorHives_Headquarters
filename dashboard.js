@@ -83,7 +83,7 @@
     } catch (_) { return ""; }
   };
   const label = (word) => String(word || "").replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
-  const originLabel = () => state.origin === "preview" ? "Example only" : "Imported — unverified";
+  const originLabel = () => state.origin === "preview" ? "Example only" : state.origin === "local" ? "Private local evidence — unverified" : "Imported — unverified";
   const priorityRank = { high: 0, medium: 1, low: 2 };
   const categoryIcons = { security: "shield", dependencies: "code", reliability: "activity", quality: "check", product: "layers", revenue: "dollar", technology: "radar" };
   const workerIcons = ["activity", "shield", "spark", "radar", "trend", "dollar"];
@@ -122,30 +122,37 @@
 
   function renderMetrics() {
     const d = state.data;
+    const local = state.origin === "local";
+    const preview = state.origin === "preview";
     $("metric-assets").textContent = d.assets.length;
     $("metric-findings").textContent = d.findings.length;
     $("metric-opportunities").textContent = d.opportunities.length;
     $("metric-employees").textContent = d.agents.length;
     $("nav-finding-count").textContent = d.findings.length;
-    $("metric-assets-caption").textContent = state.origin === "preview" ? "Illustrative system inventory" : "Systems listed in imported file";
-    $("metric-findings-caption").textContent = state.origin === "preview" ? "Example open observations" : "Findings listed in imported file";
-    $("metric-opportunities-caption").textContent = state.origin === "preview" ? "Example research leads" : "Leads listed in imported file";
-    $("metric-employees-caption").textContent = state.origin === "preview" ? "Illustrative team structure" : "Departments in imported file";
-    $("metric-assets-footer").textContent = state.origin === "preview" ? "Website + headquarters" : "Status not independently verified";
+    $("metric-assets-caption").textContent = preview ? "Illustrative system inventory" : local ? "Private collector inventory" : "Systems listed in imported file";
+    $("metric-findings-caption").textContent = preview ? "Example open observations" : local ? "Local collector observations" : "Findings listed in imported file";
+    $("metric-opportunities-caption").textContent = preview ? "Example research leads" : local ? "Collected research hypotheses" : "Leads listed in imported file";
+    $("metric-employees-caption").textContent = preview ? "Illustrative team structure" : "Departments in selected report";
+    $("metric-assets-footer").textContent = preview ? "Website + headquarters" : "Status not independently verified";
     $("metric-findings-footer").textContent = "For founder review";
     $("metric-opportunities-footer").textContent = "Validate before pursuing";
     $("metric-employees-footer").textContent = "Agent status requires telemetry";
-    $("snapshot-date").textContent = state.origin === "preview" ? "Illustrative dashboard" : "Imported file · not independently verified";
-    $("mode-label").textContent = state.origin === "preview" ? "Preview mode" : "Imported data";
-    $("mode-chip").classList.toggle("imported", state.origin !== "preview");
-    $("footer-mode").textContent = state.origin === "preview" ? "PREVIEW · NOT A LIVE HEALTH REPORT" : "IMPORTED DATA · NOT INDEPENDENTLY VERIFIED";
-    $("brief-kind").textContent = state.origin === "preview" ? "EXAMPLE" : "IMPORTED";
+    const observedAt = cleanDate(d.verification?.generatedAt || "");
+    $("snapshot-date").textContent = preview ? "Illustrative dashboard" :
+      local ? "Local evidence" + (observedAt ? " · " + observedAt : "") : "Imported file · not independently verified";
+    $("mode-label").textContent = preview ? "Preview mode" : local ? "Private evidence" : "Imported data";
+    $("mode-chip").classList.toggle("imported", !preview);
+    $("footer-mode").textContent = preview ? "PREVIEW · NOT A LIVE HEALTH REPORT" :
+      local ? "PRIVATE COLLECTOR · EVIDENCE REQUIRES REVIEW" : "IMPORTED DATA · NOT INDEPENDENTLY VERIFIED";
+    $("brief-kind").textContent = preview ? "EXAMPLE" : local ? "LOCAL REPORT" : "IMPORTED";
     const notice = $("data-notice");
     notice.hidden = false;
     const noticeText = notice.querySelector("div");
-    noticeText.textContent = state.origin === "preview"
+    noticeText.textContent = preview
       ? "Preview workspace — The records below are examples, not findings from a live scan. Import a report to explore your own observations."
-      : "Imported report — These values came from a file in your browser. Headquarters has not independently checked them or connected to production systems.";
+      : local
+        ? "Private collector report — This view refreshes from a self-hosted read-only endpoint. HTTP responses and research leads are observations, not proof that products work or business demand exists."
+        : "Imported report — These values came from a file in your browser. Headquarters has not independently checked them or connected to production systems.";
   }
 
   function renderBrief() {
