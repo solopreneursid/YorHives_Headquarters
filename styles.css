@@ -414,3 +414,10 @@ dialog::backdrop { background: #050b13cc; backdrop-filter: blur(6px); }
 .brand-mark { border-radius: 10px; filter:none; }
 .brand-mark svg, .art-core svg { display:none; }
 .art-core { background-color:#050c16; background-size:cover; }
+
+.discovery-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.discovery-actions .button { white-space:nowrap; }
+@media (max-width: 640px) {
+  .discovery-actions { width:100%; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .discovery-actions .button { width:100%; min-width:0; white-space:normal; text-align:center; }
+}
