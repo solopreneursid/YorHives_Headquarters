@@ -7,7 +7,7 @@ This review setup is developed in the YorpHives Headquarters repository and is i
 | Component | Purpose | Source | Selected version |
 | --- | --- | --- | --- |
 | [reviewdog](https://github.com/reviewdog/reviewdog) | Aggregate linter diagnostics and present local diff review results | OSS / MIT | v0.21.3 |
-| [Betterleaks](https://github.com/betterleaks/betterleaks) | Look for secrets in working files and Git history | OSS — verify repository LICENSE before commercial use | v1.10.1 |
+| [Betterleaks](https://github.com/betterleaks/betterleaks) | Look for secrets in working files and Git history | OSS / MIT (verify selected source archive license on install) | v1.10.1 |
 | [Trivy](https://github.com/aquasecurity/trivy) | Scan source for known dependency vulnerabilities, secrets and misconfigurations | OSS / Apache-2.0 | v0.76.2 |
 | [Playwright Python](https://github.com/microsoft/playwright-python) | Desktop/mobile Chromium journeys and regression tests | OSS / Apache-2.0 | 1.65.2 |
 | [PR-Agent](https://github.com/The-PR-Agent/pr-agent) | Optional model-assisted review of a local branch diff | OSS / MIT | v0.50.0 |
@@ -27,7 +27,7 @@ This review setup is developed in the YorpHives Headquarters repository and is i
 
 ## Install on your private machine
 
-Run these exact commands in an Ubuntu terminal with Python 3, git, curl, Node.js 22+, and adequate disk space:
+Run these exact commands in an Ubuntu terminal with Python 3.12+, git, curl, Node.js 22+, and adequate disk space:
 
 ```bash
 git clone https://github.com/solopreneursid/YorHives_Headquarters.git
