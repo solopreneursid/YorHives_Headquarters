@@ -13,7 +13,8 @@ from pathlib import Path
 import sys
 import time
 
-from discover import private_storage, scan, utcnow
+from discover import private_storage, connect_db, scan, utcnow
+from browser_discover import browser_discover
 from research import run as research_run, DEFAULT_CONFIG
 from compare import compare as competitor_compare
 
@@ -59,15 +60,28 @@ def main() -> int:
     parser.add_argument("--research-every", type=int, default=6, help="Run feed research every N scans; default 6")
     parser.add_argument("--compare-every", type=int, default=24, help="Recheck allowlisted competitors every N scans; default 24")
     parser.add_argument("--allow-local", action="store_true", help="Localhost only, for tests")
+    parser.add_argument("--browser-discovery", action="store_true", help="Use optional Playwright to discover client-rendered tool links")
+    parser.add_argument("--browser-every", type=int, default=6, help="When enabled, browser discovery every N scans")
     args = parser.parse_args()
-    if args.interval_minutes < 15 or args.research_every < 1 or args.compare_every < 1:
+    if args.interval_minutes < 15 or args.research_every < 1 or args.compare_every < 1 or args.browser_every < 1:
         parser.error("Use interval >=15 minutes and research-every >=1")
     state = private_storage(args.state_dir)
+    if args.browser_discovery:
+        # Create only the separate evidence database directory, never a project directory.
+        with connect_db(state):
+            pass
     counter = 0
     try:
         while True:
             errors = []
             products = None
+            if args.browser_discovery and counter % args.browser_every == 0:
+                try:
+                    browser = browser_discover(args.base_url, state)
+                    if browser.get("successfulHubs", 0) == 0:
+                        errors.append("Browser discovery did not load a hub")
+                except Exception as exc:
+                    errors.append("Browser discovery unavailable: " + str(exc)[:180])
             try:
                 products = scan(args.base_url, state, allow_local=args.allow_local)
             except Exception as exc:
