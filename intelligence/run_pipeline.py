@@ -139,6 +139,8 @@ def main() -> int:
                 if not args.loop:
                     return 2
             else:
+                if not products.get("verification", {}).get("complete", False):
+                    errors.append("Product discovery incomplete; do not trust inventory coverage")
                 report = combine(products, growth, comparisons, errors)
                 path = write_combined(state, report)
                 print(json.dumps({"at": report["pipeline"]["generatedAt"], "products": len(report.get("products", [])),
@@ -146,7 +148,7 @@ def main() -> int:
                                   "report": str(path)}), flush=True)
             counter += 1
             if not args.loop:
-                break
+                return 2 if errors else 0
             time.sleep(args.interval_minutes * 60)
     except KeyboardInterrupt:
         return 130
