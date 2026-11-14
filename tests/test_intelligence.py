@@ -201,6 +201,31 @@ class DiscoveryTests(unittest.TestCase):
             private_storage(str(ROOT / "intelligence" / "evidence"))
 
 
+class CompetitorRobotTests(unittest.TestCase):
+    def test_robots_server_error_does_not_authorize_crawl(self):
+        from compare import robots_allows
+        fake = FakeFetcher()
+        fake.routes[ORIGIN + "/robots.txt"] = (503, b"", "text/plain")
+        allowed, reason = robots_allows(fake, ORIGIN + "/tools/a")
+        self.assertFalse(allowed)
+        self.assertIn("fail closed", reason)
+
+    def test_robots_absence_permits_only_owner_allowlisted_target(self):
+        from compare import robots_allows
+        fake = FakeFetcher()
+        allowed, reason = robots_allows(fake, ORIGIN + "/tools/a")
+        self.assertTrue(allowed)
+        self.assertIn("not published", reason)
+
+    def test_robots_disallow_is_honored(self):
+        from compare import robots_allows
+        fake = FakeFetcher()
+        fake.routes[ORIGIN + "/robots.txt"] = (
+            200, b"User-agent: *\\nDisallow: /tools/\\n", "text/plain")
+        allowed, _ = robots_allows(fake, ORIGIN + "/tools/a")
+        self.assertFalse(allowed)
+
+
 class ResearchTests(unittest.TestCase):
     def test_similarity_only_finds_confident_matches(self):
         name, score = similar("Image Compressor", ["Image Compressor", "Word Counter"])
