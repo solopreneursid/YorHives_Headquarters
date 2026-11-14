@@ -51,8 +51,10 @@ def robots_allows(fetcher: SafeFetcher, url: str) -> tuple[bool, str]:
         code, raw, _ = fetcher.get(root)
         if code in (401, 403):
             return False, "robots.txt access denied"
+        if code in (404, 410):
+            return True, "robots.txt not published; respect site terms separately"
         if code != 200:
-            return True, "robots.txt absent or unavailable; respect published terms separately"
+            return False, "robots.txt cannot be verified (HTTP " + str(code) + "); fail closed"
         parser = RobotFileParser()
         parser.parse(raw.decode("utf-8", errors="replace").splitlines())
         return parser.can_fetch("YorpHivesHQ-ObservationBot", url), "robots.txt checked"
