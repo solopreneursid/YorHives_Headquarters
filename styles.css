@@ -339,3 +339,5 @@ dialog::backdrop { background: #050b13cc; backdrop-filter: blur(6px); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+/* Explicitly honor semantic hidden state, even on flex/grid components. */
+[hidden] { display: none !important; }
