@@ -1,0 +1,10 @@
+# Private local quality tools and evidence. Never commit scanner findings or models.
+.review-tools/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+*.local
+review.md
+description.md
