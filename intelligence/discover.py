@@ -368,7 +368,7 @@ def check_and_update(db: sqlite3.Connection, fetcher: SafeFetcher, discovered: d
         except (URLError, OSError, ValueError, TimeoutError) as exc:
             status = 0
             # Connection failures are observations, not proof the page was removed.
-        state = "healthy" if 200 <= status < 400 else "degraded"
+        state = "healthy" if 200 <= status < 300 else "degraded"
         fail_count = 0 if state == "healthy" else (int(before["health_fail_streak"]) + 1 if before else 1)
         feature_hash = digest(features) if features else ""
         if before is None:
@@ -406,6 +406,10 @@ def check_and_update(db: sqlite3.Connection, fetcher: SafeFetcher, discovered: d
                           content_hash=?, last_checked=? WHERE url=?""",
                        (name, hint["source"], now, state, status, fail_count, json.dumps(features),
                         feature_hash, content_hash, now, url))
+    # An incomplete discovery must break the sequence of confirmed absences.
+    # Otherwise two partial discoveries could falsely claim an existing tool vanished.
+    if not complete:
+        db.execute("UPDATE products SET missing_streak=0 WHERE active=1")
     # Two consecutive COMPLETE discovery runs must omit an asset before marking missing.
     # A temporary sitemap or homepage outage must never generate mass removals.
     if complete:
