@@ -221,7 +221,7 @@ class CompetitorRobotTests(unittest.TestCase):
         from compare import robots_allows
         fake = FakeFetcher()
         fake.routes[ORIGIN + "/robots.txt"] = (
-            200, b"User-agent: *\\nDisallow: /tools/\\n", "text/plain")
+            200, b"User-agent: *\nDisallow: /tools/\n", "text/plain")
         allowed, _ = robots_allows(fake, ORIGIN + "/tools/a")
         self.assertFalse(allowed)
 
