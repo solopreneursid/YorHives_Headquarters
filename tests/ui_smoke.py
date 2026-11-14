@@ -86,7 +86,14 @@ def main():
                     "name": "local-report.json", "mimeType": "application/json",
                     "buffer": json.dumps(hostile).encode("utf-8")
                 })
-                assert page.locator("#mode-label").inner_text() == "Imported data"
+                page.wait_for_function(
+                    """() => document.querySelector("#mode-label").textContent === "Imported data" ||
+                    document.querySelector("#toast").textContent.startsWith("Could not open report")""",
+                    timeout=10000
+                )
+                assert page.locator("#mode-label").inner_text() == "Imported data", (
+                    "Import never completed: " + page.locator("#toast").inner_text()
+                )
                 assert page.locator("#priority-list .priority-item").count() == 1
                 assert page.locator("img[src='x']").count() == 0, "Unsafe HTML element created"
                 assert page.evaluate("window.ATTACKED === true") is False
