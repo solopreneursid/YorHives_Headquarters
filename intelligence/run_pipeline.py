@@ -68,8 +68,8 @@ def main() -> int:
     state = private_storage(args.state_dir)
     if args.browser_discovery:
         # Create only the separate evidence database directory, never a project directory.
-        with connect_db(state):
-            pass
+        initial_db = connect_db(state)
+        initial_db.close()
     counter = 0
     try:
         while True:
