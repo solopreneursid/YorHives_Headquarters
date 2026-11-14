@@ -99,7 +99,7 @@ def main():
                 assert page.locator("#product-catalog .product-record").count() == 1
                 assert page.locator("#product-change-feed .product-change-record").count() == 1
                 assert page.locator("#product-feature-gaps .feature-gap-card").count() == 1
-                assert page.locator("script").count() == 2, "Untrusted product names created new script elements"
+                assert page.locator("script").count() == 1, "Untrusted product names created new script elements"
                 assert page.locator("#product-catalog a[href^='javascript:']").count() == 0, "Unsafe tool URL"
                 assert page.locator("#product-feature-gaps a[href^='javascript:']").count() == 0, "Unsafe evidence URL"
                 assert page.evaluate("window.ATTACKED === true") is False
