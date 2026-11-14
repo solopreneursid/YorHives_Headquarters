@@ -6,7 +6,10 @@ Run from repository: python3 tests/ui_smoke.py
 import functools
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
+from datetime import datetime, timezone
 from pathlib import Path
+import sys
+import tempfile
 import re
 import threading
 
@@ -17,6 +20,8 @@ except ImportError as exc:
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORTS = ROOT / ".review-tools" / "reports"
+sys.path.insert(0, str(ROOT / "intelligence"))
+from viewer import create_server
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -120,6 +125,55 @@ def main():
                 mobile_page.locator('button[data-nav="governance"]').first.click()
                 assert mobile_page.locator("#view-governance").is_visible()
                 mobile_page.screenshot(path=str(REPORTS / "headquarters-mobile.png"), full_page=True)
+
+                # A genuine self-hosted viewer must load local reports without
+                # needing a file upload and without any write-capable API.
+                with tempfile.TemporaryDirectory(prefix="yorphives-hq-browser-") as state_dir:
+                    state = Path(state_dir)
+                    now = datetime.now(timezone.utc).isoformat()
+                    report = {
+                        "schemaVersion": "yorphives.hq-intelligence.v1",
+                        "generatedAt": now,
+                        "pipeline": {"generatedAt": now, "readOnly": True, "products": {"complete": True}},
+                        "assets": [{"name": "Synthetic New Tool", "status": "healthy"}],
+                        "products": [{"id": "newtool", "name": "Synthetic New Tool",
+                                      "url": "https://yorphives.com/tools/synthetic",
+                                      "source": "sitemap", "status": "healthy",
+                                      "active": True, "features": ["resize image"]}],
+                        "changes": [], "comparisons": [],
+                        "findings": [], "opportunities": [], "agents": [], "activity": []
+                    }
+                    evidence = state / "headquarters-report.json"
+                    evidence.write_text(json.dumps(report), encoding="utf-8")
+                    evidence.chmod(0o600)
+                    private_server = create_server(state, "founder", "private-test-password-123", 0)
+                    private_thread = threading.Thread(target=private_server.serve_forever, daemon=True)
+                    private_thread.start()
+                    try:
+                        local_url = f"http://127.0.0.1:{private_server.server_address[1]}/"
+                        private_ctx = browser.new_context(
+                            http_credentials={"username": "founder", "password": "private-test-password-123"}
+                        )
+                        private_page = private_ctx.new_page()
+                        private_page.goto(local_url, wait_until="domcontentloaded")
+                        private_page.wait_for_function(
+                            """() => document.querySelector('#mode-label')?.textContent === 'Private evidence'""",
+                            timeout=12000
+                        )
+                        private_page.locator('button[data-nav="products"]').first.click()
+                        assert private_page.locator("#product-catalog .product-record").count() == 1
+                        assert "Synthetic New Tool" in private_page.locator("#product-catalog").inner_text()
+                        assert "Local discovery reported complete" in private_page.locator("#discovery-status").inner_text()
+                        private_page.locator("#product-refresh-trigger").click()
+                        private_page.wait_for_function(
+                            """() => document.querySelector('#toast')?.textContent.includes('Private evidence refreshed.')""",
+                            timeout=5000
+                        )
+                        private_ctx.close()
+                    finally:
+                        private_server.shutdown()
+                        private_server.server_close()
+                        private_thread.join(timeout=3)
 
                 assert not failures, "Uncaught browser errors: " + repr(failures)
                 assert not remote, "External browser requests detected: " + repr(remote)
