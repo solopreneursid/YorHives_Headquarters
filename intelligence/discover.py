@@ -194,10 +194,14 @@ class SafeFetcher:
                     return response.status, body, response.headers.get_content_type()
             except HTTPError as exc:
                 if 300 <= exc.code < 400 and exc.headers.get("Location"):
-                    destination = canonical(urljoin(target, exc.headers["Location"]), self.origin)
-                    if destination is None:
+                    raw_destination = urljoin(target, exc.headers["Location"])
+                    if canonical(raw_destination, self.origin) is None:
                         return exc.code, b"", "Cross-origin redirect refused"
-                    target = destination
+                    # Preserve trailing slash when following redirects: some
+                    # frameworks canonicalize /tools/example -> /tools/example/.
+                    parts = urlsplit(raw_destination)
+                    target = urlunsplit((parts.scheme, parts.netloc, parts.path or "/",
+                                         parts.query if preserve_query else "", ""))
                     continue
                 return exc.code, b"", "HTTP " + str(exc.code)
         return 508, b"", "Too many redirects"
