@@ -45,3 +45,19 @@ jobs:
         run: |
           bash -n scripts/run-review.sh
           bash -n scripts/run-local-ai-review.sh
+
+  browser-ui:
+    name: Isolated Chromium interface regression checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out test snapshot without write credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install open-source Playwright locally in test runner
+        run: |
+          python3 -m pip install --user "playwright==1.65.2"
+          python3 -m playwright install chromium
+      - name: Exercise navigation, sample provenance, imports, and XSS checks
+        run: python3 tests/ui_smoke.py
