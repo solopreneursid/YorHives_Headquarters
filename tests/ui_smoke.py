@@ -57,6 +57,13 @@ def main():
                 page.locator('[data-opportunity-filter="technology"]').click()
                 assert page.locator("#opportunities-grid .opportunity-card").count() == 1
 
+                page.locator('button[data-nav="products"]').first.click()
+                assert page.locator("#view-products").is_visible(), "Product intelligence view inaccessible"
+                assert page.locator("#product-catalog .product-record").count() == 2
+                assert page.locator("#product-change-feed .product-change-record").count() == 2
+                assert "Preview" in page.locator("#discovery-status").inner_text()
+                page.screenshot(path=str(REPORTS / "headquarters-product-intelligence.png"), full_page=True)
+
                 page.locator('button[data-nav="overview"]').first.click()
                 hostile = {
                     "assets": [{"name": "Demo", "status": "unknown"}],
@@ -66,7 +73,14 @@ def main():
                         "description": "Safe text display expected", "recommendation": "Review evidence",
                         "evidence": ["javascript:alert(1)", "https://example.org/source"]
                     }],
-                    "opportunities": [], "agents": [], "activity": []
+                    "opportunities": [], "agents": [], "activity": [],
+                    "products": [{"name": '<script>window.ATTACKED=true</script>',
+                                  "url": "javascript:alert(1)", "source": "sitemap",
+                                  "status": "unknown", "features": ["Resize image"]}],
+                    "changes": [{"kind": "new-product", "summary": '<img src=x onerror="window.ATTACKED=true">'}],
+                    "comparisons": [{"product": "Image converter", "competitor": "Example",
+                                     "missingFeatures": ['<iframe src=javascript:alert(1)>'],
+                                     "evidence": ["javascript:alert(1)"]}]
                 }
                 page.locator("#report-upload").set_input_files({
                     "name": "local-report.json", "mimeType": "application/json",
@@ -81,6 +95,14 @@ def main():
                 assert page.locator("#detail-evidence a").count() == 1, "Unsafe URL protocol was not filtered"
                 assert page.locator("#detail-evidence a").first.get_attribute("href").startswith("https:")
                 page.locator("#detail-close").click()
+                page.locator('button[data-nav="products"]').first.click()
+                assert page.locator("#product-catalog .product-record").count() == 1
+                assert page.locator("#product-change-feed .product-change-record").count() == 1
+                assert page.locator("#product-feature-gaps .feature-gap-card").count() == 1
+                assert page.locator("script").count() == 2, "Untrusted product names created new script elements"
+                assert page.locator("#product-catalog a[href^='javascript:']").count() == 0, "Unsafe tool URL"
+                assert page.locator("#product-feature-gaps a[href^='javascript:']").count() == 0, "Unsafe evidence URL"
+                assert page.evaluate("window.ATTACKED === true") is False
 
                 # Exercise responsive mobile menu with a clean browser context.
                 mobile = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True)
