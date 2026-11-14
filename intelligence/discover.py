@@ -230,7 +230,7 @@ def xml_urls(raw: bytes, origin: str) -> tuple[list[str], list[str]]:
     return links, maps
 
 
-def discover(fetcher: SafeFetcher) -> tuple[dict[str, dict], list[str], bool]:
+def discover(fetcher: SafeFetcher, browser_file: Path | None = None) -> tuple[dict[str, dict], list[str], bool, bool]:
     """Discover sources; never claim complete inventory when all sources fail."""
     found: dict[str, dict] = {}
     notes: list[str] = []
@@ -303,6 +303,26 @@ def discover(fetcher: SafeFetcher) -> tuple[dict[str, dict], list[str], bool]:
                     break
         except (URLError, OSError, ValueError) as exc:
             notes.append("Hub unavailable (" + path + "): " + trimmed(exc, 160))
+    browser_complete = False
+    if browser_file and browser_file.is_file():
+        try:
+            browser_report = json.loads(browser_file.read_text(encoding="utf-8"))
+            saved = datetime.fromisoformat(str(browser_report["generatedAt"]).replace("Z", "+00:00"))
+            age = (datetime.now(timezone.utc) - saved).total_seconds()
+            if browser_report.get("origin") == fetcher.origin and 0 <= age < 12 * 3600:
+                browser_complete = browser_report.get("successfulHubs", 0) > 0
+                for item in browser_report.get("products", [])[:MAX_URLS]:
+                    if not isinstance(item, dict):
+                        continue
+                    url = canonical(str(item.get("url", "")), fetcher.origin)
+                    if not url or url == fetcher.origin + "/":
+                        continue
+                    found.setdefault(url, {"name": trimmed(item.get("name"), 160),
+                                           "source": "playwright-browser", "declared_features": []})
+            else:
+                notes.append("Browser evidence stale or from a different origin; not used")
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+            notes.append("Browser evidence unreadable; not used")
     inspected = len(found)
     truncated = inspected >= MAX_URLS
     if truncated:
@@ -311,7 +331,7 @@ def discover(fetcher: SafeFetcher) -> tuple[dict[str, dict], list[str], bool]:
         notes.append("No products discovered; no removal decisions will be made")
     # Preserve old inventory if discovery sources fail or website has no discoverable tools.
     complete = trusted_sources > 0 and inspected > 0 and not truncated
-    return dict(sorted(found.items())[:MAX_URLS]), notes, complete
+    return dict(sorted(found.items())[:MAX_URLS]), notes, complete, browser_complete
 
 
 def connect_db(storage: Path) -> sqlite3.Connection:
@@ -353,7 +373,7 @@ def note_event(db: sqlite3.Connection, now: str, url: str, kind: str, severity: 
                (now, url, kind, severity, summary))
 
 
-def check_and_update(db: sqlite3.Connection, fetcher: SafeFetcher, discovered: dict[str, dict], now: str, complete: bool) -> tuple[int, int]:
+def check_and_update(db: sqlite3.Connection, fetcher: SafeFetcher, discovered: dict[str, dict], now: str, complete: bool, browser_complete: bool = False) -> tuple[int, int]:
     previous_good = db.execute("SELECT COUNT(*) FROM scans WHERE complete=1").fetchone()[0] > 0
     onboarded = 0
     changes = 0
@@ -419,8 +439,11 @@ def check_and_update(db: sqlite3.Connection, fetcher: SafeFetcher, discovered: d
     # Two consecutive COMPLETE discovery runs must omit an asset before marking missing.
     # A temporary sitemap or homepage outage must never generate mass removals.
     if complete:
-        for row in db.execute("SELECT url,missing_streak,active FROM products").fetchall():
+        for row in db.execute("SELECT url,missing_streak,active,source FROM products").fetchall():
             if row["url"] in discovered:
+                continue
+            if row["source"] == "playwright-browser" and not browser_complete:
+                db.execute("UPDATE products SET missing_streak=0 WHERE url=?", (row["url"],))
                 continue
             absent = row["missing_streak"] + 1
             if row["active"] and absent == 2:
@@ -484,12 +507,13 @@ def scan(base_url: str, state_dir: Path, allow_local: bool = False, fetcher: Saf
     db = connect_db(state_dir)
     try:
         source = fetcher or SafeFetcher(base_url, allow_local=allow_local)
-        discovered, notes, complete = discover(source)
+        discovered, notes, complete, browser_complete = discover(source, state_dir / "browser-discovery.json")
         with db:
-            onboarded, change_count = check_and_update(db, source, discovered, now, complete)
+            onboarded, change_count = check_and_update(db, source, discovered, now, complete, browser_complete)
             db.execute("INSERT INTO scans(completed_at,complete,discovered,notes_json) VALUES(?,?,?,?)",
                        (now, int(complete), len(discovered), json.dumps(notes)))
         report = build_report(db, now, complete, notes, len(discovered))
+        report["verification"]["browserDiscoveryAvailable"] = browser_complete
         report["verification"]["newlyEnrolled"] = onboarded
         report["verification"]["newEvents"] = change_count
         # Atomic report write; destination must remain outside the product repository.
