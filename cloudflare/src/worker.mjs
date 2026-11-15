@@ -655,13 +655,14 @@ async function verifyAccess(request,env,ctx) {
   }catch{return false;}
 }
 async function report(env) {
-  const [assets,findings,leads,quota,status,security]=await Promise.all([
+  const [assets,findings,leads,quota,status,security,hypotheses]=await Promise.all([
     env.DB.prepare("SELECT * FROM assets ORDER BY kind ASC,name ASC LIMIT 150").all(),
     env.DB.prepare("SELECT * FROM findings WHERE status='open' ORDER BY observed_at DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM opportunities ORDER BY observed_at DESC LIMIT 50").all(),
     env.DB.prepare("SELECT kind,used FROM quota WHERE day=?").bind(nowIso().slice(0,10)).all(),
     env.DB.prepare("SELECT key,value,checked_at FROM status ORDER BY checked_at DESC LIMIT 30").all(),
-    env.DB.prepare("SELECT * FROM security_watch ORDER BY observed_at DESC LIMIT 15").all()
+    env.DB.prepare("SELECT * FROM security_watch ORDER BY observed_at DESC LIMIT 15").all(),
+    env.DB.prepare("SELECT * FROM product_hypotheses ORDER BY observed_at DESC LIMIT 30").all()
   ]);
   const a=assets.results||[],f=findings.results||[],o=leads.results||[],metadata=status.results||[];
   const last=metadata.find(x=>x.key==="last_cron");
@@ -677,15 +678,25 @@ async function report(env) {
   return {
     schemaVersion:"yorphives.hq-intelligence.v1", generatedAt:now,
     verification:{method:"cloudflare-worker-readonly-http",complete:discoveryComplete,
-      limitations:"HTTP evidence only; catalog completeness and feature functionality are not verified.",
+      limitations:"Public GET evidence only. A complete catalog requires an explicit owner manifest; page changes and functionality need independent verification.",
       generatedAt:last?.checked_at||"",notes:fresh?[]:["Collector heartbeat stale or absent"]},
     assets:a.map(x=>({id:fnv(x.url),name:x.name,kind:x.kind,status:x.status==="reachable"?"healthy":"unknown",summary:x.url})),
-    products:tools.map(x=>({id:fnv(x.url),name:x.name,url:x.url,source:"public-sitemap-or-hub",
-      status:x.status==="reachable"?"healthy":x.status==="degraded"?"degraded":"unknown",
-      active:true,firstSeen:x.first_seen,lastChecked:x.last_checked||"",features:[]})),
-    changes:metadata.filter(x=>x.key.startsWith("new_tool_")).map(x=>({
-      id:x.key,url:x.value.replace("New tool discovered: ",""),kind:"new-product",severity:"info",
-      summary:x.value,occurredAt:x.checked_at
+    products:tools.map(x=>({id:fnv(x.url),name:x.name,url:x.url,
+      source:x.discovery_source||"unverified",discoveryConfidence:x.inventory_confidence||"unverified",
+      evidenceUrl:x.evidence_url||"",status:x.inventory_confidence==="candidate"?"unknown":
+        x.status==="reachable"?"healthy":x.status==="degraded"?"degraded":"unknown",
+      active:true,firstSeen:x.first_seen,lastChecked:x.last_checked||"",
+      features:(()=>{try{const arr=JSON.parse(x.features_json||"[]");return Array.isArray(arr)?arr.slice(0,12):[];}catch{return [];}})(),
+      qaStatus:"unverified",qaReason:x.status==="unverified"?"Generic SPA response; route not verified":
+        "HTTP route observation only; not a functional test"})),
+    changes:metadata.filter(x=>x.key.startsWith("new_tool_")||x.key.startsWith("tool_change_")||
+      x.key==="site_bundle_change").map(x=>({
+      id:x.key,
+      url:x.key.startsWith("new_tool_")?x.value.replace(/^(?:New tool discovered: |Possible tool route \(unverified\): )/,""):"",
+      kind:x.key.startsWith("tool_change_")?"content-change":
+        x.key==="site_bundle_change"?"site-release":
+        x.value.startsWith("Possible tool route")?"candidate-route":"new-product",
+      severity:"info",summary:x.value,occurredAt:x.checked_at
     })),
     findings:f.map(x=>({id:x.id,title:x.title,category:x.category,priority:x.priority,asset:x.asset,
       description:x.description,recommendation:x.recommendation,observedAt:x.observed_at,evidence:[x.evidence]})),
@@ -697,14 +708,22 @@ async function report(env) {
     securityWatch:(security.results||[]).map(x=>({id:x.id,title:x.title,severity:x.severity,
       packages:JSON.parse(x.packages||"[]"),source:x.source_url,observedAt:x.observed_at,
       applicability:"Not evaluated against YorpHives dependencies"})),
-    comparisons:[],agents:[],
+    comparisons:(hypotheses.results||[]).map(x=>({
+      id:x.id,product:x.product_name,competitor:x.competing_title,
+      missingFeatures:[],confidence:"Public title similarity only · no feature gap verified",
+      recommendation:x.recommendation,evidence:[x.product_url,x.competing_url],
+      observedAt:x.observed_at
+    })),agents:[],
     activity:metadata.filter(x=>x.key!=="site_bundle_fingerprint").slice(0,25).map(x=>({id:x.key,title:x.key.replaceAll("_"," "),
       summary:x.value,kind:"observation",occurredAt:x.checked_at})),
     resourceBudget:{publicFetches:{used:quotaUsed.public_fetches||0,limit:FETCH_BUDGET_DAY},
       aiCalls:{used:0,limit:0,disabled:true},browserMinutes:{used:0,limit:0,disabled:true}},
     pipeline:{generatedAt:last?.checked_at||"",readOnly:true,approvalRequired:true,
-      products:{complete:discoveryComplete,method:"cloudflare-scheduled-http",
-        discovered:tools.length,notes:[]},
+      products:{complete:discoveryComplete,method:"bounded-public-http-discovery",
+        discovered:tools.length,confirmed:tools.filter(x=>x.inventory_confidence==="published").length,
+        candidates:tools.filter(x=>x.inventory_confidence==="candidate").length,
+        notes:discoveryComplete?["Owner manifest declares complete inventory, but tool functionality is not verified."]:
+          ["Public inventory incomplete; JS bundle paths are only candidates. No product absence or inferiority is established."]},
       research:{status:metadata.find(x=>x.key==="research")?.value||"not-yet-observed"},
       security:{status:metadata.find(x=>x.key==="security_watch")?.value||"not-yet-observed",
         limitation:"Public npm advisories; applicability to YorpHives is not established"},
