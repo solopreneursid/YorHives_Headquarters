@@ -88,6 +88,40 @@ class BrowserAssuranceContractTests(unittest.TestCase):
         self.assertEqual(report["checks"][0]["status"], "passed")
         self.assertTrue((self.state / "browser-assurance-report.json").exists())
 
+    def test_large_catalog_is_fairly_covered_across_cycles(self):
+        items = [
+            {"name": "Tool " + str(n), "url": ORIGIN + "/tools/t" + str(n), "active": True}
+            for n in range(75)
+        ]
+        (self.state / "product-intelligence-report.json").write_text(json.dumps({
+            "schemaVersion": "yorphives.hq-intelligence.v1", "products": items
+        }))
+        visited = []
+        def probe(url):
+            visited.append(url)
+            return {"status": "pass", "reason": "rendered", "httpStatus": 200}
+        first = run(self.state, ORIGIN, probe=probe)
+        self.assertEqual(first["verification"]["checkedThisCycle"], 60)
+        self.assertEqual(first["verification"]["notYetTested"], 15)
+        second = run(self.state, ORIGIN, probe=probe)
+        self.assertEqual(second["verification"]["notYetTested"], 0)
+        self.assertEqual(len(second["checks"]), 75)
+        self.assertEqual(len(set(visited)), 75)
+
+    def test_confirmed_failure_stays_visible_when_probes_blocked(self):
+        (self.state / "product-intelligence-report.json").write_text(json.dumps({
+            "schemaVersion": "yorphives.hq-intelligence.v1",
+            "products": [{"name": "Image Compressor", "url": TOOL, "active": True}]
+        }))
+        run(self.state, ORIGIN, probe=self.verdict("fail"))
+        after_second = run(self.state, ORIGIN, probe=self.verdict("fail"))
+        self.assertEqual(len(after_second["findings"]), 1)
+        after_block = run(self.state, ORIGIN, probe=self.verdict("blocked", "browser-not-installed"))
+        self.assertEqual(after_block["checks"][0]["status"], "unverified")
+        self.assertEqual(len(after_block["findings"]), 1, "Unverified != recovered")
+        recovered = run(self.state, ORIGIN, probe=self.verdict("pass"))
+        self.assertEqual(recovered["findings"], [])
+
     def test_scanner_is_absent_cannot_claim_a_pass(self):
         with self.assertRaises(ValueError):
             _inventory(self.state, ORIGIN)
