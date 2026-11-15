@@ -92,7 +92,7 @@ test("scheduled passive check uses GET only and writes evidence without any proj
         bind(...args){entry.args=args;return this},
         async run(){
           // Check SQL placeholder/arities for this simple unit fixture.
-          const count=(sql.match(/\\?/g)||[]).length;
+          const count=(sql.match(/\?/g)||[]).length;
           assert.equal(entry.args.length,count,"SQL binding mismatch: "+sql);
           return {meta:{changes:1}};
         },
