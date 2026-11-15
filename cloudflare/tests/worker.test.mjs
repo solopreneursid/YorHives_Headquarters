@@ -37,6 +37,8 @@ test("one 5-minute Cron handles all schedules without paid always-on services",(
   const at=(x)=>schedulePlan(new Date(x).getTime());
   assert.deepEqual(at("2026-11-15T00:05:00Z"),{uptime:true,products:false,discovery:false,research:false,security:false,retention:false});
   assert.deepEqual(at("2026-11-15T06:00:00Z"),{uptime:true,products:true,discovery:true,research:false,security:false,retention:false});
+  assert.equal(at("2026-11-15T06:15:00Z").products,true);
+  assert.equal(at("2026-11-15T06:20:00Z").products,false);
   assert.deepEqual(at("2026-11-15T03:00:00Z"),{uptime:true,products:true,discovery:false,research:true,security:false,retention:true});
 });
 test("private report fails closed if Access is not configured", async()=>{
