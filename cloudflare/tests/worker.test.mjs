@@ -45,6 +45,34 @@ test("private report fails closed if Access is not configured", async()=>{
   const res=await handler.fetch(request,{DB:{}},{});
   assert.equal(res.status,403);
 });
+test("verified Worker-level Access allows only the exact founder identity and audience",async()=>{
+  const owner="founder-test@example.com",aud="test-audience-very-long-12345";
+  const env={ACCESS_OWNER_EMAIL:owner,ACCESS_AUD:aud};
+  const req=new Request("https://private.example.workers.dev/");
+  const authorized={access:{aud,async getIdentity(){return {email:"Founder-Test@example.com"};}}};
+  assert.equal(await verifyAccess(req,env,authorized),true);
+  assert.equal(await verifyAccess(req,env,{access:{aud:"some-other-application",async getIdentity(){return {email:owner};}}}),false);
+  assert.equal(await verifyAccess(req,env,{access:{aud,async getIdentity(){return {email:"intruder@example.com"};}}}),false);
+  assert.equal(await verifyAccess(req,env,{access:{aud,async getIdentity(){return {};}}}),false);
+  assert.equal(await verifyAccess(req,env,{access:{aud,async getIdentity(){throw Error("identity unavailable");}}}),false);
+  assert.equal(await verifyAccess(req,{ACCESS_AUD:aud},authorized),false);
+  assert.equal(await verifyAccess(req,env,{}),false);
+});
+test("signed-in founder can fetch private UI only through Worker-verified identity",async()=>{
+  const owner="founder-test@example.com",aud="test-audience-very-long-12345";
+  const env={ACCESS_OWNER_EMAIL:owner,ACCESS_AUD:aud,ASSETS:{fetch:async()=>new Response("private-ui-test",{status:200})}};
+  const req=new Request("https://private.example.workers.dev/");
+  const good={access:{aud,async getIdentity(){return {email:owner};}}};
+  const wrong={access:{aud,async getIdentity(){return {email:"someone-else@example.com"};}}};
+  const okay=await handler.fetch(req,env,good);
+  assert.equal(okay.status,200);
+  assert.equal(await okay.text(),"private-ui-test");
+  const forbidden=await handler.fetch(req,env,wrong);
+  assert.equal(forbidden.status,403);
+  const spoof=new Request(req.url,{headers:{"cf-access-jwt-assertion":"not-a-valid-signed-token",
+    "x-user-email":owner}});
+  assert.equal((await handler.fetch(spoof,env,{})).status,403);
+});
 test("HTTP write methods are rejected even without Access setup",async()=>{
   const res=await handler.fetch(new Request("https://example.workers.dev/api/report",{method:"POST"}),{},{});
   assert.equal(res.status,405);
