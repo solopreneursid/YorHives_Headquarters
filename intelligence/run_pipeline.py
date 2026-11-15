@@ -32,7 +32,7 @@ def combine(products: dict, growth: dict | None, comparisons: dict | None, assur
         report["comparisons"] = comparisons.get("comparisons", [])[:80]
     report["checks"] = []
     if assurance is not None:
-        report["checks"] = assurance.get("checks", [])[:60]
+        report["checks"] = assurance.get("checks", [])[:150]
         report["findings"] = (report.get("findings", []) + assurance.get("findings", []))[:200]
         checked = {item.get("url"): item for item in report["checks"] if isinstance(item, dict)}
         for product in report.get("products", []):
