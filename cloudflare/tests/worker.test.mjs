@@ -82,3 +82,39 @@ test("configuration uses isolated HQ worker, single Cron and no paid service bin
   assert(!conf.containers);
   assert(!conf.queues);
 });
+
+test("scheduled passive check uses GET only and writes evidence without any project mutation",async()=>{
+  const calls=[], originalFetch=globalThis.fetch;
+  const db={
+    prepare(sql){
+      const entry={sql,args:[]};calls.push(entry);
+      return {
+        bind(...args){entry.args=args;return this},
+        async run(){
+          // Check SQL placeholder/arities for this simple unit fixture.
+          const count=(sql.match(/\\?/g)||[]).length;
+          assert.equal(entry.args.length,count,"SQL binding mismatch: "+sql);
+          return {meta:{changes:1}};
+        },
+        async first(){return null},
+        async all(){return {results:[]}}
+      };
+    }
+  };
+  globalThis.fetch=async(input,init)=>{
+    assert.equal(init?.method,"GET");
+    assert.equal(input,"https://yorphives.com/");
+    return new Response("ok",{status:200,headers:{"content-type":"text/html"}});
+  };
+  try{
+    let pending;
+    await handler.scheduled({scheduledTime:Date.parse("2026-11-15T00:05:00Z")},{DB:db},
+      {waitUntil(p){pending=p;}});
+    assert(pending,"Scheduled handler must register an awaited task");
+    await pending;
+    assert(calls.some(x=>x.sql.includes("INSERT INTO assets")),"Website record was not stored");
+    assert(calls.some(x=>x.sql.includes("INSERT INTO quota")),"Cost guard was not evaluated");
+    assert(calls.some(x=>x.sql.includes("last_cron")),"Heartbeat was not saved");
+    assert(!calls.some(x=>/DELETE FROM assets|UPDATE.*repository|DROP TABLE/i.test(x.sql)));
+  }finally{globalThis.fetch=originalFetch;}
+});
