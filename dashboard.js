@@ -50,7 +50,8 @@
     view: "overview",
     findingFilter: "all",
     opportunityFilter: "all",
-    selectedDetail: null
+    selectedDetail: null,
+    feedFilter: "all"
   };
 
   const $ = (id) => document.getElementById(id);
@@ -109,12 +110,13 @@
       else button.removeAttribute("aria-current");
     });
     $("breadcrumb-current").textContent = ({
-      overview: "Overview", monitoring: "Monitoring", opportunities: "Opportunities", products: "Product intelligence",
-      workforce: "AI workforce", activity: "Activity & evidence", governance: "Governance"
+      overview: "Home", monitoring: "Alerts", opportunities: "Ideas", products: "My tools",
+      workforce: "AI team", activity: "History", governance: "Safety & access"
     })[view];
     document.body.classList.remove("nav-open");
     $("sidebar-scrim").hidden = true;
     $("mobile-menu").setAttribute("aria-expanded", "false");
+    $("mobile-more").setAttribute("aria-expanded", "false");
     if (location.hash !== "#" + view) history.replaceState(null, "", "#" + view);
     window.scrollTo({ top: 0, behavior: "instant" });
     $("main-content").focus({ preventScroll: true });
@@ -154,6 +156,125 @@
       : local
         ? "Read-only collector report — These are recorded HTTP observations and research leads, not proof that every product feature works or that market demand exists."
         : "Imported report — These values came from a file in your browser. Headquarters has not independently checked them or connected to production systems.";
+  }
+
+  function renderHomeFeed() {
+    const d=state.data;
+    const preview=state.origin==="preview";
+    const official=state.origin==="cloudflare" || state.origin==="local";
+    const at=cleanDate(d.verification?.generatedAt);
+    $("home-updated").textContent=preview?"You're viewing example updates · Not live":
+      at?"Last update: "+at+" · "+(official?"Automatic report":"Imported report"):
+      "Report timestamp unavailable · Check data source";
+
+    $("home-alert-count").textContent=d.findings.length;
+    $("home-idea-count").textContent=d.opportunities.length;
+    $("home-tool-count").textContent=(state.origin==="cloudflare" && !d.verification?.complete)?"?":d.products.length;
+    $("home-update-count").textContent=d.activity.length+d.changes.length;
+
+    const site=d.assets.find(asset=>asset.kind==="website" || /yorphives website/i.test(asset.name));
+    const sitePill=$("home-site-pill");
+    const siteCopy=$("home-site-copy");
+    sitePill.className="home-site-pill";
+    if(preview || !site || site.status==="unknown"){
+      sitePill.textContent=preview?"Example · not live":"Status not verified";
+      sitePill.classList.add("unknown");
+      siteCopy.textContent=preview?"This is an example screen, not a live website check.":
+        "No reliable website status in this report yet. Check coverage before assuming the site works.";
+    }else if(site.status==="healthy"){
+      sitePill.textContent="Reported reachable";
+      sitePill.classList.add("good");
+      siteCopy.textContent="The latest recorded check reached the website. Individual tool features are not verified.";
+    }else{
+      sitePill.textContent="Issue reported";
+      sitePill.classList.add("warning");
+      siteCopy.textContent="A recent check reported a problem. Open Alerts and review the evidence.";
+    }
+
+    const lead=[...d.findings].sort((a,b)=>(priorityRank[a.priority]??3)-(priorityRank[b.priority]??3))[0];
+    const opportunity=d.opportunities[0];
+    const next=$("home-next-copy");
+    const nextButton=$("home-next-action");
+    if(lead){
+      next.textContent="Review: "+lead.title+". Headquarters can suggest what to investigate, not make changes.";
+      nextButton.dataset.nav="monitoring";
+      nextButton.replaceChildren(document.createTextNode("Review alert "),icon("chevron"));
+    }else if(state.origin==="cloudflare" && !d.verification?.complete){
+      next.textContent="Your website tool list is incomplete. Review discovery before trusting comparisons.";
+      nextButton.dataset.nav="products";
+      nextButton.replaceChildren(document.createTextNode("See my tools "),icon("chevron"));
+    }else if(opportunity){
+      next.textContent="There is an idea worth looking at: "+opportunity.title+". Demand is not verified.";
+      nextButton.dataset.nav="opportunities";
+      nextButton.replaceChildren(document.createTextNode("Explore ideas "),icon("chevron"));
+    }else{
+      next.textContent="No decisions are listed in this report. Check coverage; an empty list isn't proof that all is well.";
+      nextButton.dataset.nav="monitoring";
+      nextButton.replaceChildren(document.createTextNode("Review coverage "),icon("chevron"));
+    }
+
+    const entries=[];
+    d.findings.forEach(item=>entries.push({
+      id:"alert-"+item.id,kind:"alerts",title:item.title,
+      text:item.description || "A monitoring observation may need your review.",
+      date:item.observedAt,chip:item.priority==="high"?"Needs attention":"For review",
+      source:"Monitoring",icon:"shield",action:"Read recommendation",open:()=>showDetail(item,"finding")
+    }));
+    d.opportunities.forEach(item=>entries.push({
+      id:"idea-"+item.id,kind:"ideas",title:item.title,
+      text:item.description || "A research lead to investigate before investing.",
+      date:item.observedAt,chip:item.kind==="catalog-unverified"?"Catalog incomplete":"Unverified idea",
+      source:"Ideas",icon:"spark",action:"Explore idea",open:()=>showDetail(item,"opportunity")
+    }));
+    d.changes.forEach(item=>entries.push({
+      id:"change-"+item.id,kind:"changes",title:item.kind==="new-product"?"New tool spotted":"Website change noticed",
+      text:item.summary || "A change was observed. Review its source before drawing conclusions.",
+      date:item.occurredAt,chip:"Observation",source:"My tools",icon:"layers",action:"View tools",
+      open:()=>showView("products")
+    }));
+    d.activity.forEach(item=>entries.push({
+      id:"activity-"+item.id,kind:"changes",title:item.title,
+      text:item.summary || "An update was logged; see History for details.",
+      date:item.occurredAt,chip:"Activity log",source:"HQ history",icon:"clock",action:"View history",
+      open:()=>showView("activity")
+    }));
+    const groupOrder={alerts:0,changes:1,ideas:2};
+    entries.sort((a,b)=>{
+      const ad=Date.parse(a.date||""),bd=Date.parse(b.date||"");
+      const atime=Number.isFinite(ad)?ad:0,btime=Number.isFinite(bd)?bd:0;
+      return btime-atime || (groupOrder[a.kind]||0)-(groupOrder[b.kind]||0);
+    });
+    const filtered=entries.filter(entry=>state.feedFilter==="all" || entry.kind===state.feedFilter).slice(0,8);
+    const parent=$("home-feed-list");
+    parent.replaceChildren();
+    if(!filtered.length){
+      parent.append(emptyState(state.feedFilter==="all"?"No updates in this report":"Nothing in this category yet",
+        "That doesn't mean everything is healthy. Check when your sources last reported, or choose another filter."));
+      return;
+    }
+    for(const item of filtered){
+      const card=node("article","feed-card feed-"+item.kind);
+      const avatar=node("span","feed-avatar");
+      avatar.append(icon(item.icon));
+      const head=node("div","feed-card-top");
+      const author=node("div","feed-author");
+      append(author,node("strong","",item.source),
+        node("small","",cleanDate(item.date)||"No timestamp"));
+      const status=node("span","feed-provenance",preview?"EXAMPLE":state.origin==="cloudflare"?"REPORTED":"UNVERIFIED");
+      append(head,avatar,author,status);
+      const content=node("div","feed-card-content");
+      const badge=node("span","feed-badge",item.chip);
+      append(content,badge,node("h3","",item.title),
+        node("p","",item.text.length>220?item.text.slice(0,217)+"…":item.text));
+      const foot=node("div","feed-card-bottom");
+      const action=node("button","feed-open",item.action);
+      action.type="button";
+      action.append(icon("chevron"));
+      action.addEventListener("click",item.open);
+      append(foot,node("span","feed-safe-note","Read-only · Your decision"),action);
+      append(card,head,content,foot);
+      parent.append(card);
+    }
   }
 
   function renderBrief() {
@@ -460,6 +581,7 @@
 
   function renderAll() {
     renderMetrics();
+    renderHomeFeed();
     renderBrief();
     renderCoverage();
     renderPriorityInbox();
@@ -597,6 +719,12 @@
     state.origin = origin;
     state.findingFilter = "all";
     state.opportunityFilter = "all";
+    state.feedFilter = "all";
+    document.querySelectorAll("[data-feed-filter]").forEach(button=>{
+      const active=button.dataset.feedFilter==="all";
+      button.classList.toggle("is-selected",active);
+      button.setAttribute("aria-pressed",String(active));
+    });
     document.querySelectorAll("[data-finding-filter], [data-opportunity-filter]").forEach(button => {
       button.classList.toggle("is-selected", button.dataset.findingFilter === "all" || button.dataset.opportunityFilter === "all");
     });
@@ -682,6 +810,21 @@
   function initialize() {
     document.querySelectorAll("[data-nav]").forEach(button => button.addEventListener("click", () => showView(button.dataset.nav)));
     window.addEventListener("hashchange", () => showView(location.hash.replace("#", "")));
+    document.querySelectorAll("[data-feed-filter]").forEach(chip=>chip.addEventListener("click",()=>{
+      state.feedFilter=chip.dataset.feedFilter;
+      document.querySelectorAll("[data-feed-filter]").forEach(button=>{
+        const active=button===chip;
+        button.classList.toggle("is-selected",active);
+        button.setAttribute("aria-pressed",String(active));
+      });
+      renderHomeFeed();
+    }));
+    $("mobile-more").addEventListener("click",()=>{
+      const open=document.body.classList.toggle("nav-open");
+      $("sidebar-scrim").hidden=!open;
+      $("mobile-menu").setAttribute("aria-expanded",String(open));
+      $("mobile-more").setAttribute("aria-expanded",String(open));
+    });
     document.querySelectorAll("[data-finding-filter]").forEach(button => button.addEventListener("click", () => {
       state.findingFilter = button.dataset.findingFilter;
       document.querySelectorAll("[data-finding-filter]").forEach(chip => chip.classList.toggle("is-selected", chip === button));
