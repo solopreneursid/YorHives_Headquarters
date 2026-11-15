@@ -101,7 +101,7 @@ with sync_playwright() as pw:
             baseline=page.evaluate("window.__reportRequests")
             page.locator('.quick-grid [data-action="refresh"]').click()
             page.wait_for_function("(previous)=>window.__reportRequests>previous",arg=baseline)
-            assert "refreshed" in page.locator("#toast").inner_text().lower()
+            page.wait_for_function("document.querySelector('#toast')?.textContent.includes('Report refreshed')")
             # File import clearly remains local. Explicit refresh reconnects to live.
             page.locator("#report-file").set_input_files({
                 "name":"private-hq.json","mimeType":"application/json","buffer":json.dumps(report()).encode()
