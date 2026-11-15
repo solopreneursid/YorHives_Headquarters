@@ -186,7 +186,7 @@ def main():
                         private_page.locator('button[data-nav="products"]').first.click()
                         assert private_page.locator("#product-catalog .product-record").count() == 1
                         assert "Synthetic New Tool" in private_page.locator("#product-catalog").inner_text()
-                        assert "Local discovery reported complete" in private_page.locator("#discovery-status").inner_text()
+                        assert "Owner manifest reports a complete catalog" in private_page.locator("#discovery-status").inner_text()
                         private_page.locator("#product-refresh-trigger").click()
                         private_page.wait_for_function(
                             """() => document.querySelector('#toast')?.textContent.includes('Read-only evidence refreshed.')""",
