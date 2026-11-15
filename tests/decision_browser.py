@@ -37,6 +37,7 @@ def main():
             assert len(posts)==1 and posts[0]['revision']==0
             assert 'implemented' in page.locator('#decision-next').inner_html()
             assert 'verified' not in page.locator('#decision-next').inner_html()
+            page.locator('#detail-dialog details > summary').click()
             assert 'Founder will investigate' in page.locator('#decision-detail-history').inner_text()
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+2')
             page.locator('#detail-close').click();page.locator('.decision-workspace summary').click()
