@@ -400,12 +400,16 @@ async function report(env) {
   const last=metadata.find(x=>x.key==="last_cron");
   const discovery=metadata.find(x=>x.key==="discovery");
   const fresh=Boolean(last && Date.now()-Date.parse(last.checked_at)<2*3600000);
+  const discoveryFresh=Boolean(discovery && Number.isFinite(Date.parse(discovery.checked_at)) &&
+    Date.now()-Date.parse(discovery.checked_at)>=0 &&
+    Date.now()-Date.parse(discovery.checked_at)<12*3600000);
+  const discoveryComplete=Boolean(discoveryFresh && discovery?.value.startsWith("observed:"));
   const tools=a.filter(x=>x.kind==="tool");
   const quotaUsed=Object.fromEntries((quota.results||[]).map(row=>[row.kind,row.used]));
   const now=nowIso();
   return {
     schemaVersion:"yorphives.hq-intelligence.v1", generatedAt:now,
-    verification:{method:"cloudflare-worker-readonly-http",complete:Boolean(discovery?.value.startsWith("observed:")),
+    verification:{method:"cloudflare-worker-readonly-http",complete:discoveryComplete,
       limitations:"HTTP evidence only; catalog completeness and feature functionality are not verified.",
       generatedAt:last?.checked_at||"",notes:fresh?[]:["Collector heartbeat stale or absent"]},
     assets:a.map(x=>({id:fnv(x.url),name:x.name,kind:x.kind,status:x.status==="reachable"?"healthy":"unknown",summary:x.url})),
@@ -420,7 +424,7 @@ async function report(env) {
       description:x.description,recommendation:x.recommendation,observedAt:x.observed_at,evidence:[x.evidence]})),
     opportunities:o.map(x=>({id:x.id,title:x.title,category:"product",priority:"medium",
       description:x.description,recommendation:x.recommendation,observedAt:x.observed_at,evidence:[x.source_url],
-      confidence:"Public mention only; not validated market demand",score:x.score})),
+      confidence:"Public mention only; not validated market demand",score:x.score,kind:x.kind})),
     securityWatch:(security.results||[]).map(x=>({id:x.id,title:x.title,severity:x.severity,
       packages:JSON.parse(x.packages||"[]"),source:x.source_url,observedAt:x.observed_at,
       applicability:"Not evaluated against YorpHives dependencies"})),
@@ -430,7 +434,7 @@ async function report(env) {
     resourceBudget:{publicFetches:{used:quotaUsed.public_fetches||0,limit:FETCH_BUDGET_DAY},
       aiCalls:{used:0,limit:0,disabled:true},browserMinutes:{used:0,limit:0,disabled:true}},
     pipeline:{generatedAt:last?.checked_at||"",readOnly:true,approvalRequired:true,
-      products:{complete:Boolean(discovery?.value.startsWith("observed:")),method:"cloudflare-scheduled-http",
+      products:{complete:discoveryComplete,method:"cloudflare-scheduled-http",
         discovered:tools.length,notes:[]},
       research:{status:metadata.find(x=>x.key==="research")?.value||"not-yet-observed"},
       security:{status:metadata.find(x=>x.key==="security_watch")?.value||"not-yet-observed",
