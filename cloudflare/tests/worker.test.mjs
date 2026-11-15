@@ -166,3 +166,19 @@ test("passive site release tracking sees only same-origin JS/CSS assets, never e
   ]);
   assert.deepEqual(siteBundleRefs("not a page"),[]);
 });
+
+test("incomplete catalog cannot produce false missing-product conclusions",()=>{
+  const result=classifyLead("Show HN: free screenshot converter",[]);
+  assert.equal(result.kind,"catalog-unverified");
+  assert.match(result.recommendation,/inventory is incomplete/);
+});
+test("opportunity feeds exclude generic sentiment and unrelated games",()=>{
+  const xml='<rss>'+
+    '<item><title>Ask HN: My product makes money and I feel useless</title><link>https://example.org/mood</link></item>'+
+    '<item><title>Show HN: Multiplayer RTS playable in a browser</title><link>https://example.org/game</link></item>'+
+    '<item><title>Ask HN: What tool would automate PDF invoices?</title><link>https://example.org/invoices</link></item>'+
+    '</rss>';
+  const leads=feedLeads(xml);
+  assert.equal(leads.length,1);
+  assert.match(leads[0].title,/PDF invoices/);
+});
