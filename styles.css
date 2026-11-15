@@ -928,3 +928,11 @@ body.session-ending::after {
   overscroll-behavior-inline:contain;
   contain:layout paint;
 }
+
+
+/* On 641–700px rotated phones, the active bottom tab already names the
+   screen; suppress the duplicate breadcrumb so longer translated/section
+   labels never crowd the 44px logout control (especially Safari/WebKit). */
+@media (min-width:641px) and (max-width:700px) {
+  .topbar .breadcrumb-current {display:none;}
+}
