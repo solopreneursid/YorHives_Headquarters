@@ -396,7 +396,26 @@ function base64UrlBytes(value) {
 }
 function base64UrlJson(value) { return JSON.parse(new TextDecoder().decode(base64UrlBytes(value))); }
 let jwksCache={url:"",until:0,keys:[]};
-async function verifyAccess(request,env) {
+async function verifyAccess(request,env,ctx) {
+  const expectedOwner=String(env.ACCESS_OWNER_EMAIL||"").trim().toLowerCase();
+  const expectedAudience=String(env.ACCESS_AUD||"");
+  if(!expectedOwner || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(expectedOwner) ||
+     expectedAudience.length<10) return false;
+  // With Worker-level Cloudflare Access, ctx.access is the platform-validated
+  // identity. Browser sessions can be authenticated without forwarding the
+  // legacy Cf-Access-Jwt-Assertion request header to this Worker.
+  if(ctx?.access) {
+    try {
+      if(ctx.access.aud!==expectedAudience ||
+         typeof ctx.access.getIdentity!=="function") return false;
+      const identity=await ctx.access.getIdentity();
+      const email=String(identity?.email||"").trim().toLowerCase();
+      return email===expectedOwner;
+    }catch{return false;}
+  }
+  // Legacy HTTP app fallback: only an explicitly signed JWT with the exact
+  // audience AND owner email may authenticate. No caller-supplied email header.
+
   const domain=String(env.ACCESS_TEAM_DOMAIN||"");
   const audience=String(env.ACCESS_AUD||"");
   if(!/^https:\/\/[a-z0-9-]+\.cloudflareaccess\.com$/i.test(domain) || audience.length<10) return false;
@@ -409,6 +428,7 @@ async function verifyAccess(request,env) {
     const now=Math.floor(Date.now()/1000);
     if(header.alg!=="RS256" || !header.kid || claims.iss!==domain ||
        !(Array.isArray(claims.aud)?claims.aud.includes(audience):claims.aud===audience) ||
+       String(claims.email||"").trim().toLowerCase()!==expectedOwner ||
        !Number.isFinite(claims.exp) || claims.exp<=now || (claims.nbf && claims.nbf>now+30)) return false;
     if(jwksCache.url!==domain || jwksCache.until<Date.now() || !jwksCache.keys.some(k=>k.kid===header.kid)){
       const res=await fetch(domain+"/cdn-cgi/access/certs",{redirect:"error"});
@@ -486,7 +506,7 @@ export default {
   async fetch(request,env,ctx) {
     const route=new URL(request.url).pathname;
     if(!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
-    if(!(await verifyAccess(request,env))) return new Response("Private Headquarters access not configured or unauthorized",{status:403,headers:{"cache-control":"no-store"}});
+    if(!(await verifyAccess(request,env,ctx))) return new Response("Private Headquarters access not configured or unauthorized",{status:403,headers:{"cache-control":"no-store","x-content-type-options":"nosniff"}});
     if(route==="/api/report") {
       if(!env.DB) return json({error:"Evidence database is not configured"},503);
       const result=await report(env);
