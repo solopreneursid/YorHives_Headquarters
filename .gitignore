@@ -8,3 +8,7 @@ __pycache__/
 *.local
 review.md
 description.md
+
+# Reproducible isolated Cloudflare pilot bundle (contains only public UI files)
+cloudflare/.generated/
+cloudflare/dist/
