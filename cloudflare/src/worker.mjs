@@ -149,6 +149,11 @@ function feedLeads(xml) {
     const link=clampText((item.match(/<link>([^<]+)<\/link>/i)||[])[1],450);
     if(!title || !/^https?:\/\/[^\s]+$/i.test(link) ||
        !/\b(tool|app|open source|website|image|pdf|browser|developer|automation|convert|product|workflow|agent)\b/i.test(title)) continue;
+    // Ask HN often contains personal conversations. Keep concrete requests
+    // for tools/solutions rather than classifying generic sentiment as demand.
+    if(/^Ask HN:/i.test(title) && !/\b(need|looking for|recommend|which|what|how|where|any tool|is there|alternatives|automate|solution)\b/i.test(title)) continue;
+    // An unrelated entertainment launch is not a validated technology problem.
+    if(/\b(multiplayer|rts|gaming)\b/i.test(title) && !/\b(editor|sdk|engine|framework|developer tool|automation)\b/i.test(title)) continue;
     found.push({title,link});
     if(found.length >= 8) break;
   }
@@ -156,6 +161,10 @@ function feedLeads(xml) {
 }
 // Only compares words in titles to the observed catalog; does NOT establish feature parity.
 function classifyLead(title, catalog) {
+  if(!Array.isArray(catalog) || !catalog.length) {
+    return {kind:"catalog-unverified",related:null,
+      recommendation:"First verify the YorpHives product catalog. The current site inventory is incomplete, so this is only an external research mention."};
+  }
   const tokenize = value => new Set(String(value||"").toLowerCase()
     .replace(/^(show|ask) hn\s*:\s*/,"")
     .split(/[^a-z0-9]+/).filter(word => word.length >= 3 &&
@@ -452,7 +461,9 @@ async function report(env) {
       description:x.description,recommendation:x.recommendation,observedAt:x.observed_at,evidence:[x.evidence]})),
     opportunities:o.map(x=>({id:x.id,title:x.title,category:"product",priority:"medium",
       description:x.description,recommendation:x.recommendation,observedAt:x.observed_at,evidence:[x.source_url],
-      confidence:"Public mention only; not validated market demand",score:x.score,kind:x.kind})),
+      confidence:x.kind==="catalog-unverified"?
+        "Research mention · YorpHives catalog incomplete" :
+        "Research mention · user demand not validated",score:x.score,kind:x.kind})),
     securityWatch:(security.results||[]).map(x=>({id:x.id,title:x.title,severity:x.severity,
       packages:JSON.parse(x.packages||"[]"),source:x.source_url,observedAt:x.observed_at,
       applicability:"Not evaluated against YorpHives dependencies"})),
