@@ -607,7 +607,9 @@
       const top = node("div", "feature-gap-top");
       append(top, node("strong", "", (c.product || "YorpHives product") + " → " + (c.competitor || "Competitor")),
         node("span", "outline-pill", c.confidence || "Unverified"));
-      const text = node("p", "", c.missingFeatures.length ? "Feature claims to verify: " + c.missingFeatures.join(" · ") : "Possible alternative based on a public mention. No feature shortfall has been verified.");
+      const text = node("p", "", c.evidenceSummary ||
+        (c.missingFeatures.length ? "Feature claims to verify: " + c.missingFeatures.join(" · ") :
+        "Possible alternative based on a public mention. No feature shortfall has been verified."));
       const next = node("p", "gap-next", c.recommendation || "Verify with direct evidence before considering changes.");
       append(card, top, text, next);
       const links = node("div", "gap-evidence");
@@ -721,7 +723,8 @@
         id: cleanText(c.id, 80) || "gap" + i, product: cleanText(c.product, 160),
         competitor: cleanText(c.competitor, 160),
         missingFeatures: Array.isArray(c.missingFeatures) ? c.missingFeatures.slice(0, 40).map(x => cleanText(x, 130)).filter(Boolean) : [],
-        confidence: cleanText(c.confidence, 100), recommendation: cleanText(c.recommendation, 800),
+        confidence: cleanText(c.confidence, 100), evidenceSummary: cleanText(c.evidenceSummary, 400),
+        recommendation: cleanText(c.recommendation, 800),
         evidence: evidence(c)
       })),
       agents: items("agents").map((a, i) => ({
