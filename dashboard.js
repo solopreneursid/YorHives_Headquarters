@@ -20,9 +20,11 @@
   const state = {
     page: PAGES[location.hash.slice(1)] ? location.hash.slice(1) : 'home', data:EMPTY(), source:'preview',
     navHistory:[], homeFilter:'all', pulseQuery:'', discoverFilter:'all', discoverQuery:'', discoverSort:'newest', savedOnly:false,
+    discoverSource:'hq', githubQuery:'', githubResults:[], githubLoading:false, githubSearched:false, githubError:'', githubSearchedQuery:'', githubTotal:0, githubIncomplete:false, githubSort:'stars',githubFilter:'all',githubSavedOnly:false,
     productFilter:'all', productQuery:'', decisionFilter:'all', busy:false, detail:null,
     compact:store.get('compact',false) === true, alerts:store.get('alerts',false) === true,
-    saved:new Set(sessionSaved()), pulse:[], searchQuery:'', saving:false
+    saved:new Set(sessionSaved()), pulse:[], searchQuery:'', saving:false,
+    githubSaved:new Map((()=>{try{const x=JSON.parse(sessionStorage.getItem('yh:github-saved')||'[]');return Array.isArray(x)?x.filter(t=>Array.isArray(t)&&typeof t[0]==='string'&&t[1]&&typeof t[1]==='object').slice(0,60):[];}catch{return [];}})())
   };
   let lastFocus=null, toastTimer, lastHighKey='', lastLiveFetch=0;
   const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -93,16 +95,71 @@
   }
   function savedKey(x){return safeKey(x._kind,x._id);}
   function discover(){
+    if(state.discoverSource==='github')return discoverOnline();
     const all=discoveryItems();let filtered=all.filter(x=>(state.discoverFilter==='all'||state.discoverFilter===x._category) && (!state.savedOnly||state.saved.has(savedKey(x))) && `${x.title||x.name||''} ${x.description||''} ${x.evidenceSummary||''}`.toLowerCase().includes(state.discoverQuery.toLowerCase()));
     filtered.sort(state.discoverSort==='name'?(a,b)=>String(a.title||a.name).localeCompare(String(b.title||b.name)):(a,b)=>sortDate(b._date)-sortDate(a._date));
     const cards=filtered.map(x=>`<article class="lead-card"><div class="lead-top">${badge(x._kind==='product'?'Site inventory':x._kind==='comparison'?'Comparison':'Research')}<button type="button" class="save-btn ${state.saved.has(savedKey(x))?'is-saved':''}" data-save-kind="${esc(x._kind)}" data-save-id="${esc(x._id)}" aria-pressed="${state.saved.has(savedKey(x))}" aria-label="${state.saved.has(savedKey(x))?'Remove saved item':'Save item'}">${state.saved.has(savedKey(x))?'★':'☆'}</button></div><button class="lead-body" type="button" data-detail="${esc(x._kind)}" data-id="${esc(x._id)}"><strong>${esc(cut(x.title||x.name||'Item',100))}</strong><small>${esc(cut(x.description||x.evidenceSummary||x.qaReason||'Review evidence',110))}</small><span class="lead-footer">Details ${icon('arrow')}</span></button></article>`).join('');
     const purpose=[['apps','Apps & tools','Open-source candidates','compass'],['technology','Technology','Models & standards','spark'],['markets','Markets','Customer needs','users'],['competitors','Competitors','Product comparisons','chart'],['revenue','Revenue','Business models','check']];
-    return header('Discover','Tools · markets · opportunities',importButton())+provenance()+
+    return header('Discover','Tools · markets · opportunities',importButton())+provenance()+discoverSourceTabs()+
       `<div class="filter-scroller">${CATEGORIES.map(([id,n])=>tab(n,id,state.discoverFilter,'discover-filter')).join('')}</div>`+
       `<div class="toolbar"><label class="inline-search">${icon('search')}<input id="discover-query" type="search" placeholder="Search discoveries" value="${esc(state.discoverQuery)}" aria-label="Search discoveries" /></label><select id="discover-sort" class="select" aria-label="Sort discoveries"><option value="newest" ${state.discoverSort==='newest'?'selected':''}>Newest</option><option value="name" ${state.discoverSort==='name'?'selected':''}>A–Z</option></select><button type="button" class="button ${state.savedOnly?'button-active':'button-subtle'}" data-action="toggle-saved" aria-pressed="${state.savedOnly}">☆ Saved</button></div>`+
       (all.length?`<div class="lead-grid scroll-grid" role="region" tabindex="0" aria-label="Discovered tools and opportunities">${cards||blank('No matching items')}</div>`:`<div class="purpose-grid">${purpose.filter(x=>state.discoverFilter==='all'||state.discoverFilter===x[0]).map(([id,n,s,i])=>`<button type="button" class="purpose-card purpose-button" data-discover-filter="${esc(id)}"><span class="purpose-icon">${icon(i)}</span><h2>${esc(n)}</h2><p>${esc(s)}</p></button>`).join('')}</div>`)+
       `<div class="page-footnote">${all.length?`${filtered.length} shown · `:''}Research is not validated demand.</div>`;
   }
+
+  function discoverSourceTabs(){
+    return `<div class="discover-sources" role="group" aria-label="Research source">${tab('HQ records','hq',state.discoverSource,'discover-source')}${tab('Find open source','github',state.discoverSource,'discover-source')}</div>`;
+  }
+  function githubCandidates(){
+    if(!state.githubSavedOnly)return state.githubResults;
+    const all=new Map([...state.githubResults.map(x=>[x.id,x]),...state.githubSaved]);
+    return [...all.values()].filter(x=>state.githubSaved.has(x.id));
+  }
+  function discoverOnline(){
+    const all=githubCandidates();
+    const filtered=all.filter(x=>state.githubFilter==='all'||x.category===state.githubFilter);
+    filtered.sort(state.githubSort==='name'?(a,b)=>String(a.title).localeCompare(String(b.title)):
+      state.githubSort==='stars'?(a,b)=>(b.stars||0)-(a.stars||0):
+      (a,b)=>sortDate(b.updatedAt)-sortDate(a.updatedAt));
+    const cards=filtered.map(x=>`<article class="lead-card"><div class="lead-top">${badge(x.category==='technology'?'Technology · GitHub':'App · GitHub')}<button type="button" class="save-btn ${state.githubSaved.has(x.id)?'is-saved':''}" data-github-save="${esc(x.id)}" aria-pressed="${state.githubSaved.has(x.id)}" aria-label="${state.githubSaved.has(x.id)?'Remove saved project':'Save project'}">${state.githubSaved.has(x.id)?'★':'☆'}</button></div><button type="button" class="lead-body" data-detail="github" data-id="${esc(x.id)}"><strong>${esc(cut(x.title,100))}</strong><small>${esc(cut(x.description||'Public repository · description unavailable',140))}</small><span class="lead-meta">${esc(x.license||'License unverified')} · ★ ${num(x.stars)}</span><span class="lead-footer">Details ${icon('arrow')}</span></button></article>`).join('');
+    const empty=state.githubLoading?blank('Searching…'):state.githubSavedOnly?blank('No saved projects'):
+      state.githubSearched?blank('No matching projects','Try another topic or filter.'):
+      blank('Find an open-source project','Enter a topic and search.');
+    const notice=state.githubError?`<strong class="discover-error">${esc(state.githubError)}</strong>`:
+      state.githubLoading?'Searching public GitHub repositories…':
+      state.githubSearched?`${num(state.githubTotal)} public matches · ${filtered.length} shown${state.githubIncomplete?' · Partial results':''}`:
+      'Direct public GitHub search · No account or payment';
+    return header('Discover','Find · assess · save',importButton())+provenance()+discoverSourceTabs()+
+      `<form id="github-search-form" class="discover-search-form"><label class="inline-search">${icon('search')}<input id="github-query" type="search" value="${esc(state.githubQuery)}" maxlength="64" aria-label="Search public GitHub repositories" placeholder="e.g. PDF editor" /></label><button type="submit" class="button button-primary discover-submit" ${state.githubLoading?'disabled':''}>${icon('search')} ${state.githubLoading?'Searching…':'Find projects'}</button></form>`+
+      `<div class="discover-controls"><div class="filter-scroller compact-tabs">${[['all','All'],['apps','Apps & tools'],['technology','Technology']].map(([id,name])=>tab(name,id,state.githubFilter,'github-filter')).join('')}</div><select id="github-sort" class="select" aria-label="Sort public projects"><option value="stars" ${state.githubSort==='stars'?'selected':''}>Stars</option><option value="newest" ${state.githubSort==='newest'?'selected':''}>Recently updated</option><option value="name" ${state.githubSort==='name'?'selected':''}>A–Z</option></select>${button('github-saved',state.githubSavedOnly?'★ Saved':'☆ Saved','check',state.githubSavedOnly?'button-active':'button-subtle')}${state.githubQuery?button('github-clear','Clear','close'):''}</div>`+
+      `<div class="discover-live-status" role="status" aria-live="polite">${notice}</div><div class="lead-grid scroll-grid" role="region" tabindex="0" aria-label="Public open-source project results">${cards||empty}</div>`+
+      `<div class="page-footnote">Public GitHub metadata · License, code safety, demand and reuse rights unverified. Saved locally in this tab.</div>`;
+  }
+  async function searchGithub(){
+    if(state.githubLoading)return;
+    const q=state.githubQuery.normalize('NFKC').trim().replace(/\s+/g,' ');
+    if(!/^[\p{L}\p{N} ._-]{2,64}$/u.test(q)||q.split(/\s+/).length>8){
+      state.githubError='Enter 2–64 letters or numbers, up to 8 words.';render();return;
+    }
+    state.githubError='';state.githubLoading=true;render();
+    try{
+      const reply=await fetch('/api/discover?q='+encodeURIComponent(q),{
+        credentials:'same-origin',headers:{accept:'application/json'},cache:'no-store'});
+      const data=await reply.json().catch(()=>({}));
+      if(!reply.ok)throw Error(data.error||'Search unavailable');
+      if(data.source!=='github-public'||!Array.isArray(data.items))throw Error('Invalid search response');
+      state.githubResults=data.items.slice(0,12).filter(x=>typeof x.id==='string'&&/^[\w.-]+\/[\w.-]+$/.test(x.id)).map(x=>({
+        id:x.id,title:String(x.title||x.id),description:String(x.description||'').slice(0,280),
+        url:'https://github.com/'+x.id,license:typeof x.license==='string'?x.license:null,
+        stars:Number.isSafeInteger(x.stars)?x.stars:0,category:x.category==='technology'?'technology':'apps',
+        updatedAt:String(x.updatedAt||''),language:String(x.language||''),source:'github-public'}));
+      state.githubTotal=Math.max(0,Number(data.total)||0);
+      state.githubIncomplete=data.incomplete===true;state.githubSearched=true;
+      state.githubSavedOnly=false;notify(state.githubResults.length?'Projects found':'No matching projects');
+    }catch(e){state.githubError=String(e.message||'Search unavailable').slice(0,180);notify('Search unavailable');}
+    finally{state.githubLoading=false;if(state.page==='discover')render();}
+  }
+
   function assignmentFor(name){const threads=list(state.data.operating,'threads');return threads.filter(x=>x.contract?.owner===name);}
   function team(){const statusText=ready()?state.data.operating?.aiStatus||'Not connected':'Not connected';return header('AI Employees','Six departments · evidence routing')+provenance()+
     `<div class="compact-info">${icon('info')} AI inference: ${esc(statusText)}</div>`+
@@ -160,11 +217,11 @@
     if(push&&location.hash!=='#'+to)history.pushState({hqPage:to},'','#'+to);render();window.scrollTo(0,0);}
   function goBack(){const prior=state.navHistory.pop()||'home';state.page=PAGES[prior]?prior:'home';history.replaceState({hqPage:state.page},'','#'+state.page);render();window.scrollTo(0,0);}
   function browserRoute(){const to=location.hash.slice(1);if(!PAGES[to]||to===state.page)return;state.navHistory.push(state.page);state.page=to;render();window.scrollTo(0,0);}
-  function record(kind,id){if(kind==='department')return DEPARTMENTS[Number(id)]||null;if(kind==='pulse')return state.pulse[Number(id)]||null;if(kind==='review')return queue()[Number(id)]||null;
+  function record(kind,id){if(kind==='department')return DEPARTMENTS[Number(id)]||null;if(kind==='github')return state.githubResults.find(x=>String(x.id)===String(id))||state.githubSaved.get(String(id))||null;if(kind==='pulse')return state.pulse[Number(id)]||null;if(kind==='review')return queue()[Number(id)]||null;
     if(kind==='thread')return list(state.data.operating,'threads').find(x=>x.thread===id)||null;
     if(kind==='decision')return list(state.data.decisionJournal,'events').find(x=>String(x.sequence??x.thread)===String(id))||null;
     const arr=list(state.data,files(kind));return arr.find(x=>String(x.id)===String(id))||(String(id).startsWith('at-')?arr[Number(id.slice(3))]:null)||null;}
-  function sources(x,kind){const raw=[...(Array.isArray(x?.evidence)?x.evidence:[]),x.evidenceUrl,x.evidence_url,x.source_url,x.source,kind==='product'?x.url:null];return [...new Set(raw.map(link).filter(Boolean))].slice(0,8);}
+  function sources(x,kind){const raw=[...(Array.isArray(x?.evidence)?x.evidence:[]),x.evidenceUrl,x.evidence_url,x.source_url,x.source,kind==='product'||kind==='github'?x.url:null];return [...new Set(raw.map(link).filter(Boolean))].slice(0,8);}
   function detailFields(items){return `<div class="detail-fields">${items.filter(([,v])=>filled(v)).map(([name,v])=>`<div class="detail-field"><small>${esc(name)}</small><p>${esc(String(v))}</p></div>`).join('')}</div>`;}
   function openDetail(kind,id){let x=record(kind,id);if(!x){notify('Record unavailable');return;}
     state.detail={kind,id};lastFocus=document.activeElement;
@@ -174,6 +231,7 @@
     const title=target.title||target.name||target.competitor||x.title||'Details';
     const fields=kind==='department'?[['Responsibility',x.job],['Independent review',x.review],['Routed records',`${assignmentFor(x.name).length} (not proof of AI work)`],['AI inference',state.data.operating?.aiStatus||'Not connected']]:
       kind==='decision'?[['Status',STATE_LABELS[x.state]||x.state],['Date',time(x.created_at)],['Reason',x.note],['Feedback',x.feedback],['Success condition',x.success_condition],['Measured outcome',x.outcome]]:
+       kind==='github'?[['Summary',x.description],['License',x.license||'Unverified'],['GitHub stars',String(x.stars??0)+' · popularity signal only'],['Primary language',x.language],['Updated',time(x.updatedAt)],['Review','Candidate only. Verify license, safety and suitability before reuse.']]:
       [['Summary',target.description||target.evidenceSummary||target.summary||discussion],['Recommendation',target.recommendation],['Priority',target.priority],['Evidence',x.contract?.classification||'Unverified'],['Confidence',target.confidence||target.discoveryConfidence],['Observed',time(target.observedAt||target._date||target.occurredAt)],['Source status',state.source==='live'?'Live report':'Not live-verified']];
     const urls=sources(target,actualKind);let extras='';
     if(kind==='department'){
@@ -263,10 +321,13 @@ Revenue: unavailable`;
   async function toggleAlerts(checked){if(!checked){state.alerts=false;store.set('alerts',false);notify('Browser alerts off');return;}
     if(!('Notification' in window)||!window.isSecureContext){state.alerts=false;notify('Browser alerts require a secure connection');return;}
     let permission=Notification.permission;if(permission==='default')permission=await Notification.requestPermission();state.alerts=permission==='granted';store.set('alerts',state.alerts);notify(state.alerts?'Alerts on · open tab only':'Notification permission unavailable');}
-  function action(cmd){switch(cmd){case 'import':$('report-file').click();break;case 'refresh':refresh(true);break;case 'clear-pulse-search':state.pulseQuery='';render();break;case 'toggle-saved':state.savedOnly=!state.savedOnly;render();break;case 'export-report':if(ready())downloadJson(state.data,'hq-evidence-private.json');break;case 'export-decisions':downloadJson({exportedAt:today(),events:list(state.data.decisionJournal,'events')},'hq-decisions-private.json');break;case 'copy-summary':copySummary();break;case 'close-detail':closeDetail();break;}}
+  function action(cmd){switch(cmd){case 'import':$('report-file').click();break;case 'refresh':refresh(true);break;case 'clear-pulse-search':state.pulseQuery='';render();break;case 'toggle-saved':state.savedOnly=!state.savedOnly;render();break;case 'github-saved':state.githubSavedOnly=!state.githubSavedOnly;render();break;case 'github-clear':state.githubQuery='';render();break;case 'export-report':if(ready())downloadJson(state.data,'hq-evidence-private.json');break;case 'export-decisions':downloadJson({exportedAt:today(),events:list(state.data.decisionJournal,'events')},'hq-decisions-private.json');break;case 'copy-summary':copySummary();break;case 'close-detail':closeDetail();break;}}
   function bind(){document.addEventListener('click',e=>{
       const nav=e.target.closest('[data-page]');if(nav){if($('search-modal').open)$('search-modal').close();if(!$('detail-drawer').hidden)closeDetail();navigate(nav.dataset.page);return;}
       const detail=e.target.closest('[data-detail]');if(detail){if($('search-modal').open)$('search-modal').close();openDetail(detail.dataset.detail,detail.dataset.id);return;}
+      const src=e.target.closest('[data-discover-source]');if(src){state.discoverSource=src.dataset.discoverSource==='github'?'github':'hq';render();return;}
+      const githubCategory=e.target.closest('[data-github-filter]');if(githubCategory){state.githubFilter=githubCategory.dataset.githubFilter;render();return;}
+      const ghStar=e.target.closest('[data-github-save]');if(ghStar){const id=ghStar.dataset.githubSave;const item=state.githubResults.find(x=>x.id===id)||state.githubSaved.get(id);if(item){if(state.githubSaved.has(id))state.githubSaved.delete(id);else state.githubSaved.set(id,item);try{sessionStorage.setItem('yh:github-saved',JSON.stringify([...state.githubSaved].slice(-60)));}catch{}render();notify(state.githubSaved.has(id)?'Saved in this tab':'Removed from saved');}return;}
       const d=e.target.closest('[data-discover-filter]');if(d){state.discoverFilter=d.dataset.discoverFilter;render();return;}
       const p=e.target.closest('[data-pulse-filter]');if(p){state.homeFilter=p.dataset.pulseFilter;render();return;}
       const f=e.target.closest('[data-decision-filter]');if(f){state.decisionFilter=f.dataset.decisionFilter;render();return;}
@@ -281,10 +342,10 @@ Revenue: unavailable`;
     $('search-input').addEventListener('input',renderSearch);$('search-close').addEventListener('click',()=>$('search-modal').close());$('copy-close').addEventListener('click',()=>$('copy-modal').close());
     $('detail-close').addEventListener('click',closeDetail);$('detail-scrim').addEventListener('click',closeDetail);
     $('report-file').addEventListener('change',e=>{openLocal(e.target.files[0]);e.target.value='';});
-    document.addEventListener('input',e=>{if(['discover-query','product-query','pulse-query'].includes(e.target.id)){state[e.target.id==='discover-query'?'discoverQuery':e.target.id==='product-query'?'productQuery':'pulseQuery']=e.target.value;render({keepFocus:true});}});
-    document.addEventListener('change',async e=>{if(e.target.id==='discover-sort'){state.discoverSort=e.target.value;render();}if(e.target.id==='product-filter'){state.productFilter=e.target.value;render();}if(e.target.id==='decision-state')updateDecisionFields();
+    document.addEventListener('input',e=>{if(e.target.id==='github-query'){state.githubQuery=e.target.value;return;}if(['discover-query','product-query','pulse-query'].includes(e.target.id)){state[e.target.id==='discover-query'?'discoverQuery':e.target.id==='product-query'?'productQuery':'pulseQuery']=e.target.value;render({keepFocus:true});}});
+    document.addEventListener('change',async e=>{if(e.target.id==='discover-sort'){state.discoverSort=e.target.value;render();}if(e.target.id==='github-sort'){state.githubSort=e.target.value;render();}if(e.target.id==='product-filter'){state.productFilter=e.target.value;render();}if(e.target.id==='decision-state')updateDecisionFields();
       if(e.target.id==='compact-toggle'){state.compact=e.target.checked;store.set('compact',state.compact);render();}if(e.target.id==='alerts-toggle'){await toggleAlerts(e.target.checked);render();}});
-    document.addEventListener('submit',e=>{if(e.target.getAttribute('id')==='decision-form'){e.preventDefault();submitDecision(e.target);}});
+    document.addEventListener('submit',e=>{if(e.target.getAttribute('id')==='decision-form'){e.preventDefault();submitDecision(e.target);}if(e.target.id==='github-search-form'){e.preventDefault();searchGithub();}});
     window.addEventListener('popstate',browserRoute);window.addEventListener('hashchange',browserRoute);
     document.addEventListener('keydown',e=>{
       if(e.key==='Escape'){if(!$('detail-drawer').hidden)closeDetail();$('more-popover').hidden=true;$('more-button').setAttribute('aria-expanded','false');}
