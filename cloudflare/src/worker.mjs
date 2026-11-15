@@ -111,6 +111,23 @@ function hubTools(html, base=SITE) {
   }
   return found;
 }
+// Passive release signal, NOT a browser test or proof that a tool changed.
+// Modern SPA builds often change hashed JS/CSS asset URLs after a new release.
+function siteBundleRefs(html,base=SITE) {
+  const found=new Set();
+  for(const m of String(html||"").slice(0,MAX_TEXT_BYTES).matchAll(
+    /\b(?:src|href)\s*=\s*["']([^"']+\.(?:js|css)(?:\?[^"']*)?)["']/gi)){
+    try{
+      const parsed=new URL(m[1],base);
+      if(parsed.protocol!=="https:" || !ORIGIN_SET.has(parsed.origin) ||
+        parsed.username || parsed.password || !/\.(js|css)$/i.test(parsed.pathname)) continue;
+      parsed.search=""; parsed.hash="";
+      found.add(parsed.toString());
+    }catch{}
+    if(found.size>=24) break;
+  }
+  return [...found].sort();
+}
 function manifestTools(text, base=SITE) {
   try {
     const data=JSON.parse(text);const entries=Array.isArray(data)?data:data.products;
@@ -223,6 +240,17 @@ async function discoverTools(env) {
       const result=await getPublic(env,url,{body:true});
       if(result.status!==200 || result.text===null) continue;
       sources++;
+      if(kind==="hub" && url===SITE+"/"){
+        const assetRefs=siteBundleRefs(result.text);
+        if(assetRefs.length){
+          const fingerprint=fnv(assetRefs.join("|"));
+          const previous=await env.DB.prepare("SELECT value FROM status WHERE key='site_bundle_fingerprint'").first();
+          if(previous?.value && previous.value!==fingerprint)
+            await saveStatus(env,"site_bundle_change",
+              "Public site build assets changed. Review catalog for added or updated tools; product identity is not confirmed.");
+          await saveStatus(env,"site_bundle_fingerprint",fingerprint);
+        }
+      }
       const urls=kind==="sitemap"?sitemapTools(result.text):kind==="manifest"?
         manifestTools(result.text):hubTools(result.text);
       for(const item of urls) candidates.add(item);
@@ -429,7 +457,7 @@ async function report(env) {
       packages:JSON.parse(x.packages||"[]"),source:x.source_url,observedAt:x.observed_at,
       applicability:"Not evaluated against YorpHives dependencies"})),
     comparisons:[],agents:[],
-    activity:metadata.slice(0,25).map(x=>({id:x.key,title:x.key.replaceAll("_"," "),
+    activity:metadata.filter(x=>x.key!=="site_bundle_fingerprint").slice(0,25).map(x=>({id:x.key,title:x.key.replaceAll("_"," "),
       summary:x.value,kind:"observation",occurredAt:x.checked_at})),
     resourceBudget:{publicFetches:{used:quotaUsed.public_fetches||0,limit:FETCH_BUDGET_DAY},
       aiCalls:{used:0,limit:0,disabled:true},browserMinutes:{used:0,limit:0,disabled:true}},
@@ -480,4 +508,4 @@ export default {
     }));
   }
 };
-export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,schedulePlan,verifyAccess,report};
+export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,schedulePlan,verifyAccess,report};
