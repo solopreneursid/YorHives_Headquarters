@@ -43,7 +43,7 @@ function evidenceDatabase(){
         },
         async first(){
           if(sql.includes("SELECT failures FROM assets WHERE url"))return {failures:0};
-          if(sql.includes("SELECT value FROM status WHERE key"))return status.get(record.args[0])||null;
+          if(sql.includes("SELECT value FROM status WHERE key"))return status.get(record.args[0]||"discovery")||null;
           return null;
         },
         async all(){
