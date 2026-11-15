@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1019">
   <meta name="description" content="YorpHives Headquarters — a founder-controlled AI office for monitoring, research, opportunity discovery, and long-term growth.">
   <title>YorpHives Headquarters — Your Daily Feed</title>
@@ -26,6 +26,7 @@
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M5 5 19 19M19 5 5 19"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M11 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"/><path d="M14 16l4-4-4-4M8 12h10"/></symbol>
     <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m0 0L7 8m5-5 5 5M4 16v4h16v-4"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
     <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 2 2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2L12 2Z"/></symbol>
@@ -73,6 +74,9 @@
         <div class="founder">
           <span class="avatar">F</span><span class="founder-label"><strong>Only you</strong><small>Founder access</small></span><svg class="icon founder-chevron"><use href="#i-chevron"/></svg>
         </div>
+        <a class="sidebar-signout" href="/cdn-cgi/access/logout" title="End your Cloudflare Access session">
+          <svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg><span>Sign out</span>
+        </a>
       </div>
     </aside>
 
@@ -85,10 +89,10 @@
           <span class="breadcrumb-root">My Headquarters</span><svg class="icon breadcrumb-divider"><use href="#i-chevron"/></svg><span class="breadcrumb-current" id="breadcrumb-current">Home</span>
         </div>
         <div class="topbar-right">
-          <button class="quick-search" id="search-trigger" aria-label="Search findings and opportunities"><svg class="icon"><use href="#i-search"/></svg><span>Find an update</span><kbd>⌘ K</kbd></button>
+          <button class="quick-search" id="search-trigger" aria-label="Search findings and opportunities"><svg class="icon"><use href="#i-search"/></svg><span>Find an update</span><kbd id="search-shortcut" aria-hidden="true">Ctrl K</kbd></button>
           <span class="top-divider"></span>
           <span class="mode-chip" id="mode-chip"><span class="mode-dot"></span><span id="mode-label">Preview mode</span></span>
-          <button class="top-avatar" aria-label="Founder account">F</button>
+          <a class="topbar-signout" href="/cdn-cgi/access/logout" aria-label="Sign out of Headquarters" title="Sign out of Cloudflare Access"><svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg><span>Sign out</span></a>
         </div>
       </header>
 
@@ -332,6 +336,7 @@
     <div class="help-step"><span>02</span><div><strong>Understand</strong><p>Findings and opportunities are organized by priority, affected asset, and supporting source.</p></div></div>
     <div class="help-step"><span>03</span><div><strong>Decide</strong><p>You review recommendations and make changes outside Headquarters using founder-owned credentials.</p></div></div>
     <p class="helper-note">You can open a JSON report to explore its records locally. Reports marked Cloudflare were collected by the private scheduled monitoring service.</p>
+    <p class="helper-note">Use <strong>Sign out</strong> at the top right, or in the menu, when you're finished. It ends your Cloudflare Access session across applications protected by the same Access team.</p>
     <div class="dialog-footer"><button class="button button-primary" id="help-done">Got it</button></div>
   </dialog>
   <dialog id="search-dialog" class="search-dialog" aria-label="Search headquarters">
