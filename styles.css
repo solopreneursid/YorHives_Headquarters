@@ -869,3 +869,15 @@ body.session-ending::after {
 @media (max-width:360px) {
   .filter-chips { margin-left:-12px; margin-right:-12px; padding-left:12px; padding-right:12px; }
 }
+
+
+/* Safari/WebKit includes negative-gutter filter scrollers in document width.
+   Keep horizontal scrolling inside the filter row instead of the entire page. */
+@media(max-width:640px) {
+  .filter-chips {
+    margin-left:0;margin-right:0;padding-left:0;padding-right:0;padding-bottom:14px;
+    width:100%;max-width:100%;min-width:0;box-sizing:border-box;
+    overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;
+  }
+  .filter-chip {flex:0 0 auto;}
+}
