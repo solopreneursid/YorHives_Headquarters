@@ -906,7 +906,10 @@ async function report(env) {
       applicability:"Not evaluated against YorpHives dependencies"})),
     comparisons:(hypotheses.results||[]).map(x=>({
       id:x.id,product:x.product_name,competitor:x.competing_title,
-      missingFeatures:[],confidence:"Public title similarity only · no feature gap verified",
+      missingFeatures:[],evidenceSummary:x.evidence_summary,
+      confidence:String(x.evidence_summary||"").startsWith("Official page mentions:")?
+        "Official public description · feature parity unverified":
+        "Public title similarity only · feature parity unverified",
       recommendation:x.recommendation,evidence:[x.product_url,x.competing_url],
       observedAt:x.observed_at
     })),agents:[],
