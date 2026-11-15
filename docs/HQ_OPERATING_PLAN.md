@@ -90,43 +90,61 @@ new table and history; the old version does not use it. No destructive down migr
 ## Verification and release status — continued readiness audit
 
 **Overall status: NOT ready for full production launch.** Software implementation,
-local verification and deployment are separate milestones. No publication or migration
-was performed during this audit.
+local verification and deployment are separate milestones. The private pilot was published
+on 2026-11-15; migrations 0005 and 0006 were applied to its dedicated HQ database after
+a SQL export was restored and checked successfully in an isolated SQLite database.
 
 | Area | Current evidence | Status |
 | --- | --- | --- |
-| Founder workflow | Server-enforced decisions, evidence labels, feedback, three-item queue and three-opportunity cap | Implemented; locally tested |
+| Founder workflow | Server-enforced decisions, evidence labels, feedback, three-item queue and three-opportunity cap | Implemented; locally tested; private pilot journal enabled |
 | Customer experiments | Acceptance requires audience, problem, hypothesis, metric, positive target, <=40-hour effort cap, stop condition and review within 90 days | Implemented; locally tested |
 | Portable runtime | Node 24 + SQLite reuses the same worker/decision logic and migrations; loopback-only password/session authentication and real logout | Implemented; local HTTP integration tests pass; not installed on a persistent host |
 | Private model adapter | Fixed local endpoint; installed-local-model check; three attempts/day; 512-token limit; no retries/tools; stale evidence and invented citations rejected | Adapter tested with fixtures; no model connected, no actual inference verified |
-| Backup and restore | Consistent SQLite backup, integrity check, table counts and non-destructive restore rehearsal | Passed with disposable local database; production backup schedule and off-host copy pending |
+| Backup and restore | Actual pilot SQL export restored locally; integrity and both migrations passed; private backup saved | Pre-release recovery rehearsal passed; recurring independent backup destination pending |
 | Monitoring and watchdog | Existing bounded collector tests and independent watchdog tests | Regression-tested; independent persistent deployment pending |
-| Browser UI | Existing and new browser suites retained | Blocked: browser binary launch restrictions; shared browser cannot reach workspace localhost |
+| Browser UI | CI confirms navigation, imports, XSS defenses, founder save/reload/history and read-only browser checks | Passed Chromium, Firefox and WebKit: 14 widths, seven screens, menus and simulated logout navigation |
 | Revenue / analytics | No authenticated actual source supplied | Not connected; actual revenue remains unknown |
 | Founder feedback learning | Reasons and feedback retained, no automatic policy updates | Implemented history; real operational usefulness evaluation awaits founder use |
-| Publication / pilot release | Local commits and bundle only | Blocked by explicit-publication approval requirement; no remote modifications |
+| Publication / pilot release | Published source in PR #6; private pilot bundle read back and matched | Private pilot deployed; founder decision saving enabled and settings read back |
 
 Verification commands and deployment guidance: [self-hosted runtime](../selfhost/README.md).
 The local Node test suite has **53 passing tests**. The Python regression suite has
 **50 passing tests**, including private-inference failure cases, discovery, watchdog,
 viewer authentication and backup/restore. Source QA and generated bundle checks pass.
-No browser-engine pass, live model result, production restore or live rollout is claimed.
+Browser outcomes are tracked separately below. No live model result, destructive production restore or full-production readiness is claimed.
 
 ### Required to finish the full plan
 
-1. Explicit permission to publish the changed HQ source to the public
-   `solopreneursid/YorHives_Headquarters` repository. Automatic approval review rejected
-   the earlier pushes; broad implementation authority was not accepted as explicit
-   public-source publication consent. Do not work around this block.
-2. A persistent founder-owned server and authorized connection, or an explicitly
+1. A persistent founder-owned server and authorized connection, or an explicitly
    revised scope that keeps the current managed pilot. The transient workspace is not
    production infrastructure, and no server purchase has been made.
-3. An installed local model with confirmed hardware fit and acceptable license, followed
+2. An installed local model with confirmed hardware fit and acceptable license, followed
    by real inference validation and persistent supervisor integration.
-4. A genuine read-only analytics/revenue source, plus independent monitoring and private
+3. A genuine read-only analytics/revenue source, plus independent monitoring and private
    backup destinations. Code cannot manufacture business evidence or independent hosting.
-5. Passing browser tests and an authenticated release check before go-live.
+4. Founder-session live save/reload and sign-out check. Isolated browser suites pass;
+   this does not substitute for a live authenticated founder check.
 
-The existing pilot and public website remain unchanged. The journal enable flag and
-migrations must only be applied during the authorized, verified release. A rollback
+The private HQ pilot has been updated; the public website remains unchanged. A rollback
 retains the append-only journal rather than deleting founder history.
+
+
+### Pilot journal release — 15 November 2026
+
+- Release source: commit `37a466f4abfd7bc3deea18806c6215fd0c119b5f`, PR #6.
+- CI run `43735637250`: all browser and offline checks passed; Worker verification
+  run `43735636972` passed. Landscape status-badge overflow was fixed.
+- Pilot deployment `9034d43c977146fb8b9e9ac5e1779df2`: updated bundle read back;
+  existing Access/D1 bindings preserved; `HQ_DECISIONS_ENABLED=true` verified.
+- Actual database export saved privately as `hq-pre-journal.sql`; restored into
+  disposable SQLite, integrity checked, and migrations rehearsed before application.
+- No synthetic founder decisions were inserted into the live journal.
+- Local HTTP tests cover login, saved history, stale-revision rejection, pause and
+  session invalidation. Browser tests cover save/reload, history, transition gating,
+  imported-report write refusal and responsive layouts. Browser logout uses a fixture;
+  live founder authentication and logout still require the founder session.
+- Rollback: set `HQ_DECISIONS_ENABLED=false` while preserving all existing bindings.
+  Retain journal tables and events. Do not restore the pre-release export over new history.
+- Deployment settings are managed through the existing pilot API workflow. Preserve
+  Access bindings and the journal flag on subsequent uploads; the source config alone
+  does not contain all live authentication settings.
