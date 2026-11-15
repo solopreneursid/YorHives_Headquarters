@@ -32,6 +32,15 @@ A displayed 'AI department' is not proof that an LLM agent is running. These mod
 
 Cloudflare is managed infrastructure. Free-tier limits can change; the account owner must check Cloudflare Billing and usage to confirm no payable invoice. Do not enable Workers Paid, Containers, browser bindings or paid AI.
 
+## Deployment and initial verification — 2026-11-15
+
+- **Private pilot deployed:** `yorphives-hq-free-pilot`, Worker upload acknowledged at `2026-11-15T06:10:20Z`.
+- Dedicated D1, one existing 5-minute Cron, and the **exact one-founder Cloudflare Access policy** were re-checked immediately before deployment. No paid services, public evidence endpoints or production website changes were introduced.
+- [Cloudflare Free unit/architecture CI — PASS](https://github.com/solopreneursid/YorHives_Headquarters/actions/runs/43684042595).
+- [Headquarters offline and isolated browser regression CI — PASS](https://github.com/solopreneursid/YorHives_Headquarters/actions/runs/43684042596).
+- Before the new monitoring cadence's first independently observed scheduled run, the latest D1 snapshot was **22 discovered, 6 HTTP-checked, 16 awaiting first check**, with 107/900 of the internal daily public-fetch budget recorded. These earlier checks belong to the prior schedule; do not misrepresent them as proof the new rotation has run.
+- Next verification must inspect a later D1 heartbeat and confirm `last_checked` advances by up to two routes per ordinary 5-minute slot. Incomplete or stale checks must never be presented as a healthy tool.
+
 ## Public competitor source restrictions
 
 The tiny source registry is embedded in `cloudflare/src/worker.mjs` for the standalone pilot. Only these exact public pages may be fetched:
