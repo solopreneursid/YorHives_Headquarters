@@ -12,6 +12,21 @@ Verification: [Cloudflare Free authentication test run](https://github.com/solop
 
 This proves the **anonymous authentication gate**, not the complete interactive login. The founder still needs to complete sign-in and confirm that the dashboard and private D1 report load after authentication. If sign-in succeeds but the Worker still returns `403`, inspect the JWT signature/issuer/audience verification without disabling the authentication gate.
 
+## Founder-only login: second repair — 2026-11-15
+
+A real founder browser visit still displayed `Private Headquarters access not configured or unauthorized` **after** the Worker-level Cloudflare Access redirect had been independently tested. That means the **unauthenticated redirect test was not enough to confirm successful login**.
+
+Cloudflare's current Worker Access integration exposes a platform-verified signed-in user as `ctx.access` (with `ctx.access.aud` and `ctx.access.getIdentity()`). The earlier Worker code expected a legacy `Cf-Access-Jwt-Assertion` request header on every browser visit and rejected the request if that header wasn't present, even after Cloudflare Access had already authenticated the browser.
+
+**Repair now deployed to the isolated pilot:** 
+- First prefer Cloudflare's **verified** `ctx.access` identity and require the exact application audience **and** exact single founder email.
+- If `ctx.access` is unavailable, accept only a cryptographically verified Access JWT with matching issuer, audience, expiration **and** founder email. Caller-supplied email headers are never trusted.
+- The allowed founder email is a Cloudflare Worker binding `ACCESS_OWNER_EMAIL`, derived from the existing *one-email* Access allow policy, **not embedded in public source files**.
+- If either identity or application doesn't match, fail closed with HTTP 403; do not expose dashboard data or provide authentication bypasses.
+- No changes to the live YorpHives website, original Worker, schedules, billing tier, DNS or project permissions.
+
+**Verification:** [Cloudflare Free access security regression](https://github.com/solopreneursid/YorHives_Headquarters/actions/runs/43664315615) and [Headquarters regression](https://github.com/solopreneursid/YorHives_Headquarters/actions/runs/43664315624) passed. Unit tests cover founder identity, wrong email, wrong audience, no identity, thrown identity lookups and forged headers. Cloudflare reports one allowed founder address, matching Access audience, the `ACCESS_OWNER_EMAIL` binding and one five-minute Cron. **A successful browser sign-in still requires confirmation from the founder**; no one-time access code or account session was collected.
+
 ## Pilot access
 
 Private URL: https://yorphives-hq-free-pilot.solopreneursid-proy.workers.dev/
