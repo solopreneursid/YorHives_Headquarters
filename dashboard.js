@@ -306,7 +306,8 @@
       append(bottom, node("small", "", item.confidence), open);
       const context = node("div", "lead-context", item.kind === "possible-existing-product" ?
         "POSSIBLE EXISTING TOOL · CHECK FEATURE PARITY" : item.kind === "potential-missing-product" ?
-        "POSSIBLE NEW TOOL · VALIDATE DEMAND" : "UNVALIDATED RESEARCH LEAD");
+        "POSSIBLE NEW TOOL · VALIDATE DEMAND" : item.kind === "catalog-unverified" ?
+        "CATALOG NOT VERIFIED · RESEARCH MENTION ONLY" : "UNVALIDATED RESEARCH LEAD");
       append(card, top, context, node("h3", "", item.title), node("p", "", item.description), bottom);
       parent.append(card);
     });
@@ -525,7 +526,7 @@
         id: cleanText(o.id, 80) || "opportunity" + i, title: cleanText(o.title, 160) || "Untitled lead",
         category: ["product", "revenue", "technology"].includes(o.category) ? o.category : "product",
         confidence: cleanText(o.confidence, 70) || "Unassessed",
-        kind: ["potential-missing-product", "possible-existing-product"].includes(o.kind) ? o.kind : "unvalidated-lead",
+        kind: ["potential-missing-product", "possible-existing-product", "catalog-unverified"].includes(o.kind) ? o.kind : "unvalidated-lead",
         description: cleanText(o.description, 3000), recommendation: cleanText(o.recommendation, 3000),
         observedAt: cleanText(o.observedAt, 45), evidence: evidence(o)
       })),
