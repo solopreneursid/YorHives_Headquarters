@@ -8,6 +8,7 @@ All SQLite and report writes are in a separate private evidence directory.
 from __future__ import annotations
 
 import argparse
+import hashlib
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import json
@@ -141,7 +142,7 @@ def _inventory(state: Path, origin: str) -> list[dict]:
             continue
         urls.add(url)
         products.append({"url": url, "name": trimmed(item.get("name"), 150) or "Unnamed tool"})
-    return products[:MAX_PROBES]
+    return products
 
 
 def _ensure_table(db: sqlite3.Connection) -> None:
@@ -206,7 +207,7 @@ def apply_results(db: sqlite3.Connection, inputs: list[dict], probe: Callable[[s
         checks.append(check)
         if state == "failed":
             findings.append({
-                "id": "browser-qa-" + __import__("hashlib").sha256(url.encode()).hexdigest()[:16],
+                "id": "browser-qa-" + hashlib.sha256(url.encode()).hexdigest()[:16],
                 "title": "Repeated browser-render failure: " + name,
                 "category": "quality", "priority": "high",
                 "asset": name, "description": (
@@ -220,6 +221,62 @@ def apply_results(db: sqlite3.Connection, inputs: list[dict], probe: Callable[[s
         "passed": passed, "confirmedFailures": failed,
         "pendingConfirmation": pending, "unverified": blocked
     }}
+
+
+def schedule_probes(db: sqlite3.Connection, products: list[dict]) -> list[dict]:
+    """Prefer newly discovered routes, then unresolved first failures, then oldest checks.
+
+    A fixed first-N slice would permanently starve late-added products once the
+    catalog exceeded the scan budget. This queue eventually covers all routes.
+    """
+    _ensure_table(db)
+    previous = {row["url"]: row for row in db.execute("SELECT * FROM browser_assurance").fetchall()}
+    def order(item: dict):
+        last = previous.get(item["url"])
+        priority = 0 if last is None else 1 if last["status"] == "pending_confirmation" else 2
+        return priority, last["last_checked"] if last else "", item["url"]
+    return sorted(products, key=order)[:MAX_PROBES]
+
+
+def aggregate_known_checks(db: sqlite3.Connection, products: list[dict], now: str) -> tuple[list[dict], list[dict]]:
+    """Show all catalog items, but never describe stale browser evidence as fresh."""
+    rows = {row["url"]: row for row in db.execute("SELECT * FROM browser_assurance").fetchall()}
+    checks, active_findings = [], []
+    now_dt = datetime.fromisoformat(now.replace("Z", "+00:00"))
+    for item in products:
+        row = rows.get(item["url"])
+        if row is None:
+            checks.append({"url": item["url"], "name": item["name"], "status": "unverified",
+                           "reason": "not-yet-tested", "failStreak": 0, "checkedAt": "",
+                           "scope": "read-only-browser-render-and-runtime-errors"})
+            continue
+        try:
+            at = datetime.fromisoformat(row["last_checked"].replace("Z", "+00:00"))
+            fresh = 0 <= (now_dt - at).total_seconds() < 12 * 3600
+        except (ValueError, TypeError):
+            fresh = False
+        visible = row["status"] if fresh else "unverified"
+        reason = row["reason"] if fresh else "browser-observation-stale"
+        checks.append({"url": item["url"], "name": item["name"], "status": visible,
+                       "reason": reason, "failStreak": row["fail_streak"],
+                       "checkedAt": row["last_checked"], "httpStatus": row["last_http"],
+                       "uncaughtErrors": row["uncaught_errors"],
+                       "blockedRequests": row["blocked_requests"],
+                       "scope": "read-only-browser-render-and-runtime-errors"})
+        if row["fail_streak"] >= 2:
+            active_findings.append({
+                "id": "browser-qa-" + hashlib.sha256(item["url"].encode()).hexdigest()[:16],
+                "title": "Unresolved browser-render failure: " + item["name"],
+                "category": "quality", "priority": "high", "asset": item["name"],
+                "description": ("At least two consecutive read-only browser checks previously failed. " +
+                                ("Latest browser attempt was unavailable or blocked." if row["status"] == "unverified" else
+                                 "Last observation is stale; retest required." if not fresh else
+                                 "Reason: " + row["reason"]) +
+                                " No tool functionality or security claim is implied."),
+                "recommendation": "Review the failing page in an isolated test session and obtain a confirmed passing check before closing this finding.",
+                "observedAt": row["last_checked"], "evidence": [item["url"]]
+            })
+    return checks, active_findings
 
 
 def run(state: Path, origin: str, *, probe: Callable[[str], dict] | None = None,
@@ -237,17 +294,22 @@ def _persist(state: Path, products: list[dict], probe: Callable[[str], dict],
     db = connect_db(state)
     try:
         with db:
-            result = apply_results(db, products, probe, now)
+            scheduled = schedule_probes(db, products)
+            result = apply_results(db, scheduled, probe, now)
+            checks, outstanding = aggregate_known_checks(db, products, now)
         report = {
             "schemaVersion": "yorphives.hq-browser-assurance.v1",
             "generatedAt": now, "origin": origin,
             "verification": {
                 "method": "isolated-readonly-chromium-dom-observation",
                 "assets": len(products),
+                "checkedThisCycle": len(scheduled),
+                "reportedCoverage": sum(bool(check.get("checkedAt")) for check in checks),
+                "notYetTested": sum(not check.get("checkedAt") for check in checks),
                 "limitations": "Does not click/submit or verify advertised features; results require independent QA and founder review.",
                 **result["summary"]
             },
-            "checks": result["checks"], "findings": result["findings"]
+            "checks": checks, "findings": outstanding
         }
         out = state / "browser-assurance-report.json"
         stage = state / ".browser-assurance-report.tmp"
