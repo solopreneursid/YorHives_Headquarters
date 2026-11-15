@@ -335,6 +335,26 @@
       ? "Passive monitoring · no browser testing"
       : checked.length ? qaFailed + " confirmed alerts · " + qaPending + " awaiting confirmation"
       : "No browser checks reported";
+
+    const spending = $("zero-cost-summary"); spending.replaceChildren();
+    const guard = state.data.resourceBudget;
+    if (!guard) {
+      spending.append(emptyState("Budget telemetry unavailable",
+        "Connect the isolated Cloudflare Free collector to see daily request counts and explicit disabled capabilities."));
+    } else {
+      const area = node("div", "budget-grid");
+      const stats = [
+        ["Public HTTP requests today", guard.used + " / " + (guard.limit || "not set"), guard.limit > 0 ? "Internal daily limit" : "No limit declared"],
+        ["AI inference", guard.aiDisabled ? "OFF" : "Not verified", "No paid model calls expected"],
+        ["Production browser testing", guard.browserDisabled ? "OFF" : "Not verified", "No browser sessions in this worker"]
+      ];
+      for (const [name, count, hint] of stats) {
+        const tile = node("div", "budget-record");
+        append(tile, node("span", "", name), node("strong", "", count), node("small", "", hint));
+        area.append(tile);
+      }
+      spending.append(area);
+    }
     $("catalog-kind").textContent = local ? "LOCAL REPORT" : imported ? "IMPORTED" : "EXAMPLE";
     $("discovery-status").textContent = !imported ? "Preview — not connected"
       : verifiedScan ? (local ? "Local discovery reported complete" : "Imported successful discovery")
@@ -509,6 +529,17 @@
         occurredAt: cleanText(a.occurredAt, 45)
       }))
     };
+    const rawBudget = raw.resourceBudget;
+    if (rawBudget && typeof rawBudget === "object" && !Array.isArray(rawBudget)) {
+      const publicFetches = rawBudget.publicFetches || {};
+      const number = value => Number.isSafeInteger(value) && value >= 0 ? Math.min(value, 1_000_000) : 0;
+      normal.resourceBudget = {
+        used: number(publicFetches.used),
+        limit: number(publicFetches.limit),
+        aiDisabled: rawBudget.aiCalls?.disabled === true,
+        browserDisabled: rawBudget.browserMinutes?.disabled === true
+      };
+    }
     normal.verification = {
       complete: raw.pipeline?.products?.complete === true || raw.verification?.complete === true,
       generatedAt: cleanText(raw.pipeline?.generatedAt || raw.generatedAt, 45),
