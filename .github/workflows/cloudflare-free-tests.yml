@@ -21,7 +21,7 @@ jobs:
       - name: Check Cloudflare worker JavaScript
         run: |
           node --check cloudflare/src/worker.mjs
-          node --test cloudflare/tests/worker.test.mjs
+          node --test cloudflare/tests/*.test.mjs
       - name: Build vetted public assets only
         run: |
           node cloudflare/build-assets.mjs
