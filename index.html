@@ -55,6 +55,7 @@
         <div class="nav-group-title">WORKSPACE</div>
         <button class="nav-item is-active" data-nav="overview" aria-current="page"><svg class="icon"><use href="#i-grid"/></svg><span>Overview</span></button>
         <button class="nav-item" data-nav="monitoring"><svg class="icon"><use href="#i-activity"/></svg><span>Monitoring</span><span class="nav-count" id="nav-finding-count">—</span></button>
+        <button class="nav-item" data-nav="products"><svg class="icon"><use href="#i-layers"/></svg><span>Product intelligence</span></button>
         <button class="nav-item" data-nav="opportunities"><svg class="icon"><use href="#i-radar"/></svg><span>Opportunities</span></button>
         <button class="nav-item" data-nav="workforce"><svg class="icon"><use href="#i-bots"/></svg><span>AI workforce</span></button>
         <div class="nav-group-title nav-group-spaced">INTELLIGENCE</div>
@@ -160,6 +161,47 @@
           <div class="inner-insight"><svg class="icon"><use href="#i-info"/></svg><span>Ideas are leads, not guaranteed income. Verify demand, licensing, cost, and sources before investing.</span></div>
           <div class="filter-bar"><div class="filter-chips" role="group" aria-label="Filter opportunities"><button class="filter-chip is-selected" data-opportunity-filter="all">All leads</button><button class="filter-chip" data-opportunity-filter="product">Products</button><button class="filter-chip" data-opportunity-filter="revenue">Revenue</button><button class="filter-chip" data-opportunity-filter="technology">Technology</button></div><span class="filter-detail" id="opportunity-count"></span></div>
           <div id="opportunities-grid" class="opportunities-grid"></div>
+        </section>
+
+
+        <section id="view-products" class="view" aria-labelledby="products-heading" hidden>
+          <div class="page-heading">
+            <div><div class="eyebrow"><span class="eyebrow-line"></span> CONTINUOUS PRODUCT INTELLIGENCE</div>
+              <h1 id="products-heading">Know what's new.<br><em>Never miss a tool.</em></h1>
+              <p>Automatically discover published YorpHives tools, notice meaningful changes, check availability, and investigate competitive feature gaps — all without editing your projects.</p>
+            </div><span class="header-emblem mint"><svg class="icon"><use href="#i-layers"/></svg></span>
+          </div>
+          <div class="inner-insight"><svg class="icon"><use href="#i-lock"/></svg><span>Read-only by design. A tool's HTTP response and visible controls are observations, not proof that all features work. Research leads require independent validation.</span></div>
+          <div class="discovery-strip">
+            <div class="discovery-live-icon"><svg class="icon"><use href="#i-radar"/></svg></div>
+            <div class="discovery-strip-copy"><span class="small-eyebrow">AUTO-DISCOVERY ENGINE</span><strong id="discovery-status">Preview — not connected</strong><small id="discovery-explainer">Automatic enrollment starts when a read-only scanner is installed and scheduled on your own server.</small></div>
+            <div class="discovery-actions"><button class="button button-secondary" id="product-refresh-trigger"><svg class="icon"><use href="#i-refresh"/></svg> Refresh local evidence</button><button class="button button-secondary" id="product-import-trigger"><svg class="icon"><use href="#i-upload"/></svg> Import report</button></div>
+          </div>
+          <div class="product-stat-grid">
+            <article class="product-stat"><span>Discovered products</span><strong id="product-total">0</strong><small>Website tools & applications</small></article>
+            <article class="product-stat"><span>Recently added</span><strong id="product-new">0</strong><small>Automatically enrolled</small></article>
+            <article class="product-stat"><span>Change observations</span><strong id="product-changes-total">0</strong><small>Requires review, not auto-fix</small></article>
+            <article class="product-stat"><span>Feature comparisons</span><strong id="product-comparisons-total">0</strong><small>Evidence-based hypotheses</small></article>
+            <article class="product-stat"><span>Browser assurance</span><strong id="product-qa-total">—</strong><small id="product-qa-caption">No browser QA checks reported</small></article>
+          </div>
+          <div class="product-intel-grid">
+            <section class="panel product-intel-panel" aria-labelledby="product-catalog-heading">
+              <div class="panel-heading"><div><span class="small-eyebrow">AUTO-ENROLLED INVENTORY</span><h2 id="product-catalog-heading">YorpHives product catalog</h2></div><span class="outline-pill" id="catalog-kind">PREVIEW</span></div>
+              <p class="intel-caption">Every discovered tool enters monitoring automatically. HTTP status, first sighting, and visible controls remain traceable.</p>
+              <div id="product-catalog" class="product-catalog"></div>
+            </section>
+            <section class="panel product-intel-panel" aria-labelledby="product-changes-heading">
+              <div class="panel-heading"><div><span class="small-eyebrow">WHAT CHANGED?</span><h2 id="product-changes-heading">Discovery & change feed</h2></div><button class="subtle-link" data-nav="activity">Evidence log <svg class="icon"><use href="#i-arrow"/></svg></button></div>
+              <p class="intel-caption">New launches, visible controls, repeated failures, and tools no longer found in the catalog.</p>
+              <div id="product-change-feed" class="product-change-feed"></div>
+            </section>
+          </div>
+          <section class="panel product-gap-panel" aria-labelledby="product-gaps-heading">
+            <div class="panel-heading"><div><span class="small-eyebrow">COMPETITIVE FEATURE GAP WATCH</span><h2 id="product-gaps-heading">Where could we do better?</h2></div><button class="subtle-link" data-nav="opportunities">Growth radar <svg class="icon"><use href="#i-arrow"/></svg></button></div>
+            <p class="intel-caption">Only source-backed comparisons should become findings. Missing competitor features are hypotheses until measured or verified.</p>
+            <div id="product-feature-gaps"></div>
+          </section>
+          <div class="inner-insight product-footer-note"><svg class="icon"><use href="#i-info"/></svg><span>Current support: public sitemap, same-origin product links, optional product manifest, status checks and visible HTML controls. JavaScript-only tools need a manifest or an independent browser-based discovery adapter for complete coverage.</span></div>
         </section>
 
         <section id="view-workforce" class="view" aria-labelledby="workforce-heading" hidden>

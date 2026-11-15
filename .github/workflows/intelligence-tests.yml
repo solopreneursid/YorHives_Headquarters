@@ -1,0 +1,69 @@
+name: Headquarters read-only intelligence tests
+
+on:
+  pull_request:
+    paths:
+      - 'intelligence/**'
+      - 'tests/**'
+      - 'index.html'
+      - 'dashboard.js'
+      - 'styles.css'
+      - '.github/workflows/intelligence-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-contracts:
+    name: Offline source and intelligence checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out read-only test snapshot
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Parse Python modules without running them
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          modules = sorted(Path('intelligence').glob('*.py')) + sorted(Path('tests').glob('*.py'))
+          for module in modules:
+              ast.parse(module.read_text(encoding='utf-8'), filename=str(module))
+              print('PASS syntax:', module)
+          PY
+      - name: Run isolated discovery and growth unit tests
+        run: |
+          python3 tests/test_intelligence.py
+          python3 tests/test_viewer.py
+          python3 tests/test_assurance.py
+          python3 tests/test_watchdog.py
+      - name: Parse frontend JS and run deterministic checks
+        run: |
+          node --check dashboard.js
+          node --test tests/quality.test.mjs
+          node scripts/qa-check.mjs
+      - name: Validate shell runners without executing
+        run: |
+          bash -n scripts/run-review.sh
+          bash -n scripts/run-local-ai-review.sh
+
+  browser-ui:
+    name: Isolated Chromium interface regression checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out test snapshot without write credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install open-source Playwright locally in test runner
+        run: |
+          python3 -m pip install --user "playwright==1.65.2"
+          python3 -m playwright install chromium
+      - name: Exercise navigation, sample provenance, imports, and XSS checks
+        run: |
+          python3 tests/ui_smoke.py
+          python3 tests/test_assurance_browser.py

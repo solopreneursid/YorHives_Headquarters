@@ -1,0 +1,11 @@
+{
+  "purpose": "Public source signals only. Never treat RSS mentions as verified demand.",
+  "feeds": [
+    {
+      "id": "hacker-news-show",
+      "url": "https://hnrss.org/show",
+      "description": "Public Show HN product and project submissions"
+    }
+  ],
+  "competitorWatchlist": []
+}
