@@ -21,7 +21,16 @@ All external calls are restricted to allowlisted **public GET** URLs. Redirects 
 
 Cloudflare Pages production `yorphives` currently references an older GitHub source project `solopreneursid/YorpHives` that is not accessible via the connected GitHub account. The separate `solopreneursid/YorpHives_Website` repository currently contains only `LICENSE`. Neither represents a reliable current product inventory.
 
-Accordingly, **the deployed website's public responses** are the evidence source, not repository search. Previously recorded discovery returned `partial:no-discoverable-tool-routes`. This is not proof that YorpHives has zero tools.
+Accordingly, **the deployed website's public responses** are the evidence source, not repository search. Earlier discovery returned `partial:no-discoverable-tool-routes`. The v3 engine's first live scan at `2026-11-15T05:30:47Z` also returned `partial:published:0:candidates:0:sources:0` despite a successful heartbeat and an internal request counter of 74/900. **These results show a discovery blind spot, not an empty website.**
+
+A direct read-only inspection of the Cloudflare Pages **production deployment's public-file index** (Nov 9 deployment) found these publicly deployed paths:
+- `/free-tools-tool-sitemap.xml`
+- `/free-tools/index.html`
+- `/free-tools/file-studio/index.html`
+
+The v4 adapter therefore adds the exact **tool-specific public sitemap** and directory-index hubs, treats trailing-slash redirects as unverified (not outages), and records per-source HTTP status diagnostics in dedicated private D1 status records.
+
+These file paths are evidence from the owner-controlled Pages deployment, **not** proof that tool functionality works. The runtime collector continues to use only public GET sources and no Cloudflare account credentials.
 
 ## Optional future website manifest — not deployed
 
@@ -70,7 +79,7 @@ Tests:
 - Mocked public GET only, no redirects, no website writes, no paid AI/browsers.
 - SQLite-compatible migration tests, existing UI regression tests, founder-only Access regression tests.
 
-The upgraded discovery engine has a one-time versioned scan at its first normal five-minute Cron after deployment, then the normal six-hour cadence. It does **not** create a remotely callable admin or scan-trigger API.
+The upgraded v4 discovery engine has a one-time versioned scan at its first normal five-minute Cron after deployment, then the normal six-hour cadence. It does **not** create a remotely callable admin or scan-trigger API.
 
 ## Remaining limitations
 
