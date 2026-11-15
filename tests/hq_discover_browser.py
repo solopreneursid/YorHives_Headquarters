@@ -45,7 +45,7 @@ with sync_playwright() as pw:
             args.update(executable_path="/usr/bin/chromium",args=["--no-sandbox","--disable-dev-shm-usage"])
         browser=engine.launch(**args)
         for width in (320,390,768,1440):
-            page=browser.new_page(viewport={"width":width,"height":820})
+            page=browser.new_page(viewport={"width":width,"height":820},accept_downloads=True)
             errors=[]
             page.on("pageerror",lambda e:errors.append(str(e)))
             page.set_content(HTML)
@@ -114,6 +114,13 @@ with sync_playwright() as pw:
             page.locator(".lead-card").first.locator("[data-github-save]").click()
             page.locator('[data-action="github-saved"]').click()
             assert page.locator(".lead-card").count()==1
+            # Shortlist export is a private, source-labeled JSON download.
+            with page.expect_download() as exported:
+                page.locator('[data-action="github-export"]').click()
+            assert exported.value.suggested_filename=="hq-open-source-shortlist.json"
+            payload=json.loads(Path(exported.value.path()).read_text())
+            assert payload["source"]=="github-public" and len(payload["projects"])==1
+            assert payload["projects"][0]["url"].startswith("https://github.com/")
             page.locator(".lead-body").first.click()
             assert page.locator("#detail-drawer").is_visible()
             assert page.locator('a[href^="https://github.com/"]').count()>=1
