@@ -17,9 +17,10 @@ from discover import private_storage, connect_db, scan, utcnow
 from browser_discover import browser_discover
 from research import run as research_run, DEFAULT_CONFIG
 from compare import compare as competitor_compare
+from assurance import run as assurance_run
 
 
-def combine(products: dict, growth: dict | None, comparisons: dict | None, errors: list[str]) -> dict:
+def combine(products: dict, growth: dict | None, comparisons: dict | None, assurance: dict | None, errors: list[str]) -> dict:
     report = dict(products)
     if growth is not None:
         report["opportunities"] = growth.get("opportunities", [])[:80]
@@ -29,11 +30,23 @@ def combine(products: dict, growth: dict | None, comparisons: dict | None, error
         report["comparisons"] = []
     if comparisons is not None:
         report["comparisons"] = comparisons.get("comparisons", [])[:80]
+    report["checks"] = []
+    if assurance is not None:
+        report["checks"] = assurance.get("checks", [])[:60]
+        report["findings"] = (report.get("findings", []) + assurance.get("findings", []))[:200]
+        checked = {item.get("url"): item for item in report["checks"] if isinstance(item, dict)}
+        for product in report.get("products", []):
+            check = checked.get(product.get("url"))
+            if check:
+                product["qaStatus"] = check.get("status", "unverified")
+                product["qaCheckedAt"] = check.get("checkedAt", "")
+                product["qaReason"] = check.get("reason", "")
     report["pipeline"] = {
         "generatedAt": utcnow(),
         "products": products.get("verification", {}),
         "research": growth.get("verification", {}) if growth else {"status": "not-completed"},
         "competitors": comparisons.get("verification", {}) if comparisons else {"status": "not-completed"},
+        "assurance": assurance.get("verification", {}) if assurance else {"status": "not-completed"},
         "errors": errors,
         "readOnly": True,
         "approvalRequired": True
@@ -62,11 +75,13 @@ def main() -> int:
     parser.add_argument("--allow-local", action="store_true", help="Localhost only, for tests")
     parser.add_argument("--browser-discovery", action="store_true", help="Use optional Playwright to discover client-rendered tool links")
     parser.add_argument("--browser-every", type=int, default=6, help="When enabled, browser discovery every N scans")
+    parser.add_argument("--assurance-browser", action="store_true", help="Opt in to read-only browser assurance on discovered tools")
+    parser.add_argument("--assurance-every", type=int, default=6, help="When enabled, browser QA every N scans")
     args = parser.parse_args()
-    if args.interval_minutes < 15 or args.research_every < 1 or args.compare_every < 1 or args.browser_every < 1:
+    if args.interval_minutes < 15 or args.research_every < 1 or args.compare_every < 1 or args.browser_every < 1 or args.assurance_every < 1:
         parser.error("Use interval >=15 minutes and research-every >=1")
     state = private_storage(args.state_dir)
-    if args.browser_discovery:
+    if args.browser_discovery or args.assurance_browser:
         # Create only the separate evidence database directory, never a project directory.
         initial_db = connect_db(state)
         initial_db.close()
@@ -124,6 +139,24 @@ def main() -> int:
                             errors.append("Competitor report expired; refresh required")
                     except (ValueError, KeyError, OSError, TypeError):
                         errors.append("Competitor report is unreadable")
+            assurance = None
+            if args.assurance_browser and products is not None and counter % args.assurance_every == 0:
+                try:
+                    assurance = assurance_run(state, args.base_url, allow_local=args.allow_local)
+                except Exception as exc:
+                    errors.append("Browser assurance unavailable: " + str(exc)[:180])
+            elif args.assurance_browser:
+                stored = state / "browser-assurance-report.json"
+                if stored.is_file():
+                    try:
+                        previous = json.loads(stored.read_text(encoding="utf-8"))
+                        then = datetime.fromisoformat(previous["generatedAt"].replace("Z", "+00:00"))
+                        if (datetime.now(timezone.utc) - then).total_seconds() < 12 * 3600 and previous.get("origin") == args.base_url:
+                            assurance = previous
+                        else:
+                            errors.append("Browser assurance report expired or from different origin")
+                    except (ValueError, KeyError, OSError, TypeError):
+                        errors.append("Browser assurance report unreadable")
             if products is None:
                 # Don't overwrite a previously successful product report with an empty inventory.
                 prior = state / "product-intelligence-report.json"
@@ -141,7 +174,7 @@ def main() -> int:
             else:
                 if not products.get("verification", {}).get("complete", False):
                     errors.append("Product discovery incomplete; do not trust inventory coverage")
-                report = combine(products, growth, comparisons, errors)
+                report = combine(products, growth, comparisons, assurance, errors)
                 path = write_combined(state, report)
                 print(json.dumps({"at": report["pipeline"]["generatedAt"], "products": len(report.get("products", [])),
                                   "leads": len(report.get("opportunities", [])), "warnings": errors,
