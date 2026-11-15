@@ -83,7 +83,7 @@
     } catch (_) { return ""; }
   };
   const label = (word) => String(word || "").replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
-  const originLabel = () => state.origin === "preview" ? "Example only" : state.origin === "local" ? "Private local evidence — unverified" : "Imported — unverified";
+  const originLabel = () => state.origin === "preview" ? "Example only" : state.origin === "cloudflare" ? "Cloudflare scheduled evidence — unverified" : state.origin === "local" ? "Private local evidence — unverified" : "Imported — unverified";
   const priorityRank = { high: 0, medium: 1, low: 2 };
   const categoryIcons = { security: "shield", dependencies: "code", reliability: "activity", quality: "check", product: "layers", revenue: "dollar", technology: "radar" };
   const workerIcons = ["activity", "shield", "spark", "radar", "trend", "dollar"];
@@ -122,7 +122,8 @@
 
   function renderMetrics() {
     const d = state.data;
-    const local = state.origin === "local";
+    const local = state.origin === "local" || state.origin === "cloudflare";
+    const cloud = state.origin === "cloudflare";
     const preview = state.origin === "preview";
     $("metric-assets").textContent = d.assets.length;
     $("metric-findings").textContent = d.findings.length;
@@ -140,10 +141,10 @@
     const observedAt = cleanDate(d.verification?.generatedAt || "");
     $("snapshot-date").textContent = preview ? "Illustrative dashboard" :
       local ? "Local evidence" + (observedAt ? " · " + observedAt : "") : "Imported file · not independently verified";
-    $("mode-label").textContent = preview ? "Preview mode" : local ? "Private evidence" : "Imported data";
+    $("mode-label").textContent = preview ? "Preview mode" : cloud ? "Cloudflare evidence" : local ? "Private evidence" : "Imported data";
     $("mode-chip").classList.toggle("imported", !preview);
     $("footer-mode").textContent = preview ? "PREVIEW · NOT A LIVE HEALTH REPORT" :
-      local ? "PRIVATE COLLECTOR · EVIDENCE REQUIRES REVIEW" : "IMPORTED DATA · NOT INDEPENDENTLY VERIFIED";
+      cloud ? "CLOUDFLARE FREE · OBSERVATION ONLY" : local ? "PRIVATE COLLECTOR · EVIDENCE REQUIRES REVIEW" : "IMPORTED DATA · NOT INDEPENDENTLY VERIFIED";
     $("brief-kind").textContent = preview ? "EXAMPLE" : local ? "LOCAL REPORT" : "IMPORTED";
     const notice = $("data-notice");
     notice.hidden = false;
@@ -151,7 +152,7 @@
     noticeText.textContent = preview
       ? "Preview workspace — The records below are examples, not findings from a live scan. Import a report to explore your own observations."
       : local
-        ? "Private collector report — This view refreshes from a self-hosted read-only endpoint. HTTP responses and research leads are observations, not proof that products work or business demand exists."
+        ? "Read-only collector report — These are recorded HTTP observations and research leads, not proof that every product feature works or that market demand exists."
         : "Imported report — These values came from a file in your browser. Headquarters has not independently checked them or connected to production systems.";
   }
 
@@ -319,7 +320,7 @@
     const changes = state.data.changes || [];
     const comparisons = state.data.comparisons || [];
     const imported = state.origin !== "preview";
-    const local = state.origin === "local";
+    const local = state.origin === "local" || state.origin === "cloudflare";
     const verifiedScan = imported && state.data.verification?.complete;
     $("product-total").textContent = products.length;
     $("product-new").textContent = changes.filter(item => item.kind === "new-product").length;
@@ -329,9 +330,10 @@
     const qaPassed = checked.filter(p => p.qaStatus === "passed").length;
     const qaFailed = checked.filter(p => p.qaStatus === "failed").length;
     const qaPending = checked.filter(p => p.qaStatus === "pending_confirmation").length;
-    $("product-qa-total").textContent = checked.length ? qaPassed + "/" + checked.length : "—";
-    $("product-qa-caption").textContent = checked.length
-      ? qaFailed + " confirmed alerts · " + qaPending + " awaiting confirmation"
+    $("product-qa-total").textContent = state.origin === "cloudflare" ? "HTTP" : checked.length ? qaPassed + "/" + checked.length : "—";
+    $("product-qa-caption").textContent = state.origin === "cloudflare"
+      ? "Passive monitoring · no browser testing"
+      : checked.length ? qaFailed + " confirmed alerts · " + qaPending + " awaiting confirmation"
       : "No browser checks reported";
     $("catalog-kind").textContent = local ? "LOCAL REPORT" : imported ? "IMPORTED" : "EXAMPLE";
     $("discovery-status").textContent = !imported ? "Preview — not connected"
@@ -551,7 +553,8 @@
     }
     try {
       const response = await fetch("/api/report", { credentials: "same-origin", cache: "no-store" });
-      if (response.status !== 200 || response.headers.get("X-YorpHives-HQ-Evidence") !== "readonly-local") {
+      const mode = response.headers.get("X-YorpHives-HQ-Evidence");
+      if (response.status !== 200 || !["readonly-local", "readonly-cloudflare"].includes(mode)) {
         if (notify) showToast("No fresh, authenticated private report is available.");
         return false;
       }
@@ -562,8 +565,8 @@
         return false;
       }
       if (state.origin === "imported" && !notify) return true;
-      applyReport(raw, "local");
-      if (notify) showToast("Private evidence refreshed. Check timestamps and sources.");
+      applyReport(raw, mode === "readonly-cloudflare" ? "cloudflare" : "local");
+      if (notify) showToast("Read-only evidence refreshed. Check timestamps and sources.");
       return true;
     } catch (error) {
       if (notify) showToast("Private evidence unavailable: " + cleanText(error.message, 90));
