@@ -943,11 +943,12 @@ body.session-ending::after {
   border:1px solid #dfeeea;border-radius:21px;padding:22px 25px;margin:0 0 26px;
   box-shadow:0 8px 29px #25496009;min-width:0;}
 .founder-brief-header {display:flex;justify-content:space-between;align-items:start;
-  gap:16px;margin-bottom:18px;}
+  flex-wrap:wrap;gap:16px;margin-bottom:18px;}
+.founder-brief-header>div {min-width:0;flex:1 1 240px;}
 .founder-brief-header h2 {font-size:21px;letter-spacing:-.65px;color:#203a4c;
   line-height:1.3;margin:6px 0 4px;font-weight:790;}
 .founder-brief-header p {color:#6f8593;font-size:12px;margin:0;}
-.brief-origin {display:inline-flex;align-items:center;white-space:nowrap;padding:7px 11px;
+.brief-origin {display:inline-flex;align-items:center;white-space:normal;max-width:100%;overflow-wrap:anywhere;padding:7px 11px;
   background:#e9f8f1;color:#167967;border:1px solid #d1eee0;
   border-radius:100px;font-size:10px;letter-spacing:.6px;font-weight:750;}
 .brief-stats {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
@@ -976,6 +977,7 @@ body.session-ending::after {
  .brief-stat:nth-child(4) {border-top:1px solid #edf1f5;}}
 @media(max-width:580px) {.founder-briefing {padding:16px 15px;margin-bottom:20px;border-radius:16px;}
  .founder-brief-header {flex-direction:column;gap:9px;}
+ .founder-brief-header>div {flex:0 1 auto;}
  .founder-brief-header h2 {font-size:19px;}
  .brief-stat {padding:12px;}
  .brief-stat strong {font-size:17px;}
