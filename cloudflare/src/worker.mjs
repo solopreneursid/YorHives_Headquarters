@@ -14,7 +14,7 @@ const RESEARCH_SOURCES = [RESEARCH, "https://hnrss.org/ask"];
 // Strictly allowlisted, public, anonymous, GET-only; not an applicability assessment.
 const ADVISORY_SOURCE = "https://api.github.com/advisories?type=reviewed&ecosystem=npm&per_page=3";
 const MAX_ROUTES_PER_DISCOVERY = 45;
-const MAX_CHECKS_PER_TICK = 3; // three least-recently-checked tool routes every 15 minutes
+const MAX_CHECKS_PER_TICK = 2; // bounded two-product rounds every five minutes; Free-tier safe
 const FETCH_BUDGET_DAY = 900; // intentionally far below platform ceilings
 const MAX_TEXT_BYTES = 100000;
 // Build-time replacement for the isolated API pilot; Wrangler Static Assets take priority.
@@ -591,15 +591,22 @@ async function securityWatch(env) {
 function schedulePlan(scheduledTime){
   const time=new Date(scheduledTime);
   const minute=time.getUTCMinutes(),hour=time.getUTCHours();
-  return {uptime:true,products:minute%15===0,discovery:minute===0 && hour%6===0,
-    research:minute===0 && hour===3, security:minute===0 && hour===4, retention:minute===0 && hour===3};
+  const discovery=minute===0 && hour%6===0;
+  const research=minute===0 && hour===3;
+  const security=minute===0 && hour===4;
+  // Keep heavy scanners separate from tool HTTP checks on 10ms CPU Free Cron.
+  // 2 tools per ordinary five-minute event and site check every 15 min:
+  // 564 tool checks/day + 96 website checks/day, leaving ~240 public fetches
+  // for discovery, research, advisory and bounded competitor source reviews.
+  return {uptime:minute%15===0,products:!(discovery||research||security),
+    discovery,research,security,retention:research};
 }
 async function scheduledCycle(env, scheduledTime) {
   if(!env.DB) throw Error("Missing D1 binding");
   const plan=schedulePlan(scheduledTime);
   // Cloudflare is free only while account remains on Free; this worker has
   // no paid API, AI binding, browser use, writable GitHub credential or deployment tool.
-  await checkSite(env);
+  if(plan.uptime) await checkSite(env);
   if(plan.products) await checkProducts(env);
   // On a newly initialized HQ database, discover/research immediately rather
   // than waiting up to six hours or one day for the first scheduled window.
