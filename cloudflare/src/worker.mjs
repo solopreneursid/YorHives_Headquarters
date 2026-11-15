@@ -339,7 +339,7 @@ function publicPageFingerprint(html){
   return stable?fnv(stable):"";
 }
 async function discoverTools(env) {
-  const choices=new Map(),manifestDeclared=new Set(); let validSources=0,manifestComplete=false,scriptCandidateCount=0;
+  const choices=new Map(),manifestDeclared=new Set(),sourceHealth=[]; let validSources=0,manifestComplete=false,scriptCandidateCount=0;
   const rank={manifest:5,structured:4,link:3,sitemap:2,script:1};
   const insert=(url,source,evidence,name="",features=[])=>{
     const safe=safeProductUrl(url,SITE,source==="manifest"||source==="structured");
@@ -353,6 +353,7 @@ async function discoverTools(env) {
   // The website's GitHub source may not correspond to the current Pages deploy.
   try{
     const result=await getPublic(env,SITE+"/.well-known/yorphives-products.json",{body:true});
+    sourceHealth.push("manifest:"+result.status);
     if(result.status===200 && result.text){
       const parsed=productManifest(result.text);
       if(parsed.items.length){validSources++;manifestComplete=parsed.complete;}
@@ -365,6 +366,7 @@ async function discoverTools(env) {
   const sitemaps=[SITE+"/sitemap.xml",SITE+"/free-tools-tool-sitemap.xml",SITE+"/sitemap_index.xml"];
   try{
     const robots=await getPublic(env,SITE+"/robots.txt",{body:true});
+    sourceHealth.push("robots:"+robots.status);
     if(robots.status===200 && robots.text){
       for(const m of robots.text.matchAll(/^\s*Sitemap:\s*(\S+)\s*$/gim)){
         const url=safeToolUrl(m[1]);
@@ -376,6 +378,7 @@ async function discoverTools(env) {
     const source=sitemaps[k];
     try{
       const response=await getPublic(env,source,{body:true});
+      sourceHealth.push("sitemap:"+new URL(source).pathname+":"+response.status);
       if(response.status!==200||!response.text)continue;
       const parsed=sitemapEntries(response.text);
       if(parsed.routes.length||parsed.children.length)validSources++;
@@ -389,6 +392,7 @@ async function discoverTools(env) {
   for(const url of hubs){
     try{
       const page=await getPublic(env,url,{body:true});
+      sourceHealth.push("hub:"+new URL(url).pathname+":"+page.status);
       if(page.status!==200||page.text===null)continue;
       const links=hubTools(page.text,url);
       const structured=publicStructuredProducts(page.text);
@@ -411,6 +415,7 @@ async function discoverTools(env) {
           if(main){
             try{
               const bundle=await getPublic(env,main,{body:true});
+              sourceHealth.push("script:"+bundle.status+(bundle.text===null?":oversize":""));
               if(bundle.status===200&&bundle.text){
                 const hinted=publicBundleToolHints(bundle.text);
                 scriptCandidateCount+=hinted.length;
@@ -460,6 +465,8 @@ async function discoverTools(env) {
   const label=manifestComplete?"observed:manifest-complete:":"partial:";
   await saveStatus(env,"discovery",label+"published:"+confirmed+":candidates:"+scriptCandidateCount+
     ":sources:"+validSources+(mismatch?":manifest-mismatch":""));
+  await saveStatus(env,"discovery_sources",sourceHealth.slice(0,14).join(","));
+
   // Discoveries are never removed on missing scans; a missing source is NOT
   // evidence of deletion, and literal JS routes never prove functionality.
   return {discovered:choices.size,newlyEnrolled:enrolled,confirmed,manifestComplete,scriptCandidateCount};
@@ -737,7 +744,7 @@ async function report(env) {
       recommendation:x.recommendation,evidence:[x.product_url,x.competing_url],
       observedAt:x.observed_at
     })),agents:[],
-    activity:metadata.filter(x=>x.key!=="site_bundle_fingerprint" && x.key!=="discovery_engine_version").slice(0,25).map(x=>({id:x.key,title:x.key.replaceAll("_"," "),
+    activity:metadata.filter(x=>x.key!=="site_bundle_fingerprint" && x.key!=="discovery_engine_version" && x.key!=="discovery_sources").slice(0,25).map(x=>({id:x.key,title:x.key.replaceAll("_"," "),
       summary:x.value,kind:"observation",occurredAt:x.checked_at})),
     resourceBudget:{publicFetches:{used:quotaUsed.public_fetches||0,limit:FETCH_BUDGET_DAY},
       aiCalls:{used:0,limit:0,disabled:true},browserMinutes:{used:0,limit:0,disabled:true}},
