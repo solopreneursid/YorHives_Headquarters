@@ -151,7 +151,7 @@ test("HTTP 308 directory redirects are not interpreted as broken tool functional
   state.products.set(route,{url:route,name:"File Studio",kind:"tool",failures:1,
     page_fingerprint:"",inventory_confidence:"published",last_checked:null,
     features_json:"[]",status:"pending"});
-  state.status.set("discovery_engine_version",{value:"v3",checked_at:new Date().toISOString()});
+  state.status.set("discovery_engine_version",{value:"v4",checked_at:new Date().toISOString()});
   globalThis.fetch=async(url,options)=>{
     assert.equal(options.method,"GET");
     assert.equal(options.redirect,"manual");
@@ -168,4 +168,30 @@ test("HTTP 308 directory redirects are not interpreted as broken tool functional
     assert(!state.calls.some(x=>x.sql.startsWith("INSERT INTO findings")),
       "Canonical redirect must not create an outage alert");
   }finally{globalThis.fetch=originalFetch;}
+});
+
+test("conflicting sitemap evidence prevents a false complete owner catalog",async()=>{
+  const state=evidenceDatabase(),oldFetch=globalThis.fetch;
+  globalThis.fetch=async(url,opts)=>{
+    assert.equal(opts.method,"GET");
+    if(url==="https://yorphives.com/")return new Response("<title>HQ tools</title>",
+      {status:200,headers:{"content-type":"text/html"}});
+    if(url==="https://yorphives.com/.well-known/yorphives-products.json")return new Response(
+      JSON.stringify({complete:true,products:[{url:"/tools/declared",name:"Declared"}]}),
+      {status:200,headers:{"content-type":"application/json"}});
+    if(url==="https://yorphives.com/sitemap.xml")return new Response(
+      '<urlset><url><loc>https://yorphives.com/tools/not-listed-in-manifest</loc></url></urlset>',
+      {status:200,headers:{"content-type":"application/xml"}});
+    return new Response(null,{status:404});
+  };
+  try{
+    let run;
+    await worker.scheduled({scheduledTime:Date.parse("2026-11-15T06:00:00Z")},
+      {DB:state.db},{waitUntil(p){run=p}});
+    await run;
+    assert.equal(state.products.size,2,"Public extra route must still be enrolled for observation");
+    const status=state.status.get("discovery").value;
+    assert(status.startsWith("partial:"),"Manifest discrepancy must not certify completeness");
+    assert(status.includes("manifest-mismatch"));
+  }finally{globalThis.fetch=oldFetch;}
 });
