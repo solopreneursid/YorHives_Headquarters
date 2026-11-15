@@ -126,7 +126,9 @@ with sync_playwright() as pw:
             page.locator("#github-query").fill("nothing here")
             page.locator(".discover-submit").click()
             page.wait_for_function("document.querySelector('.discover-live-status')?.textContent.includes('0 public')")
-            assert page.locator(".lead-card").count()==1 # saved shortlist remains explicit
+            assert page.locator(".lead-card").count()==0
+            page.locator('[data-action="github-saved"]').click()
+            assert page.locator(".lead-card").count()==1 # saved shortlist remains accessible
             page.locator('[data-action="github-saved"]').click()
             assert page.locator(".lead-card").count()==0
             assert "No matching projects" in page.locator("#page-root").inner_text()
