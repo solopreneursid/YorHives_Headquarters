@@ -76,7 +76,7 @@ async function limitedFetch(url, {allowResearch = false, allowSecurity = false, 
   if (!body) { await response.body?.cancel(); return {status, text:null}; }
   if (status !== 200) { await response.body?.cancel(); return {status, text:null}; }
   const contentType = response.headers.get("content-type") || "";
-  if (!/(xml|html|json|rss|atom|text)/i.test(contentType)) {
+  if (!/(xml|html|json|rss|atom|text|javascript)/i.test(contentType)) {
     await response.body?.cancel(); return {status, text:null};
   }
   return {status, text: await boundedText(response)};
@@ -202,6 +202,88 @@ function parseAdvisories(text) {
   }
   return output;
 }
+
+const DISALLOWED_PRODUCT_PATH = /^\/(?:api|admin|internal|cdn-cgi|_next|assets|auth|account|login|logout|settings|billing|dashboard|private)(?:\/|$)/i;
+function safeProductUrl(raw, base=SITE, allowVanity=false) {
+  const url=safeToolUrl(raw,base);
+  if(!url || url.length>400) return null;
+  const path=new URL(url).pathname;
+  if(path==="/" || DISALLOWED_PRODUCT_PATH.test(path) || /[{}:*]/.test(path) ||
+     /%(?:2f|5c|00)/i.test(path)) return null;
+  if(!allowVanity && !isTool(url)) return null;
+  return url;
+}
+function productManifest(text) {
+  try {
+    const data=JSON.parse(String(text||""));
+    const list=Array.isArray(data)?data:data?.products;
+    if(!Array.isArray(list)) return {items:[],complete:false};
+    const seen=new Set(),items=[];
+    for(const entry of list.slice(0,MAX_ROUTES_PER_DISCOVERY)) {
+      if(!entry || typeof entry!=="object") continue;
+      const url=safeProductUrl(entry.url,SITE,true);
+      if(!url || seen.has(url)) continue;
+      seen.add(url);
+      items.push({url,name:clampText(entry.name,90),features:Array.isArray(entry.features)?
+        entry.features.slice(0,12).map(x=>clampText(x,80)).filter(Boolean):[]});
+    }
+    // An explicitly completed, nonempty owner manifest is the only basis for
+    // treating the inventory as comprehensive. All other sources are partial.
+    return {items,complete:!Array.isArray(data)&&data.complete===true&&items.length>0};
+  }catch{return {items:[],complete:false};}
+}
+function sitemapEntries(xml) {
+  const routes=[],children=[];
+  for(const m of String(xml||"").slice(0,MAX_TEXT_BYTES).matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)){
+    const raw=m[1].replaceAll("&amp;","&");
+    const next=safeToolUrl(raw);
+    if(!next) continue;
+    if(/\.xml$/i.test(new URL(next).pathname)){
+      if(children.length<3&&!children.includes(next))children.push(next);
+    }else{
+      const route=safeProductUrl(next);
+      if(route && !routes.includes(route) && routes.length<MAX_ROUTES_PER_DISCOVERY)routes.push(route);
+    }
+  }
+  return {routes,children};
+}
+function publicStructuredProducts(html) {
+  const items=[],seen=new Set();
+  const collect=(node,depth=0)=>{
+    if(!node||depth>4||items.length>=MAX_ROUTES_PER_DISCOVERY)return;
+    if(Array.isArray(node)){for(const child of node.slice(0,MAX_ROUTES_PER_DISCOVERY))collect(child,depth+1);return;}
+    if(typeof node!=="object")return;
+    const kinds=Array.isArray(node["@type"])?node["@type"]:[node["@type"]];
+    const application=kinds.some(x=>["SoftwareApplication","WebApplication","MobileApplication"].includes(x));
+    if(application){
+      const url=safeProductUrl(node.url||node["@id"],SITE,true);
+      if(url&&!seen.has(url)){seen.add(url);items.push({url,name:clampText(node.name,90)});}
+    }
+    if(node.item)collect(node.item,depth+1);
+    if(node.itemListElement)collect(node.itemListElement,depth+1);
+    if(node["@graph"])collect(node["@graph"],depth+1);
+  };
+  const scripts=String(html||"").slice(0,MAX_TEXT_BYTES).matchAll(
+    /<script\b[^>]*\btype=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  for(const m of scripts) {
+    try{collect(JSON.parse(m[1]));}catch{}
+    if(items.length>=MAX_ROUTES_PER_DISCOVERY)break;
+  }
+  return items;
+}
+function publicBundleToolHints(javascript) {
+  const found=[];
+  const code=String(javascript||"").slice(0,MAX_TEXT_BYTES).replaceAll("\\/","/");
+  // A literal product URL in public source is only a *route candidate*:
+  // bundles can contain obsolete routes, examples and dead code.
+  for(const match of code.matchAll(/["'\x60](\/(?:tools|tool|free-tools|apps|app|explore|products)\/[a-z0-9][a-z0-9/_-]{1,110})["'\x60]/gi)) {
+    const url=safeProductUrl(match[1]);
+    if(url&&!found.includes(url))found.push(url);
+    if(found.length>=12)break;
+  }
+  return found;
+}
+
 async function saveStatus(env,key,value) {
   await env.DB.prepare("INSERT INTO status(key,value,checked_at) VALUES(?,?,?) "+
   "ON CONFLICT(key) DO UPDATE SET value=excluded.value,checked_at=excluded.checked_at")
@@ -539,4 +621,4 @@ export default {
     }));
   }
 };
-export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,schedulePlan,verifyAccess,report};
+export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,schedulePlan,verifyAccess,report};
