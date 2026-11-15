@@ -167,10 +167,14 @@
       at?"Last update: "+at+" · "+(official?"Automatic report":"Imported report"):
       "Report timestamp unavailable · Check data source";
 
+    // Hide low-level collector heartbeat keys from the founder's social feed.
+    // They remain available in History for auditability.
+    const meaningfulActivity=d.activity.filter(item=>
+      !/^(last[ _-]?cron|discovery|research|security[ _-]?watch|site[ _-]?bundle[ _-]?fingerprint)$/i.test(item.title));
     $("home-alert-count").textContent=d.findings.length;
     $("home-idea-count").textContent=d.opportunities.length;
     $("home-tool-count").textContent=(state.origin==="cloudflare" && !d.verification?.complete)?"?":d.products.length;
-    $("home-update-count").textContent=d.activity.length+d.changes.length;
+    $("home-update-count").textContent=meaningfulActivity.length+d.changes.length;
 
     const site=d.assets.find(asset=>asset.kind==="website" || /yorphives website/i.test(asset.name));
     const sitePill=$("home-site-pill");
@@ -232,7 +236,7 @@
       date:item.occurredAt,chip:"Observation",source:"My tools",icon:"layers",action:"View tools",
       open:()=>showView("products")
     }));
-    d.activity.forEach(item=>entries.push({
+    meaningfulActivity.forEach(item=>entries.push({
       id:"activity-"+item.id,kind:"changes",title:item.title,
       text:item.summary || "An update was logged; see History for details.",
       date:item.occurredAt,chip:"Activity log",source:"HQ history",icon:"clock",action:"View history",
