@@ -908,3 +908,11 @@ body.session-ending::after {
   .topbar .quick-search,.topbar-signout {min-width:44px;width:44px;flex:0 0 44px;}
   .home-feed-filters {width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;}
 }
+
+
+/* Keep the 44px sign-out hit target fully in view on narrow landscape phones.
+   The small nudge compensates for rounding between the sticky header and
+   fractional-width status chip when browser viewport units change on rotate. */
+@media (min-width:641px) and (max-width:700px) and (orientation:landscape) {
+  .topbar-right {position:relative;left:-9px;}
+}
