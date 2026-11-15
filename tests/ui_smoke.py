@@ -166,7 +166,7 @@ def main():
                         assert "Local discovery reported complete" in private_page.locator("#discovery-status").inner_text()
                         private_page.locator("#product-refresh-trigger").click()
                         private_page.wait_for_function(
-                            """() => document.querySelector('#toast')?.textContent.includes('Private evidence refreshed.')""",
+                            """() => document.querySelector('#toast')?.textContent.includes('Read-only evidence refreshed.')""",
                             timeout=5000
                         )
                         private_ctx.close()
