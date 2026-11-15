@@ -90,10 +90,41 @@ with sync_playwright() as pw:
                 assert page.locator("h1").inner_text()==target,(engine.name,width,label)
                 page.evaluate("location.hash='home'")
                 page.wait_for_timeout(30)
-            page.locator(".shortcut-row [data-page='team']").click()
-            assert page.locator("h1").inner_text()=="AI Employees"
+            # All four Home shortcuts, and both desktop/mobile Back controls.
+            for slug,title in (("discover","Discover"),("team","AI Employees"),
+                               ("decisions","Decisions"),("growth","Growth")):
+                page.locator(f'.shortcut-row [data-page="{slug}"]').click()
+                assert page.locator("h1").inner_text()==title,(engine.name,width,slug)
+                back=(page.locator("#mobile-back-button") if page.locator("#mobile-back-button").is_visible()
+                      else page.locator("#back-button"))
+                assert back.is_visible()
+                back.click()
+                assert page.locator("h1").inner_text()=="Home",(engine.name,width,slug,"back")
+            # Global search, modal close and keyboard / shortcut.
+            opener=(page.locator("#mobile-search-button") if page.locator("#mobile-search-button").is_visible()
+                    else page.locator("#global-search-button"))
+            opener.click()
+            assert page.locator("#search-modal").is_visible()
+            page.locator("#search-input").fill("Growth")
+            page.locator('#search-results [data-page="growth"]').click()
+            assert page.locator("h1").inner_text()=="Growth"
+            assert not page.locator("#search-modal").is_visible()
             page.evaluate("location.hash='home'")
             page.wait_for_timeout(30)
+            page.locator("h1").click()
+            page.keyboard.press("/")
+            assert page.locator("#search-modal").is_visible()
+            page.locator("#search-close").click()
+            assert not page.locator("#search-modal").is_visible()
+            # Mobile More menu is a functional route, not a decorative button.
+            if page.locator("#more-button").is_visible():
+                page.locator("#more-button").click()
+                assert page.locator("#more-popover").is_visible()
+                page.locator('#more-popover [data-page="control"]').click()
+                assert page.locator("h1").inner_text()=="HQ Control"
+                page.evaluate("location.hash='home'")
+                page.wait_for_timeout(30)
+
             page.locator('[data-detail="review"]').first.click()
             assert page.locator("#detail-drawer").is_visible()
             page.keyboard.press("Escape")
@@ -101,6 +132,9 @@ with sync_playwright() as pw:
             with page.expect_download() as download_info:
                 page.locator('.quick-grid [data-action="export-report"]').click()
             assert download_info.value.suggested_filename=="hq-evidence-private.json"
+            exported=json.loads(Path(download_info.value.path()).read_text())
+            assert exported["schemaVersion"]=="yorphives.hq-intelligence.v1"
+            assert len(exported["findings"])==22
             # Clipboard-denied fallback must present selectable text.
             page.evaluate("""()=>Object.defineProperty(navigator,'clipboard',{configurable:true,
               value:{writeText:async()=>{throw Error('denied')}}})""")
@@ -109,18 +143,37 @@ with sync_playwright() as pw:
             assert "Headquarters: Responding" in page.locator("#copy-text").input_value()
             page.locator("#copy-close").click()
             assert not page.locator("#copy-modal").is_visible()
+            # Clipboard permitted path copies the actual status without dialog.
+            page.evaluate("""()=>Object.defineProperty(navigator,'clipboard',{configurable:true,
+              value:{writeText:async value=>window.__clipboardCopied=value}})""")
+            page.locator('.quick-grid [data-action="copy-summary"]').click()
+            assert "YorpHives HQ" in page.evaluate("window.__clipboardCopied")
+            assert not page.locator("#copy-modal").is_visible()
             baseline=page.evaluate("window.__reportRequests")
             page.locator('.quick-grid [data-action="refresh"]').click()
             page.wait_for_function("(previous)=>window.__reportRequests>previous",arg=baseline)
             page.wait_for_function("document.querySelector('#toast')?.textContent.includes('Report refreshed')")
             # File import clearly remains local. Explicit refresh reconnects to live.
-            page.locator("#report-file").set_input_files({
+            with page.expect_file_chooser() as picked:
+                page.locator('.quick-grid [data-action="import"]').click()
+            picked.value.set_files({
                 "name":"private-hq.json","mimeType":"application/json","buffer":json.dumps(report()).encode()
             })
             page.wait_for_function("document.querySelector('.provenance')?.textContent.includes('Imported report')")
             assert page.locator(".stat-action").first.locator("strong").inner_text()=="Imported"
             page.locator('.quick-grid [data-action="refresh"]').click()
             page.wait_for_function("document.querySelector('.provenance')?.textContent.includes('Live report')")
+            # Invalid imports cannot overwrite the live report or invent website status.
+            page.locator("#report-file").set_input_files({"name":"invalid.json","mimeType":"application/json","buffer":b'{"schemaVersion":"wrong"}'})
+            page.wait_for_function("document.querySelector('#toast')?.textContent.includes('Invalid HQ report')")
+            assert page.locator(".provenance").inner_text().startswith("Live report")
+            # The header refresh button also fetches current same-origin evidence.
+            header_refresh=(page.locator("#mobile-refresh-button") if page.locator("#mobile-refresh-button").is_visible()
+                            else page.locator("#refresh-button"))
+            baseline=page.evaluate("window.__reportRequests")
+            header_refresh.click()
+            page.wait_for_function("(previous)=>window.__reportRequests>previous",arg=baseline)
+            page.wait_for_function("document.querySelector('#toast')?.textContent.includes('Report refreshed')")
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth+2")
             assert not errors,(engine.name,width,errors)
             print("PASS Home",engine.name,width)
