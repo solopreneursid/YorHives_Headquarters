@@ -52,11 +52,11 @@ def run_engine(browser_type,base):
 
         if width in DEEP_CHECK_WIDTHS:
             for view in VIEW_NAMES:
-                page.evaluate("(view) => document.querySelector('.sidebar [data-nav=\\"'+view+'\\"]').click()", view)
+                page.evaluate("(view) => [...document.querySelectorAll(\'.sidebar [data-nav]\')].find(el=>el.dataset.nav===view).click()", view)
                 assert page.locator("#view-"+view).is_visible()
                 layout=is_non_overflowing(page)
                 assert layout["okay"], f"{browser_type.name} {width}px {view} overflow: {layout}"
-            page.evaluate("document.querySelector('.sidebar [data-nav=\\"overview\\"]').click()")
+            page.evaluate("document.querySelector(\'.sidebar [data-nav=overview]\').click()")
             if width<=860:
                 page.locator("#mobile-more").click()
                 assert page.locator("#sidebar").is_visible()
