@@ -61,6 +61,16 @@ This is intentionally **passive monitoring and research**. There is no browser a
 - An independent external outage monitor still requires an environment outside Cloudflare. The old isolated Python watchdog is not part of this Cloudflare deployment.
 - A Cloudflare Account, D1 and Access are managed services: no immediate SaaS bill within Free quotas, but **not full self-hosting** or guaranteed indefinite free access.
 
+## Founder budget visibility
+
+The Product Intelligence screen now includes a **₹0 operating budget** panel. When the private Cloudflare report is accessible, it displays:
+
+- Counted public HTTP GET requests used today out of the internal daily cap of 900.
+- AI inference: disabled.
+- Production browser testing: disabled.
+
+If the private report is unavailable, it clearly shows that telemetry is not connected rather than asserting ₹0 usage. Cloudflare's own billing/usage dashboard remains the authoritative source of actual payable charges; this pilot does **not** have permission to inspect subscriptions or billing settings.
+
 ## Zero-spend safeguards
 
 1. Stay on Cloudflare **Workers Free**. Do not upgrade the plan, enable Containers, or add paid bindings.
