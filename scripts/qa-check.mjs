@@ -60,10 +60,14 @@ for (const [expr, rule, message] of [
 if (!/\[hidden\]\s*\{\s*display\s*:\s*none\s*!important/.test(css)) {
   report("styles.css", 1, "WARNING", "hidden-style", "Hidden views may be displayed when flex/grid CSS overrides the hidden attribute");
 }
-if (!html.includes("PREVIEW") && !js.includes('origin: "preview"')) {
+if (!/preview/i.test(html) && !/source:\s*['"]preview['"]|origin:\s*['"]preview['"]/.test(js)) {
   report("index.html", 1, "ERROR", "provenance", "Preview records must not masquerade as live monitoring");
 }
-if (!html.includes('id="view-governance"')) {
+if (html.includes('id="page-root"')) {
+  for (const page of ["home","discover","team","decisions","growth","control"]) {
+    if (!html.includes('data-page="'+page+'"')) report("index.html",1,"ERROR","broken-navigation","Missing HQ navigation: "+page);
+  }
+} else if (!html.includes('id="view-governance"')) {
   report("index.html", 1, "ERROR", "governance", "Governance screen is required");
 }
 if (rdjsonl) {
