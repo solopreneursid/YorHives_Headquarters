@@ -3,404 +3,65 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b1019">
-  <meta name="description" content="YorpHives Headquarters — a founder-controlled AI office for monitoring, research, opportunity discovery, and long-term growth.">
-  <title>YorpHives Headquarters — Your Daily Feed</title>
+  <meta name="theme-color" content="#f7f8fc">
+  <meta name="description" content="YorpHives Headquarters — six clear pages for founder oversight.">
+  <title>YorpHives HQ — Clean Workspace</title>
   <link rel="stylesheet" href="./styles.css">
-  <script defer src="./dashboard.js"></script>
+  
 </head>
 <body>
-  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
-    <symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></symbol>
-    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></symbol>
-    <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="m12 12 6-6"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></symbol>
-    <symbol id="i-trend" viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
-    <symbol id="i-bots" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="14" rx="4"/><path d="M12 2v4M8 12h.01M16 12h.01M9 16h6M2 11v5M22 11v5"/></symbol>
-    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
-    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
-    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
-    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 19 19 5M8 5h11v11"/></symbol>
-    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
-    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"/></symbol>
-    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
-    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
-    <symbol id="i-close" viewBox="0 0 24 24"><path d="M5 5 19 19M19 5 5 19"/></symbol>
-    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M11 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"/><path d="M14 16l4-4-4-4M8 12h10"/></symbol>
-    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m0 0L7 8m5-5 5 5M4 16v4h16v-4"/></symbol>
-    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
-    <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 2 2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2L12 2Z"/></symbol>
-    <symbol id="i-briefcase" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></symbol>
-    <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 8-4 4 4 4m8-8 4 4-4 4m-3-12-2 16"/></symbol>
-    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2h8l5 5v15H6zM14 2v5h5M9 12h7M9 16h7"/></symbol>
-    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
-    <symbol id="i-external" viewBox="0 0 24 24"><path d="M13 5h6v6M19 5l-9 9"/><path d="M19 14v5H5V5h5"/></symbol>
-    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14-5L4 8m0-5v5h5M4 13a8 8 0 0 0 14 5l2-2m0 5v-5h-5"/></symbol>
-    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5 9-5Zm-9 10 9 5 9-5M3 17l9 5 9-5"/></symbol>
-    <symbol id="i-dollar" viewBox="0 0 24 24"><path d="M12 2v20M17 6c-2-2-10-2-10 2 0 5 10 2 10 7s-8 5-10 2"/></symbol>
-    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
-  </svg>
-
-  <div class="shell" id="app-shell">
-    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
-      <a class="brand" href="#overview" aria-label="YorpHives Headquarters, overview">
-        <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 52 52" fill="none"><path d="m26 5 17.32 10v20L26 45 8.68 35V15L26 5Z" stroke="currentColor" stroke-width="2.2"/><path d="m26 14 10 6v12l-10 6-10-6V20l10-6Z" fill="currentColor" opacity=".95"/><path d="M26 14v24M16 20l20 12m0-12L16 32" stroke="#0b1019" stroke-width="1.8"/></svg>
-        </span>
-        <span><strong>YorpHives</strong><small>HEADQUARTERS</small></span>
-      </a>
-
-      <div class="sidebar-scope"><span class="scope-indicator"></span> YOUR PRIVATE SPACE</div>
-
-      <nav class="side-nav" aria-label="Sections">
-        <div class="nav-group-title">YOUR SPACE</div>
-        <button class="nav-item is-active" data-nav="overview" aria-current="page"><svg class="icon"><use href="#i-grid"/></svg><span>Home</span></button>
-        <button class="nav-item" data-nav="monitoring"><svg class="icon"><use href="#i-activity"/></svg><span>Alerts</span><span class="nav-count" id="nav-finding-count">—</span></button>
-        <button class="nav-item" data-nav="products"><svg class="icon"><use href="#i-layers"/></svg><span>My tools</span></button>
-        <button class="nav-item" data-nav="opportunities"><svg class="icon"><use href="#i-radar"/></svg><span>Ideas</span></button>
-        <button class="nav-item" data-nav="workforce"><svg class="icon"><use href="#i-bots"/></svg><span>AI team</span></button>
-        <div class="nav-group-title nav-group-spaced">MORE</div>
-        <button class="nav-item" data-nav="activity"><svg class="icon"><use href="#i-clock"/></svg><span>History</span></button>
-        <button class="nav-item" data-nav="governance"><svg class="icon"><use href="#i-lock"/></svg><span>Safety & access</span></button>
-      </nav>
-
-      <div class="sidebar-bottom">
-        <div class="principle-box">
-          <span class="principle-icon"><svg class="icon"><use href="#i-shield"/></svg></span>
-          <strong>You stay in charge</strong>
-          <p>Headquarters watches and suggests. Only you decide what changes.</p>
-          <button class="text-link" data-nav="governance">View guardrails <svg class="icon"><use href="#i-chevron"/></svg></button>
-        </div>
-        <div class="founder">
-          <span class="avatar">F</span><span class="founder-label"><strong>Only you</strong><small>Founder access</small></span><svg class="icon founder-chevron"><use href="#i-chevron"/></svg>
-        </div>
-        <a class="sidebar-signout" href="/cdn-cgi/access/logout" title="End your Cloudflare Access session">
-          <svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg><span>Sign out</span>
-        </a>
-      </div>
-    </aside>
-
-    <div class="sidebar-scrim" id="sidebar-scrim" hidden></div>
-
-    <div class="workspace">
-      <header class="topbar">
-        <div class="topbar-left">
-          <button type="button" class="icon-button mobile-menu" id="mobile-menu" aria-label="Open navigation" aria-expanded="false"><svg class="icon"><use href="#i-menu"/></svg></button>
-          <span class="breadcrumb-root">My Headquarters</span><svg class="icon breadcrumb-divider"><use href="#i-chevron"/></svg><span class="breadcrumb-current" id="breadcrumb-current">Home</span>
-        </div>
-        <div class="topbar-right">
-          <button class="quick-search" id="search-trigger" aria-label="Search findings and opportunities"><svg class="icon"><use href="#i-search"/></svg><span>Find an update</span><kbd id="search-shortcut" aria-hidden="true">Ctrl K</kbd></button>
-          <span class="top-divider"></span>
-          <span class="mode-chip" id="mode-chip"><span class="mode-dot"></span><span id="mode-label">Preview mode</span></span>
-          <a class="topbar-signout" href="/cdn-cgi/access/logout" aria-label="Sign out of Headquarters" title="Sign out of Cloudflare Access"><svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg><span>Sign out</span></a>
-        </div>
-      </header>
-
-      <main id="main-content" tabindex="-1">
-        <section id="view-overview" class="view is-visible" aria-labelledby="overview-heading">
-          <div class="home-welcome">
-            <div class="home-welcome-copy">
-              <span class="home-kicker"><span class="home-kicker-dot"></span> YOUR HQ · PRIVATE</span>
-              <h1 id="overview-heading">Hello, founder <span aria-hidden="true">👋</span></h1>
-              <p>The important things happening at YorpHives, without the noise.</p>
-              <span class="home-updated" id="home-updated">Loading your updates…</span>
-            </div>
-            <div class="home-welcome-actions">
-              <button class="button button-secondary" id="import-trigger"><svg class="icon"><use href="#i-upload"/></svg> Open a report</button>
-              <button class="button button-secondary help-button" id="how-trigger"><svg class="icon"><use href="#i-info"/></svg> Help</button>
-            </div>
-          </div>
-
-          <div class="notice-bar" id="data-notice"><svg class="icon"><use href="#i-info"/></svg><div><strong>Preview workspace</strong> — Everything below is clearly marked sample data, not a live scan. Import a report to explore your own observations.</div><button id="notice-dismiss" type="button" aria-label="Dismiss preview notice"><svg class="icon"><use href="#i-close"/></svg></button></div>
-
-          <div class="home-stories" aria-label="Quick overview">
-            <button class="home-story story-alerts" type="button" data-nav="monitoring">
-              <span class="story-icon"><svg class="icon"><use href="#i-bell"/></svg></span>
-              <span class="story-number" id="home-alert-count">—</span>
-              <span class="story-label">Needs review</span>
-            </button>
-            <button class="home-story story-ideas" type="button" data-nav="opportunities">
-              <span class="story-icon"><svg class="icon"><use href="#i-spark"/></svg></span>
-              <span class="story-number" id="home-idea-count">—</span>
-              <span class="story-label">Ideas found</span>
-            </button>
-            <button class="home-story story-tools" type="button" data-nav="products">
-              <span class="story-icon"><svg class="icon"><use href="#i-layers"/></svg></span>
-              <span class="story-number" id="home-tool-count">—</span>
-              <span class="story-label">Tools seen</span>
-            </button>
-            <button class="home-story story-history" type="button" data-nav="activity">
-              <span class="story-icon"><svg class="icon"><use href="#i-clock"/></svg></span>
-              <span class="story-number" id="home-update-count">—</span>
-              <span class="story-label">Updates logged</span>
-            </button>
-          </div>
-
-          <section class="founder-briefing" aria-labelledby="founder-briefing-title">
-            <header class="founder-brief-header">
-              <div><span class="home-kicker subtle">TODAY'S HQ BRIEFING</span><h2 id="founder-briefing-title">Your business, at a glance</h2>
-                <p>Reported observations and next steps—not automated changes.</p></div>
-              <span class="brief-origin" id="brief-origin">Evidence pending</span>
-            </header>
-            <div class="brief-stats">
-              <div class="brief-stat"><span>Website</span><strong id="brief-site">Not verified</strong><small id="brief-site-caption">No recent check</small></div>
-              <div class="brief-stat"><span>Tool monitoring</span><strong id="brief-coverage">—</strong>
-                <progress id="brief-progress" max="100" value="0" aria-label="Tool routes checked"></progress>
-                <small id="brief-coverage-caption">Awaiting evidence</small></div>
-              <div class="brief-stat"><span>Alerts for review</span><strong id="brief-alerts">—</strong><small id="brief-alerts-caption">No verified report</small></div>
-              <div class="brief-stat"><span>Research</span><strong id="brief-research">—</strong><small id="brief-research-caption">Leads need validation</small></div>
-            </div>
-            <div class="brief-next">
-              <div><span class="brief-next-label">YOUR NEXT MOVE</span><strong id="brief-next-title">Connect your private report</strong>
-                <p id="brief-next-detail">The founder briefing appears when reliable evidence is available.</p></div>
-              <button class="brief-action" id="brief-next-button" type="button" data-nav="products">
-                Review details <svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg>
-              </button>
-            </div>
-            <p class="brief-caveat" id="brief-caveat">No code changes, browser testing or paid AI can be initiated from this briefing.</p>
-          </section>
-
-          <section class="founder-briefing decision-workspace" aria-labelledby="decision-heading">
-            <header class="founder-brief-header"><div><span class="home-kicker subtle">YOUR DECISIONS</span><h2 id="decision-heading">Focus on what matters</h2><p id="decision-summary">Connect your private report to track decisions.</p></div><span class="brief-origin" id="decision-limit">Evidence pending</span></header>
-            <div id="decision-queue" class="decision-grid"></div>
-            <details><summary>Decision history</summary><p class="source-note">Accepted, implemented and verified outcomes are recorded separately.</p><div id="decision-history"></div><button type="button" class="button button-secondary" id="decision-export" disabled>Export decision history</button></details>
-          </section>
-          <div class="home-layout">
-            <div class="home-main-feed">
-              <section class="home-feed-section" aria-labelledby="home-feed-heading">
-                <div class="home-section-heading">
-                  <div><span class="home-kicker subtle">YOUR TIMELINE</span><h2 id="home-feed-heading">Latest updates <span class="home-wave" aria-hidden="true">✦</span></h2>
-                  <p>Like a personal feed—tap a card to see the evidence and next step.</p></div>
-                  <button class="home-small-link" type="button" data-nav="activity">See history <svg class="icon"><use href="#i-arrow"/></svg></button>
-                </div>
-                <div class="home-feed-filters" role="group" aria-label="Filter your updates">
-                  <button type="button" class="feed-filter is-selected" data-feed-filter="all" aria-pressed="true">For you</button>
-                  <button type="button" class="feed-filter" data-feed-filter="alerts" aria-pressed="false">Needs attention</button>
-                  <button type="button" class="feed-filter" data-feed-filter="ideas" aria-pressed="false">Ideas</button>
-                  <button type="button" class="feed-filter" data-feed-filter="changes" aria-pressed="false">Changes</button>
-                </div>
-                <div id="home-feed-list" class="home-feed-list" aria-live="polite"></div>
-              </section>
-            </div>
-
-            <aside class="home-right-rail" aria-label="Quick status and help">
-              <section class="home-side-card home-site-status" aria-labelledby="home-site-heading">
-                <div class="home-side-title"><span class="home-side-emoji" aria-hidden="true">🌐</span><h2 id="home-site-heading">Your website</h2></div>
-                <span class="home-site-pill" id="home-site-pill">Checking evidence…</span>
-                <p id="home-site-copy">Headquarters will show its most recent observation here.</p>
-                <button class="home-side-link" type="button" data-nav="monitoring">View monitoring <svg class="icon"><use href="#i-arrow"/></svg></button>
-              </section>
-
-              <section class="home-side-card home-next-card" aria-labelledby="home-next-heading">
-                <div class="home-side-title"><span class="home-side-emoji" aria-hidden="true">✨</span><h2 id="home-next-heading">Your next move</h2></div>
-                <p id="home-next-copy">We'll suggest a clear next step once there's evidence to review.</p>
-                <button class="home-side-link" type="button" id="home-next-action" data-nav="monitoring">Open alerts <svg class="icon"><use href="#i-chevron"/></svg></button>
-              </section>
-
-              <section class="home-side-card home-private-card" aria-labelledby="home-safe-heading">
-                <div class="home-side-title"><span class="home-side-emoji" aria-hidden="true">🔒</span><h2 id="home-safe-heading">You're in control</h2></div>
-                <p>HQ looks for problems and opportunities. It <strong>never edits your website</strong> or deploys fixes.</p>
-                <button class="home-side-link" type="button" data-nav="governance">How it stays safe <svg class="icon"><use href="#i-arrow"/></svg></button>
-              </section>
-            </aside>
-          </div>
-
-          <details class="home-full-report" id="home-full-report">
-            <summary><span class="full-report-icon"><svg class="icon"><use href="#i-grid"/></svg></span><span><strong>Full report</strong><small>More numbers, records and system details</small></span><svg class="icon full-report-chevron"><use href="#i-chevron"/></svg></summary>
-            <div class="home-full-report-body">
-          <div class="section-label-row"><div><span class="small-eyebrow">THE BIG PICTURE</span><h2>At a glance</h2></div><span class="section-footnote" id="snapshot-date">Illustrative dashboard</span></div>
-          <div class="metric-grid">
-            <article class="metric-card"><div class="metric-top"><span>Assets monitored</span><span class="metric-icon violet"><svg class="icon"><use href="#i-layers"/></svg></span></div><div class="metric-value" id="metric-assets">2</div><p id="metric-assets-caption">Illustrative system inventory</p><span class="metric-bottom"><span class="mini-dash violet-line"></span><span id="metric-assets-footer">Website + headquarters</span></span></article>
-            <article class="metric-card"><div class="metric-top"><span>Findings to review</span><span class="metric-icon peach"><svg class="icon"><use href="#i-shield"/></svg></span></div><div class="metric-value" id="metric-findings">3</div><p id="metric-findings-caption">Example open observations</p><span class="metric-bottom"><span class="mini-dash peach-line"></span><span id="metric-findings-footer">Awaiting founder review</span></span></article>
-            <article class="metric-card"><div class="metric-top"><span>Growth opportunities</span><span class="metric-icon mint"><svg class="icon"><use href="#i-trend"/></svg></span></div><div class="metric-value" id="metric-opportunities">3</div><p id="metric-opportunities-caption">Example research leads</p><span class="metric-bottom"><span class="mini-dash mint-line"></span><span id="metric-opportunities-footer">Validate before pursuing</span></span></article>
-            <article class="metric-card"><div class="metric-top"><span>AI departments</span><span class="metric-icon blue"><svg class="icon"><use href="#i-bots"/></svg></span></div><div class="metric-value" id="metric-employees">6</div><p id="metric-employees-caption">Illustrative team structure</p><span class="metric-bottom"><span class="mini-dash blue-line"></span><span id="metric-employees-footer">Telemetry not connected</span></span></article>
-          </div>
-
-          <div class="dashboard-columns">
-            <section class="panel briefing-panel" aria-labelledby="brief-heading">
-              <div class="panel-heading"><div class="panel-title-wrap"><span class="panel-icon violet"><svg class="icon"><use href="#i-spark"/></svg></span><div><span class="small-eyebrow">YOUR DAILY EXECUTIVE SUMMARY</span><h2 id="brief-heading">The founder's brief</h2></div></div><span class="outline-pill" id="brief-kind">EXAMPLE</span></div>
-              <p class="brief-intro" id="brief-summary">One calm place to understand what's happening across YorpHives. These example signals demonstrate how your AI office will summarize its findings.</p>
-              <div class="brief-tasks" id="brief-items"></div>
-              <div class="panel-bottom"><span><svg class="icon"><use href="#i-eye"/></svg> Insight, never auto-action</span><button class="subtle-link" data-nav="monitoring">Review findings <svg class="icon"><use href="#i-arrow"/></svg></button></div>
-            </section>
-            <section class="panel coverage-panel" aria-labelledby="coverage-heading">
-              <div class="panel-heading"><div class="panel-title-wrap"><span class="panel-icon mint"><svg class="icon"><use href="#i-activity"/></svg></span><div><span class="small-eyebrow">OPERATIONAL VISIBILITY</span><h2 id="coverage-heading">System coverage</h2></div></div></div>
-              <p class="coverage-note" id="coverage-note">A clear picture of your connected monitoring systems will appear here.</p>
-              <div id="system-health-grid" class="system-health-grid"></div>
-              <div class="connection-callout"><span class="connection-dot"></span><div><strong id="connection-title">Awaiting live evidence</strong><small id="connection-subtitle">A preview is not a health check.</small></div><svg class="icon"><use href="#i-info"/></svg></div>
-            </section>
-          </div>
-
-          <div class="dashboard-columns lower-columns">
-            <section class="panel list-panel" aria-labelledby="priority-heading">
-              <div class="panel-heading"><div class="panel-title-wrap"><div><span class="small-eyebrow">WHAT NEEDS A DECISION</span><h2 id="priority-heading">Priority inbox</h2></div></div><button class="subtle-link" data-nav="monitoring">All alerts <svg class="icon"><use href="#i-arrow"/></svg></button></div>
-              <div id="priority-list" class="priority-list"></div>
-            </section>
-            <section class="panel list-panel" aria-labelledby="radar-heading">
-              <div class="panel-heading"><div class="panel-title-wrap"><div><span class="small-eyebrow">WHAT COULD MOVE US FORWARD</span><h2 id="radar-heading">Opportunity radar</h2></div></div><button class="subtle-link" data-nav="opportunities">Explore all <svg class="icon"><use href="#i-arrow"/></svg></button></div>
-              <div id="opportunity-preview" class="opportunity-preview"></div>
-            </section>
-          </div>
-            </div>
-          </details>
-        </section>
-
-        <section id="view-monitoring" class="view" aria-labelledby="monitoring-heading" hidden>
-          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> KEEPING AN EYE ON THINGS</div><h1 id="monitoring-heading">What needs <em>your attention?</em></h1><p>Potential problems Headquarters noticed. Open any alert to see why it matters and what you can do next.</p></div><span class="header-emblem"><svg class="icon"><use href="#i-shield"/></svg></span></div>
-          <div class="inner-insight"><svg class="icon"><use href="#i-lock"/></svg><span>Observation only. No agent can edit code, change configuration, or deploy a fix.</span></div>
-          <div class="browser-alert-option">
-            <div><strong>Optional browser alerts</strong>
-              <small>Get a generic alert for new high-priority findings while this signed-in tab is open. Nothing is sent to an external alert service.</small></div>
-            <button type="button" id="browser-alert-toggle" class="button button-secondary" aria-pressed="false">Enable alerts</button>
-          </div>
-          <div class="filter-bar"><div class="filter-chips" role="group" aria-label="Filter findings"><button class="filter-chip is-selected" data-finding-filter="all">All findings</button><button class="filter-chip" data-finding-filter="security">Security</button><button class="filter-chip" data-finding-filter="dependencies">App packages</button><button class="filter-chip" data-finding-filter="reliability">Reliability</button><button class="filter-chip" data-finding-filter="quality">Quality</button></div><span class="filter-detail" id="monitoring-count"></span></div>
-          <div class="records-panel"><div class="records-head"><span>OBSERVATION</span><span>PRIORITY</span><span>SYSTEM</span><span>REVIEW</span></div><div id="findings-list"></div></div>
-          <section class="panel security-watch-panel" aria-labelledby="security-watch-heading">
-            <div class="panel-heading"><div><span class="small-eyebrow">PUBLIC ADVISORIES</span>
-              <h2 id="security-watch-heading">Security news to check</h2></div><span class="outline-pill">SOURCE-BASED</span></div>
-            <p class="intel-caption">These are public warnings about software packages. They do not mean YorpHives is affected.</p>
-            <div id="security-watch-list" aria-live="polite"></div>
-          </section>
-        </section>
-
-        <section id="view-opportunities" class="view" aria-labelledby="opportunities-heading" hidden>
-          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> NEW POSSIBILITIES</div><h1 id="opportunities-heading">Ideas worth <em>exploring.</em></h1><p>Discover useful things to build or improve. Each idea needs more research before it's worth your time.</p></div><span class="header-emblem mint"><svg class="icon"><use href="#i-radar"/></svg></span></div>
-          <div class="inner-insight"><svg class="icon"><use href="#i-info"/></svg><span>Ideas are leads, not guaranteed income. Verify demand, licensing, cost, and sources before investing.</span></div>
-          <div class="filter-bar"><div class="filter-chips" role="group" aria-label="Filter opportunities"><button class="filter-chip is-selected" data-opportunity-filter="all">All ideas</button><button class="filter-chip" data-opportunity-filter="product">Products</button><button class="filter-chip" data-opportunity-filter="revenue">Revenue</button><button class="filter-chip" data-opportunity-filter="technology">Technology</button></div><span class="filter-detail" id="opportunity-count"></span></div>
-          <div id="opportunities-grid" class="opportunities-grid"></div>
-        </section>
-
-
-        <section id="view-products" class="view" aria-labelledby="products-heading" hidden>
-          <div class="page-heading">
-            <div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR TOOL COLLECTION</div>
-              <h1 id="products-heading">Your tools,<br><em>all in one place.</em></h1>
-              <p>See which tools Headquarters knows about, which ones changed, and what may need attention. Missing entries mean discovery needs checking.</p>
-            </div><span class="header-emblem mint"><svg class="icon"><use href="#i-layers"/></svg></span>
-          </div>
-          <div class="inner-insight"><svg class="icon"><use href="#i-lock"/></svg><span>Read-only by design. A tool's HTTP response and visible controls are observations, not proof that all features work. Research leads require independent validation.</span></div>
-          <div class="discovery-strip">
-            <div class="discovery-live-icon"><svg class="icon"><use href="#i-radar"/></svg></div>
-            <div class="discovery-strip-copy"><span class="small-eyebrow">AUTOMATIC TOOL WATCH</span><strong id="discovery-status">Preview — not connected</strong><small id="discovery-explainer">Automatic enrollment starts when a read-only scanner is installed and scheduled on your own server.</small></div>
-            <div class="discovery-actions"><button class="button button-secondary" id="product-refresh-trigger"><svg class="icon"><use href="#i-refresh"/></svg> Refresh updates</button><button class="button button-secondary" id="product-import-trigger"><svg class="icon"><use href="#i-upload"/></svg> Open report</button></div>
-          </div>
-          <div class="product-stat-grid">
-            <article class="product-stat"><span>Tools listed</span><strong id="product-total">0</strong><small>Website tools & applications</small></article>
-            <article class="product-stat"><span>Recently added</span><strong id="product-new">0</strong><small>Automatically enrolled</small></article>
-            <article class="product-stat"><span>Changes noticed</span><strong id="product-changes-total">0</strong><small>Requires review, not auto-fix</small></article>
-            <article class="product-stat"><span>Feature ideas</span><strong id="product-comparisons-total">0</strong><small>Evidence-based hypotheses</small></article>
-            <article class="product-stat"><span>Observation mode</span><strong id="product-qa-total">—</strong><small id="product-qa-caption">Evidence source not connected</small></article>
-          </div>
-          <div class="product-intel-grid">
-            <section class="panel product-intel-panel" aria-labelledby="product-catalog-heading">
-              <div class="panel-heading"><div><span class="small-eyebrow">AUTO-ENROLLED INVENTORY</span><h2 id="product-catalog-heading">YorpHives product catalog</h2></div><span class="outline-pill" id="catalog-kind">PREVIEW</span></div>
-              <p class="intel-caption">Published tool routes enter read-only monitoring automatically. Script-only routes stay unverified until supported by public evidence.</p>
-              <div id="product-catalog" class="product-catalog"></div>
-            </section>
-            <section class="panel product-intel-panel" aria-labelledby="product-changes-heading">
-              <div class="panel-heading"><div><span class="small-eyebrow">WHAT CHANGED?</span><h2 id="product-changes-heading">Discovery & change feed</h2></div><button class="subtle-link" data-nav="activity">Evidence log <svg class="icon"><use href="#i-arrow"/></svg></button></div>
-              <p class="intel-caption">New tool routes, page metadata changes and review alerts. Missing catalog links never mean a tool was deleted.</p>
-              <div id="product-change-feed" class="product-change-feed"></div>
-            </section>
-          </div>
-          <section class="panel product-gap-panel" aria-labelledby="product-gaps-heading">
-            <div class="panel-heading"><div><span class="small-eyebrow">ALTERNATIVES & IMPROVEMENT IDEAS</span><h2 id="product-gaps-heading">Alternatives worth checking</h2></div><button class="subtle-link" data-nav="opportunities">Growth radar <svg class="icon"><use href="#i-arrow"/></svg></button></div>
-            <p class="intel-caption">Public research can highlight similar tools. No feature shortfall or competitor advantage is claimed without independent evidence.</p>
-            <div id="product-feature-gaps"></div>
-          </section>
-          <section class="panel product-gap-panel" aria-labelledby="zero-cost-heading">
-            <div class="panel-heading"><div><span class="small-eyebrow">FREE-TIER RESOURCE GUARD</span><h2 id="zero-cost-heading">₹0 operating budget</h2></div><span class="outline-pill">READ-ONLY</span></div>
-            <p class="intel-caption">Real request counts are displayed only when a supported collector report is connected. This is an internal request limit, not a Cloudflare billing guarantee.</p>
-            <div id="zero-cost-summary" role="status" aria-live="polite"></div>
-          </section>
-          <div class="inner-insight product-footer-note"><svg class="icon"><use href="#i-info"/></svg><span>Read-only monitoring and public-source research. JavaScript-only or unlinked tools require a website manifest for reliable discovery. Production Headquarters does not run browsers to operate live tools.</span></div>
-        </section>
-
-        <section id="view-workforce" class="view" aria-labelledby="workforce-heading" hidden>
-          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> MEET YOUR HELPERS</div><h1 id="workforce-heading">Your <em>AI team.</em></h1><p>See each department's job and whether it has actually connected. A listed role isn't proof an AI agent is running.</p></div><span class="header-emblem blue"><svg class="icon"><use href="#i-bots"/></svg></span></div>
-          <div class="inner-insight"><svg class="icon"><use href="#i-info"/></svg><span>These are example roles, not evidence that agents are running. Actual execution state requires signed or auditable telemetry.</span></div>
-          <div id="workforce-grid" class="workforce-grid"></div>
-        </section>
-
-        <section id="view-activity" class="view" aria-labelledby="activity-heading" hidden>
-          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR ACTIVITY HISTORY</div><h1 id="activity-heading">Everything HQ <em>noticed.</em></h1><p>A simple history of observations, with dates and sources when available.</p></div><span class="header-emblem"><svg class="icon"><use href="#i-clock"/></svg></span></div>
-          <div class="inner-insight"><svg class="icon"><use href="#i-shield"/></svg><span>Evidence links are displayed only when included in an imported report. An absence of entries does not prove all systems are healthy.</span></div>
-          <div id="activity-list" class="activity-panel"></div>
-        </section>
-
-        <section id="view-governance" class="view" aria-labelledby="governance-heading" hidden>
-          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> ONLY YOU DECIDE</div><h1 id="governance-heading">You're always<br><em>in charge.</em></h1><p>Headquarters watches and suggests. You approve every real change.</p></div><span class="header-emblem mint"><svg class="icon"><use href="#i-lock"/></svg></span></div>
-          <div class="governance-hero"><div class="governance-stamp"><svg class="icon"><use href="#i-shield"/></svg></div><div><span class="small-eyebrow">PERMANENT BOUNDARY</span><h2>Read-only intelligence. Founder-executed change.</h2><p>HQ workers may monitor, research, analyze, test in isolated read-only contexts, and recommend. They must not hold credentials that allow source edits, production changes, infrastructure mutation, or deployment.</p></div></div>
-          <div class="rules-grid">
-            <article class="rule-card"><span class="rule-number">01 / PERMISSION</span><svg class="icon"><use href="#i-eye"/></svg><h3>Observe, don't modify</h3><p>Read-only credentials, narrowly scoped APIs, and separate service identities for each agent.</p></article>
-            <article class="rule-card"><span class="rule-number">02 / EVIDENCE</span><svg class="icon"><use href="#i-file"/></svg><h3>Show your work</h3><p>Each finding should link to a source, timestamp, affected system, and reproducible reasoning.</p></article>
-            <article class="rule-card"><span class="rule-number">03 / APPROVAL</span><svg class="icon"><use href="#i-check"/></svg><h3>Founder makes the call</h3><p>Recommendations enter a review queue. Implementation happens in a separate founder-controlled workflow.</p></article>
-            <article class="rule-card"><span class="rule-number">04 / OWNERSHIP</span><svg class="icon"><use href="#i-code"/></svg><h3>Own the infrastructure</h3><p>Open-source software, open-weight models, portable data, and replaceable components by design.</p></article>
-          </div>
-          <div class="architecture-panel"><span class="small-eyebrow">HOW THE SYSTEM SHOULD FLOW</span><h2>From signal to decision</h2><div class="flow"><span>Independent detectors</span><svg class="icon"><use href="#i-chevron"/></svg><span>Evidence store</span><svg class="icon"><use href="#i-chevron"/></svg><span>AI analysis</span><svg class="icon"><use href="#i-chevron"/></svg><span>Founder review</span></div><p>Deterministic checks run routinely; private AI reasoning activates when a real signal deserves investigation. A dedicated outbound notification channel alerts the founder without granting execution rights.</p></div>
-        </section>
-
-        <footer class="footer"><span><span class="footer-icon">✳</span> YorpHives Headquarters · Intelligence for a company that keeps evolving.</span><span id="footer-mode">PREVIEW · NOT A LIVE HEALTH REPORT</span></footer>
-      </main>
-    </div>
+<svg class="svg-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <symbol id="ic-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></symbol>
+  <symbol id="ic-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8z"/></symbol>
+  <symbol id="ic-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2H3ZM17 5a3 3 0 0 1 0 6M19 20h2v-2a6 6 0 0 0-4-5.66"/></symbol>
+  <symbol id="ic-check" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="m8 12 2.5 2.5L16 9"/></symbol>
+  <symbol id="ic-chart" viewBox="0 0 24 24"><path d="M4 20V4M4 20h16M8 15l4-4 3 2 5-7"/></symbol>
+  <symbol id="ic-shield" viewBox="0 0 24 24"><path d="m12 2 8 4v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="ic-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+  <symbol id="ic-bell" viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 8-3 7-3 9h18c0-2-3-1-3-9ZM10 21h4"/></symbol>
+  <symbol id="ic-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+  <symbol id="ic-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="ic-back" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+  <symbol id="ic-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="ic-close" viewBox="0 0 24 24"><path d="M5 5 19 19M19 5 5 19"/></symbol>
+  <symbol id="ic-upload" viewBox="0 0 24 24"><path d="M12 16V4m-5 5 5-5 5 5M4 16v4h16v-4"/></symbol>
+  <symbol id="ic-refresh" viewBox="0 0 24 24"><path d="M21 11a9 9 0 0 0-15-6L3 8M3 3v5h5M3 13a9 9 0 0 0 15 6l3-3m0 5v-5h-5"/></symbol>
+  <symbol id="ic-spark" viewBox="0 0 24 24"><path d="m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></symbol>
+  <symbol id="ic-link" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7.1 0l2-2A5 5 0 0 0 12 5l-1 1M14 10a5 5 0 0 0-7.1 0l-2 2A5 5 0 0 0 12 19l1-1"/></symbol>
+  <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="ic-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+  <symbol id="ic-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+  <symbol id="ic-external" viewBox="0 0 24 24"><path d="M13 5h6v6m0-6-9 9"/><path d="M19 14v5H5V5h5"/></symbol>
+  <symbol id="ic-file" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM15 3v5h5M8 13h8M8 17h8"/></symbol>
+  <symbol id="ic-filter" viewBox="0 0 24 24"><path d="M3 5h18M6 12h12m-9 7h6"/></symbol>
+</svg>
+<a class="skip-link" href="#content">Skip to content</a>
+<div class="app-shell" id="app-shell">
+  <aside class="sidebar" aria-label="Main navigation">
+    <div class="brand-wrap"><a class="brand" href="#home" aria-label="YorpHives Headquarters home"><span class="brand-symbol">Y<span>H</span></span><span class="brand-text"><strong>YorpHives</strong><small>HEADQUARTERS</small></span></a><span class="brand-tag">FOUNDER SPACE</span></div>
+    <nav class="desktop-nav" id="desktop-nav" aria-label="Headquarters pages">
+      <button class="nav-btn active" type="button" data-page="home" aria-current="page"><svg class="icon"><use href="#ic-home"/></svg><span>Home</span></button>
+      <button class="nav-btn" type="button" data-page="discover"><svg class="icon"><use href="#ic-compass"/></svg><span>Discover</span></button>
+      <button class="nav-btn" type="button" data-page="team"><svg class="icon"><use href="#ic-users"/></svg><span>AI Employees</span></button>
+      <button class="nav-btn" type="button" data-page="decisions"><svg class="icon"><use href="#ic-check"/></svg><span>Decisions</span><span class="nav-badge" id="decision-count" hidden></span></button>
+      <div class="nav-separator" aria-hidden="true"></div>
+      <button class="nav-btn" type="button" data-page="growth"><svg class="icon"><use href="#ic-chart"/></svg><span>Growth</span></button>
+      <button class="nav-btn" type="button" data-page="control"><svg class="icon"><use href="#ic-shield"/></svg><span>HQ Control</span></button>
+    </nav>
+    <div class="sidebar-bottom"><div class="founder-badge"><span class="founder-avatar">F</span><span><strong>Founder</strong><small>Read-only HQ</small></span></div></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><div class="topbar-left"><button id="back-button" class="icon-btn back-button" aria-label="Go to previous Headquarters page" title="Go back" hidden><svg class="icon"><use href="#ic-back"/></svg></button><span class="topbar-title">HQ <span class="crumb-arrow">/</span> <strong id="current-page-label">Home</strong></span></div><div class="topbar-actions"><button id="global-search-button" class="search-trigger" aria-label="Search Headquarters"><svg class="icon"><use href="#ic-search"/></svg><span>Search</span><kbd>/</kbd></button><button id="refresh-button" class="icon-btn" title="Refresh evidence" aria-label="Refresh evidence"><svg class="icon"><use href="#ic-refresh"/></svg></button><span class="topbar-avatar" title="Founder only">F</span></div></header>
+    <div class="mobile-top"><button id="mobile-back-button" class="icon-btn mobile-back" aria-label="Go back within Headquarters" hidden><svg class="icon"><use href="#ic-back"/></svg></button><span class="mobile-wordmark">YorpHives <strong>HQ</strong></span><span class="mobile-top-actions"><button id="mobile-search-button" class="icon-btn" aria-label="Search"><svg class="icon"><use href="#ic-search"/></svg></button><button id="mobile-refresh-button" class="icon-btn" aria-label="Refresh evidence"><svg class="icon"><use href="#ic-refresh"/></svg></button><span class="topbar-avatar">F</span></span></div>
+    <main id="content" tabindex="-1"><div id="page-root" aria-live="polite"></div></main>
   </div>
-
-  <nav class="home-mobile-tabs" aria-label="Quick navigation on mobile">
-    <button type="button" data-nav="overview" class="mobile-tab is-active" aria-current="page"><svg class="icon"><use href="#i-grid"/></svg><span>Home</span></button>
-    <button type="button" data-nav="monitoring" class="mobile-tab"><svg class="icon"><use href="#i-bell"/></svg><span>Alerts</span></button>
-    <button type="button" data-nav="products" class="mobile-tab"><svg class="icon"><use href="#i-layers"/></svg><span>Tools</span></button>
-    <button type="button" data-nav="opportunities" class="mobile-tab"><svg class="icon"><use href="#i-spark"/></svg><span>Ideas</span></button>
-    <button type="button" id="mobile-more" class="mobile-tab" aria-label="More sections" aria-expanded="false"><svg class="icon"><use href="#i-menu"/></svg><span>More</span></button>
-  </nav>
-
-  <input id="report-upload" type="file" accept=".json,application/json" hidden>
-  <dialog id="detail-dialog" class="detail-dialog" aria-labelledby="detail-title">
-    <div class="dialog-top"><span class="small-eyebrow" id="detail-type">INTELLIGENCE RECORD</span><button class="icon-button" id="detail-close" aria-label="Close details"><svg class="icon"><use href="#i-close"/></svg></button></div>
-    <h2 id="detail-title"></h2><div id="detail-tags" class="detail-tags"></div>
-    <p id="detail-description" class="dialog-description"></p>
-    <div class="detail-section"><span class="small-eyebrow">RECOMMENDED NEXT STEP</span><p id="detail-action"></p></div>
-    <div class="detail-section"><span class="small-eyebrow">EVIDENCE & PROVENANCE</span><div id="detail-evidence"></div></div>
-    <div class="detail-section"><h3>Evidence assessment</h3><dl id="decision-facts" class="decision-facts"></dl></div>
-    <div class="detail-section decision-editor"><h3 id="decision-state">Needs review</h3><p id="decision-notice" class="source-note"></p>
-      <label for="decision-next">Next state</label><select id="decision-next"></select>
-      <details id="experiment-brief" hidden><summary>Customer experiment (required to accept an opportunity)</summary>
-        <p class="source-note">Define a small test before committing effort. These are your targets, not proven demand.</p>
-        <label for="experiment-audience">Audience</label><input id="experiment-audience" maxlength="400">
-        <label for="experiment-problem">Customer problem</label><input id="experiment-problem" maxlength="400">
-        <label for="experiment-hypothesis">Hypothesis to test</label><input id="experiment-hypothesis" maxlength="400">
-        <label for="experiment-metric">Success metric</label><input id="experiment-metric" maxlength="400">
-        <label for="experiment-target">Target value</label><input id="experiment-target" type="number" min="0.01" step="any">
-        <label for="experiment-effortHours">Maximum effort (hours, up to 40)</label><input id="experiment-effortHours" type="number" min="0.1" max="40" step="any">
-        <label for="experiment-reviewBy">Review date (within 90 days)</label><input id="experiment-reviewBy" type="date">
-        <label for="experiment-stopCondition">When should this experiment stop?</label><input id="experiment-stopCondition" maxlength="400">
-      </details>
-      <label for="decision-note">Your reason (required)</label><textarea id="decision-note" maxlength="800" rows="2"></textarea>
-      <label for="decision-feedback">Feedback for future review</label><select id="decision-feedback"><option value="">No feedback</option><option value="useful">Useful</option><option value="incorrect">Incorrect</option><option value="too-noisy">Too noisy</option><option value="not-priority">Not a priority</option></select>
-      <details><summary>Success condition and outcome</summary><p class="source-note">All three fields are required to record a verified outcome. This is your assessment, not automatic verification.</p>
-      <label for="decision-success">Success condition</label><textarea id="decision-success" maxlength="500" rows="2"></textarea>
-      <label for="decision-outcome">Measured result</label><textarea id="decision-outcome" maxlength="800" rows="2"></textarea>
-      <label for="decision-evidence">Outcome evidence (HTTPS URL)</label><input id="decision-evidence" type="url" maxlength="1000"></details>
-      <p id="decision-error" role="alert"></p><button type="button" class="button button-primary" id="decision-save" disabled>Save decision</button>
-      <details><summary>Previous decisions</summary><ol id="decision-detail-history"></ol></details>
-    </div>
-    <div class="dialog-footer"><button class="button button-secondary" id="copy-record"><svg class="icon"><use href="#i-file"/></svg> Copy summary</button><button class="button button-primary" id="dialog-done">Done</button></div>
-  </dialog>
-  <dialog id="help-dialog" class="detail-dialog" aria-labelledby="help-title">
-    <div class="dialog-top"><span class="small-eyebrow">GETTING STARTED</span><button class="icon-button" id="help-close" aria-label="Close help"><svg class="icon"><use href="#i-close"/></svg></button></div>
-    <h2 id="help-title">Your AI office, explained.</h2>
-    <p class="dialog-description">Headquarters brings monitoring updates and research ideas together. Anything marked EXAMPLE is just sample content—not a real observation.</p>
-    <div class="help-step"><span>01</span><div><strong>Observe</strong><p>Detectors and specialist agents gather read-only evidence about your systems and market.</p></div></div>
-    <div class="help-step"><span>02</span><div><strong>Understand</strong><p>Findings and opportunities are organized by priority, affected asset, and supporting source.</p></div></div>
-    <div class="help-step"><span>03</span><div><strong>Decide</strong><p>You review recommendations and make changes outside Headquarters using founder-owned credentials.</p></div></div>
-    <p class="helper-note">You can open a JSON report to explore its records locally. Reports marked Cloudflare were collected by the private scheduled monitoring service.</p>
-    <p class="helper-note">Use <strong>Sign out</strong> at the top right, or in the menu, when you're finished. It ends your Cloudflare Access session across applications protected by the same Access team.</p>
-    <div class="dialog-footer"><button class="button button-primary" id="help-done">Got it</button></div>
-  </dialog>
-  <dialog id="search-dialog" class="search-dialog" aria-label="Search headquarters">
-    <div class="search-dialog-header"><svg class="icon"><use href="#i-search"/></svg><input id="global-search" type="search" placeholder="Search findings, opportunities, departments..." autocomplete="off" aria-label="Search headquarters records"><kbd>ESC</kbd></div>
-    <div id="search-results" class="search-results"></div>
-    <div class="search-hint">Results are local to the data currently displayed in this browser.</div>
-  </dialog>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <nav class="bottom-nav" aria-label="Mobile navigation"><button data-page="home" class="bottom-item active" aria-current="page"><svg class="icon"><use href="#ic-home"/></svg><span>Home</span></button><button data-page="discover" class="bottom-item"><svg class="icon"><use href="#ic-compass"/></svg><span>Discover</span></button><button data-page="team" class="bottom-item"><svg class="icon"><use href="#ic-users"/></svg><span>Team</span></button><button data-page="decisions" class="bottom-item"><svg class="icon"><use href="#ic-check"/></svg><span>Decisions</span></button><button id="more-button" class="bottom-item" aria-expanded="false" aria-controls="more-popover"><svg class="icon"><use href="#ic-menu"/></svg><span>More</span></button></nav>
+</div>
+<div id="more-popover" class="more-popover" aria-label="More pages" hidden><div class="popover-title">More</div><button type="button" data-page="growth"><svg class="icon"><use href="#ic-chart"/></svg> Growth <svg class="icon right"><use href="#ic-chevron"/></svg></button><button type="button" data-page="control"><svg class="icon"><use href="#ic-shield"/></svg> HQ Control <svg class="icon right"><use href="#ic-chevron"/></svg></button><button type="button" id="import-menu-action"><svg class="icon"><use href="#ic-upload"/></svg> Open a report <svg class="icon right"><use href="#ic-chevron"/></svg></button></div>
+<div id="detail-scrim" class="detail-scrim" hidden></div><aside class="detail-drawer" id="detail-drawer" role="dialog" aria-modal="true" aria-labelledby="detail-title" hidden><div class="drawer-header"><span class="pill neutral">DETAILS</span><button class="icon-btn" id="detail-close" aria-label="Close detail"><svg class="icon"><use href="#ic-close"/></svg></button></div><div id="detail-content"></div></aside>
+<dialog id="search-modal" class="search-modal" aria-label="Search Headquarters"><div class="search-modal-top"><svg class="icon"><use href="#ic-search"/></svg><input id="search-input" type="search" placeholder="Search pages and records" autocomplete="off" aria-label="Search HQ pages and evidence"><button id="search-close" class="icon-btn" aria-label="Close search"><svg class="icon"><use href="#ic-close"/></svg></button></div><div id="search-results" class="search-results"></div><div class="search-footer">Pages and loaded records.</div></dialog>
+<input id="report-file" type="file" accept=".json,application/json" hidden>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script defer src="./dashboard.js"></script>
 </body>
 </html>

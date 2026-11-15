@@ -1,1170 +1,277 @@
-/* YorpHives Headquarters — dependency-free observation and founder-review UI.
-   Nothing here scans, deploys, edits repositories, or contacts an external API.
-   Imported JSON is displayed as unverified user-provided evidence, not live status. */
+/* YorpHives Headquarters — local-first front end. No autonomous execution. */
 (() => {
-  "use strict";
-
-  const exampleData = {
-    assets: [
-      { id: "website", name: "YorpHives website", kind: "Public platform", status: "unknown", summary: "No live monitoring connected" },
-      { id: "hq", name: "Headquarters", kind: "Private AI office", status: "unknown", summary: "No live monitoring connected" }
-    ],
-    findings: [
-      { id: "f1", title: "Example: investigate exposed credentials", category: "security", priority: "high", asset: "YorpHives website", description: "An example alert showing how security evidence could be surfaced. A future read-only detector should identify suspicious credentials or secrets in files and logs, while keeping the secret values redacted.", recommendation: "If a real finding is confirmed, revoke the affected credential and inspect access history using a separate founder-owned process.", evidence: [], observedAt: "" },
-      { id: "f2", title: "Example: review unsupported dependencies", category: "dependencies", priority: "medium", asset: "Headquarters", description: "A demonstration of an outdated-package finding. Real dependency checks will need package names, installed versions, advisory identifiers, and official support dates.", recommendation: "Compare current versions with maintainer support policy, test upgrades in isolation, and propose a founder-reviewed migration.", evidence: [], observedAt: "" },
-      { id: "f3", title: "Example: independent uptime visibility", category: "reliability", priority: "medium", asset: "YorpHives website", description: "A demonstration of a monitoring coverage gap. This is not an actual outage or failed check.", recommendation: "Add independent HTTP, TLS, and synthetic journey probes; send observations to the evidence store without permitting infrastructure changes.", evidence: [], observedAt: "" }
-    ],
-    opportunities: [
-      { id: "o1", title: "Niche workflow tools for small teams", category: "product", confidence: "Research needed", description: "Investigate repetitive business workflows where a focused, low-friction tool could provide obvious value to a specific user group.", recommendation: "Interview potential users, assess existing products, and validate willingness to pay with a narrow prototype before building.", evidence: [], observedAt: "" },
-      { id: "o2", title: "Productized technical health reports", category: "revenue", confidence: "Research needed", description: "Explore paid, evidence-based website health reports as a potential service or product line. These are illustrative business ideas, not verified demand or income forecasts.", recommendation: "Research competition and pricing, clarify scope and legal obligations, and test whether customers will pay before offering it.", evidence: [], observedAt: "" },
-      { id: "o3", title: "Self-hostable open-source bot candidates", category: "technology", confidence: "License review needed", description: "Evaluate free tools for dependency review, uptime detection, vulnerability scans, and browser checks. Candidates for further research include Renovate, Uptime Kuma, Trivy, and Playwright.", recommendation: "Independently verify each project's current license, maintenance, operating cost, security model, and suitability for self-hosting.", evidence: [], observedAt: "" }
-    ],
-    products: [
-      { id: "demo-p1", name: "Example: Image Compressor", url: "", source: "sample", status: "unknown", features: ["Upload image", "Adjust quality"], firstSeen: "", lastChecked: "", active: true },
-      { id: "demo-p2", name: "Example: Word Counter", url: "", source: "sample", status: "unknown", features: ["Count words"], firstSeen: "", lastChecked: "", active: true }
-    ],
-    changes: [
-      { id: "demo-c1", url: "", kind: "new-product", severity: "info", summary: "Example: a newly published tool is detected and enrolled automatically.", occurredAt: "" },
-      { id: "demo-c2", url: "", kind: "feature-surface-change", severity: "info", summary: "Example: a product's visible controls have changed and should be reviewed.", occurredAt: "" }
-    ],
-    comparisons: [
-      { id: "demo-gap", product: "Example: Image Compressor", competitor: "Hypothetical competitor", missingFeatures: ["Batch processing", "AVIF support"], evidence: [], confidence: "Illustrative only", recommendation: "Validate competitor claims and user demand before prioritizing." }
-    ],
-    agents: [
-      { id: "a1", name: "Engineering & Operations", responsibility: "System health, incidents, performance, maintainability, and safe architecture recommendations.", status: "not_connected" },
-      { id: "a2", name: "Security & Independent QA", responsibility: "Vulnerabilities, regression evidence, independent testing, and trust boundaries.", status: "not_connected" },
-      { id: "a3", name: "Research & Innovation", responsibility: "Open-source technology scouting, emerging standards, and reusable capabilities.", status: "not_connected" },
-      { id: "a4", name: "Global Market Intelligence", responsibility: "Customer pain points, geographic demand signals, and market research.", status: "not_connected" },
-      { id: "a5", name: "Product & Growth", responsibility: "Product hypotheses, acquisition opportunities, and user experience improvements.", status: "not_connected" },
-      { id: "a6", name: "Revenue & Business", responsibility: "Monetization research, pricing hypotheses, and verified revenue reporting.", status: "not_connected" }
-    ],
-    activity: [
-      { id: "ev1", title: "Example security observation", summary: "A sample activity entry would link to a redacted, reproducible finding.", kind: "security", occurredAt: "" },
-      { id: "ev2", title: "Example technology research", summary: "An AI research brief would include open-source licensing and source URLs.", kind: "research", occurredAt: "" }
-    ]
-  };
-
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const PAGES = {home:'Home', discover:'Discover', team:'AI Employees', decisions:'Decisions', growth:'Growth', control:'HQ Control'};
+  const DEPARTMENTS = [
+    {name:'Engineering & Operations',short:'EO',job:'Website health & engineering',review:'Security & Independent QA'},
+    {name:'Research & Innovation',short:'RI',job:'Tools & emerging technology',review:'Engineering & Operations'},
+    {name:'Global Market Intelligence',short:'MI',job:'Markets & customer needs',review:'Product & Growth'},
+    {name:'Product & Growth',short:'PG',job:'Products & adoption',review:'Global Market Intelligence'},
+    {name:'Revenue & Business',short:'RB',job:'Revenue & monetization',review:'Security & Independent QA'},
+    {name:'Security & Independent QA',short:'QA',job:'Security & independent review',review:'Founder'}
+  ];
+  const CATEGORIES = [['all','All'],['apps','Apps & tools'],['technology','Technology'],['markets','Markets'],['competitors','Competitors'],['revenue','Revenue']];
+  const TRANSITIONS = {proposed:['accepted','rejected','snoozed'],accepted:['implemented','rejected','snoozed'],implemented:['verified','accepted'],verified:['proposed'],rejected:['proposed'],snoozed:['proposed']};
+  const STATE_LABELS = {proposed:'Proposed',accepted:'Accepted',implemented:'Implemented',verified:'Outcome recorded',rejected:'Rejected',snoozed:'Paused'};
+  const EMPTY = () => ({schemaVersion:'yorphives.hq-intelligence.v1',assets:[],products:[],findings:[],opportunities:[],activity:[],changes:[],comparisons:[],securityWatch:[],agents:[],operating:{queue:[],threads:[],pending:null,activeOpportunities:null,aiStatus:'Not connected'},decisionJournal:{available:false,events:[]},resourceBudget:{publicFetches:{used:null,limit:900}},verification:{complete:false}});
+  const store = {get:(k,fallback)=>{try{return JSON.parse(localStorage.getItem('yh-ui:'+k))??fallback;}catch{return fallback;}},set:(k,v)=>{try{localStorage.setItem('yh-ui:'+k,JSON.stringify(v));}catch{}}};
+  const sessionSaved=()=>{try{const x=JSON.parse(sessionStorage.getItem('yh:saved')||'[]');return Array.isArray(x)?x.filter(y=>typeof y==='string').slice(0,500):[];}catch{return [];}};
   const state = {
-    data: exampleData,
-    origin: "preview",
-    view: "overview",
-    findingFilter: "all",
-    opportunityFilter: "all",
-    selectedDetail: null,
-    feedFilter: "all",
-    browserAlertsOn: false,
-    seenFindingIds: new Set()
+    page: PAGES[location.hash.slice(1)] ? location.hash.slice(1) : 'home', data:EMPTY(), source:'preview',
+    navHistory:[], homeFilter:'all', discoverFilter:'all', discoverQuery:'', discoverSort:'newest', savedOnly:false,
+    productFilter:'all', productQuery:'', decisionFilter:'all', busy:false, detail:null,
+    compact:store.get('compact',false) === true, alerts:store.get('alerts',false) === true,
+    saved:new Set(sessionSaved()), pulse:[], searchQuery:'', saving:false
   };
-
-  const $ = (id) => document.getElementById(id);
-  const icon = (name) => {
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("class", "icon");
-    svg.setAttribute("aria-hidden", "true");
-    const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
-    use.setAttribute("href", "#i-" + name);
-    svg.append(use);
-    return svg;
-  };
-  const node = (tag, className, content) => {
-    const element = document.createElement(tag);
-    if (className) element.className = className;
-    if (content !== undefined && content !== null) element.textContent = String(content);
-    return element;
-  };
-  const append = (parent, ...children) => { children.forEach(child => { if (child) parent.append(child); }); return parent; };
-  const cleanText = (value, max = 1000) => typeof value === "string" ? value.slice(0, max).trim() : "";
-  const cleanDate = (value) => {
-    if (typeof value !== "string" || value.length > 45) return "";
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? new Date(parsed).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "";
-  };
-  const safeUrl = (input) => {
-    try {
-      const url = new URL(input);
-      return ["https:", "http:"].includes(url.protocol) ? url.toString() : "";
-    } catch (_) { return ""; }
-  };
-  const label = (word) => String(word || "").replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
-  const originLabel = () => state.origin === "selfhost" ? "Self-hosted scheduled evidence — unverified" : state.origin === "preview" ? "Example only" : ["cloudflare","selfhost"].includes(state.origin) ? "Cloudflare scheduled evidence — unverified" : state.origin === "local" ? "Private local evidence — unverified" : "Imported — unverified";
-  const priorityRank = { high: 0, medium: 1, low: 2 };
-  const categoryIcons = { security: "shield", dependencies: "code", reliability: "activity", quality: "check", product: "layers", revenue: "dollar", technology: "radar" };
-  const workerIcons = ["activity", "shield", "spark", "radar", "trend", "dollar"];
-
-  function emptyState(title, message) {
-    const wrapper = node("div", "empty-state");
-    append(wrapper, icon("info"), node("strong", "", title), node("p", "", message));
-    return wrapper;
-  }
-
-  function showView(view) {
-    if (!["overview", "monitoring", "opportunities", "products", "workforce", "activity", "governance"].includes(view)) view = "overview";
-    state.view = view;
-    document.querySelectorAll(".view").forEach(el => {
-      const active = el.id === "view-" + view;
-      el.hidden = !active;
-      el.classList.toggle("is-visible", active);
-    });
-    document.querySelectorAll("[data-nav]").forEach(button => {
-      const active = button.dataset.nav === view;
-      button.classList.toggle("is-active", active);
-      if (active) button.setAttribute("aria-current", "page");
-      else button.removeAttribute("aria-current");
-    });
-    $("breadcrumb-current").textContent = ({
-      overview: "Home", monitoring: "Alerts", opportunities: "Ideas", products: "My tools",
-      workforce: "AI team", activity: "History", governance: "Safety & access"
-    })[view];
-    document.body.classList.remove("nav-open");
-    $("sidebar-scrim").hidden = true;
-    $("mobile-menu").setAttribute("aria-expanded", "false");
-    $("mobile-more").setAttribute("aria-expanded", "false");
-    if (location.hash !== "#" + view) history.replaceState(null, "", "#" + view);
-    window.scrollTo({ top: 0, behavior: "instant" });
-    $("main-content").focus({ preventScroll: true });
-  }
-
-  function renderMetrics() {
-    const d = state.data;
-    const local = state.origin === "local" || ["cloudflare","selfhost"].includes(state.origin);
-    const cloud = ["cloudflare","selfhost"].includes(state.origin);
-    const preview = state.origin === "preview";
-    $("metric-assets").textContent = d.assets.length;
-    $("metric-findings").textContent = d.findings.length;
-    $("metric-opportunities").textContent = d.opportunities.length;
-    $("metric-employees").textContent = d.agents.length;
-    $("nav-finding-count").textContent = d.findings.length;
-    $("metric-assets-caption").textContent = preview ? "Illustrative system inventory" : local ? "Private collector inventory" : "Systems listed in imported file";
-    $("metric-findings-caption").textContent = preview ? "Example open observations" : local ? "Local collector observations" : "Findings listed in imported file";
-    $("metric-opportunities-caption").textContent = preview ? "Example research leads" : local ? "Collected research hypotheses" : "Leads listed in imported file";
-    $("metric-employees-caption").textContent = preview ? "Illustrative team structure" : "Departments in selected report";
-    $("metric-assets-footer").textContent = preview ? "Website + headquarters" : "Status not independently verified";
-    $("metric-findings-footer").textContent = "For founder review";
-    $("metric-opportunities-footer").textContent = "Validate before pursuing";
-    $("metric-employees-footer").textContent = "Agent status requires telemetry";
-    const observedAt = cleanDate(d.verification?.generatedAt || "");
-    $("snapshot-date").textContent = preview ? "Illustrative dashboard" :
-      local ? "Local evidence" + (observedAt ? " · " + observedAt : "") : "Imported file · not independently verified";
-    $("mode-label").textContent = preview ? "Preview mode" : cloud ? "Cloudflare evidence" : local ? "Private evidence" : "Imported data";
-    $("mode-chip").classList.toggle("imported", !preview);
-    $("footer-mode").textContent = preview ? "PREVIEW · NOT A LIVE HEALTH REPORT" :
-      cloud ? "CLOUDFLARE FREE · OBSERVATION ONLY" : local ? "PRIVATE COLLECTOR · EVIDENCE REQUIRES REVIEW" : "IMPORTED DATA · NOT INDEPENDENTLY VERIFIED";
-    $("brief-kind").textContent = preview ? "EXAMPLE" : local ? "LOCAL REPORT" : "IMPORTED";
-    const notice = $("data-notice");
-    notice.hidden = false;
-    const noticeText = notice.querySelector("div");
-    noticeText.textContent = preview
-      ? "Preview workspace — The records below are examples, not findings from a live scan. Import a report to explore your own observations."
-      : local
-        ? "Read-only collector report — These are recorded HTTP observations and research leads, not proof that every product feature works or that market demand exists."
-        : "Imported report — These values came from a file in your browser. Headquarters has not independently checked them or connected to production systems.";
-  }
-
-  function renderFounderBriefing() {
-    const brief=state.data.briefing;
-    const preview=state.origin==="preview";
-    const has=brief && !preview;
-    const fresh=has && brief.collector.current;
-    $("brief-origin").textContent=preview?"EXAMPLE DATA":!has?"NO BRIEFING":fresh?"RECENT COLLECTOR":"CHECK DATA FRESHNESS";
-    $("brief-site").textContent=!has?"Not verified":
-      brief.site.status==="reported-reachable"?"HTTP reachable":
-      brief.site.status==="issue-reported"?"Issue reported":"Not verified";
-    $("brief-site-caption").textContent=has && brief.site.lastCheck?
-      "Last GET: "+(cleanDate(brief.site.lastCheck)||"time unavailable"):"No recent verified HTTP check";
-    $("brief-coverage").textContent=has?brief.coverage.checked+" / "+brief.coverage.discovered:"—";
-    $("brief-progress").value=has?brief.coverage.checkedPercent:0;
-    $("brief-coverage-caption").textContent=has?
-      brief.coverage.awaitingFirstCheck+" awaiting first check · "+brief.coverage.httpUnverified+
-      " checked but unverified":"Tool coverage not available";
-    $("brief-alerts").textContent=has?brief.alerts.open:"—";
-    $("brief-alerts-caption").textContent=has?
-      brief.alerts.highPriority+" high-priority · findings require review":"No monitoring findings loaded";
-    $("brief-research").textContent=has?brief.research.leads:"—";
-    $("brief-research-caption").textContent=has?
-      brief.research.alternatives+" possible alternatives · demand unverified":"No research feed loaded";
-    $("brief-next-title").textContent=has?brief.nextAction.label:"Connect your private report";
-    $("brief-next-detail").textContent=has?brief.nextAction.description:
-      "The briefing appears after a collector report is connected.";
-    const target=$("brief-next-button");
-    target.dataset.nav=has?brief.nextAction.section:"products";
-    target.firstChild.textContent=has?"Review evidence ":"See my tools ";
-    $("brief-caveat").textContent=has?
-      "Daily public GETs: "+brief.usage.used+" / "+brief.usage.limit+
-      " (internal guard, not billing) · No browser or AI agents change your site.":
-      "No code changes, browser testing or paid AI can be initiated from this briefing.";
-  }
-
-  function renderHomeFeed() {
+  let lastFocus=null, toastTimer, lastHighKey='';
+  const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const icon = name => `<svg class="icon" aria-hidden="true"><use href="#ic-${name}"/></svg>`;
+  const list = (d,key) => Array.isArray(d?.[key]) ? d[key] : [];
+  const cut = (s,n=115) => String(s??'').slice(0,n);
+  const filled = v => v!==undefined && v!==null && v!=='';
+  const num = v => state.source!=='preview' && filled(v) && Number.isFinite(Number(v)) ? Number(v).toLocaleString() : '—';
+  const date = v => {const ms=Date.parse(v||'');return Number.isFinite(ms)?new Date(ms).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}):'—';};
+  const time = v => {const ms=Date.parse(v||'');return Number.isFinite(ms)?new Date(ms).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'—';};
+  const today = () => new Date().toISOString();
+  const badge = (s,t='plain') => `<span class="tag tag-${t}">${esc(s)}</span>`;
+  const ready = () => state.source !== 'preview';
+  const website = () => list(state.data,'assets').find(x=>x.kind==='website');
+  const status = x => ({healthy:'HTTP OK',reachable:'HTTP OK',degraded:'Needs review',unknown:'Unknown'})[x]||'Unknown';
+  const header=(t,s,act='')=>`<header class="page-header"><div><h1>${esc(t)}</h1><p>${esc(s)}</p></div>${act?`<div class="header-action">${act}</div>`:''}</header>`;
+  const button=(id,label,iconName,cls='button-subtle',extra='')=>`<button type="button" class="button ${cls}" data-action="${esc(id)}" ${extra}>${icon(iconName)} ${esc(label)}</button>`;
+  const importButton=()=>button('import','Open report','upload');
+  const exportButton=()=>button('export-report','Export report','upload','button-subtle',!ready()?'disabled title="No report loaded"':'');
+  const blank=(name,hint='')=>`<div class="blank"><span class="blank-icon">${icon('info')}</span><strong>${esc(name)}</strong>${hint?`<small>${esc(hint)}</small>`:''}</div>`;
+  const card=(title,body,extra='',classes='')=>`<section class="panel ${classes}"><div class="panel-top"><h2>${esc(title)}</h2>${extra}</div>${body}</section>`;
+  const stat=(t,v,n,mark)=>`<article class="stat"><span class="stat-top"><span>${esc(t)}</span>${icon(mark)}</span><strong>${esc(String(v??'—'))}</strong><small>${esc(n)}</small></article>`;
+  const navlink=(to,label)=>`<button class="text-action" type="button" data-page="${esc(to)}">${esc(label)} ${icon('arrow')}</button>`;
+  const provenance=()=>{const labels={preview:['Preview','No live evidence','neutral'],live:['Live report','HTTP evidence','green'],imported:['Imported report','Local only','amber'],stale:['Stale report','Refresh failed','amber']};const [name,sub,color]=labels[state.source];return `<div class="provenance"><span class="provenance-main"><span class="provenance-dot ${color}"></span><strong>${name}</strong><span>${sub}</span></span><small>${ready()?`Updated ${esc(time(state.data.generatedAt||state.data.briefing?.generatedAt))}`:'Not connected'}</small></div>`;};
+  const link = raw => {try{const x=new URL(String(raw));return ['https:','http:'].includes(x.protocol)&&!x.username&&!x.password?x.href:null;}catch{return null;}};
+  const sortDate = x => {const n=Date.parse(x||'');return Number.isFinite(n)&&n<=Date.now()?n:0;};
+  const files = kind => ({finding:'findings',opportunity:'opportunities',product:'products',comparison:'comparisons',change:'changes',activity:'activity',security:'securityWatch'})[kind];
+  const row=(x,kind,id,sub='')=>`<button type="button" class="record-row" data-detail="${esc(kind)}" data-id="${esc(id)}"><span class="record-copy"><strong>${esc(cut(x.title||x.name||'Untitled',130))}</strong>${sub?`<small>${esc(sub)}</small>`:''}</span><span class="record-end">${icon('chevron')}</span></button>`;
+  const tab=(name,id,current,group)=>`<button class="filter ${id===current?'selected':''}" type="button" data-${group}="${esc(id)}" aria-pressed="${id===current}">${esc(name)}</button>`;
+  const safeKey=(kind,id)=>`${kind}:${id}`;
+  function records() {
     const d=state.data;
-    const preview=state.origin==="preview";
-    const official=["cloudflare","selfhost"].includes(state.origin) || state.origin==="local";
-    const at=cleanDate(d.verification?.generatedAt);
-    $("home-updated").textContent=preview?"You're viewing example updates · Not live":
-      at?"Last update: "+at+" · "+(official?"Automatic report":"Imported report"):
-      "Report timestamp unavailable · Check data source";
-
-    // Hide low-level collector heartbeat keys from the founder's social feed.
-    // They remain available in History for auditability.
-    const meaningfulActivity=d.activity.filter(item=>
-      !/^(last[ _-]?cron|discovery|research|security[ _-]?watch|site[ _-]?bundle[ _-]?fingerprint)$/i.test(item.title));
-    $("home-alert-count").textContent=d.findings.length;
-    $("home-idea-count").textContent=d.opportunities.length;
-    $("home-tool-count").textContent=(["cloudflare","selfhost"].includes(state.origin) && !d.verification?.complete)?"?":d.products.length;
-    $("home-update-count").textContent=meaningfulActivity.length+d.changes.length;
-
-    const site=d.assets.find(asset=>asset.kind==="website" || /yorphives website/i.test(asset.name));
-    const sitePill=$("home-site-pill");
-    const siteCopy=$("home-site-copy");
-    sitePill.className="home-site-pill";
-    if(preview || !site || site.status==="unknown"){
-      sitePill.textContent=preview?"Example · not live":"Status not verified";
-      sitePill.classList.add("unknown");
-      siteCopy.textContent=preview?"This is an example screen, not a live website check.":
-        "No reliable website status in this report yet. Check coverage before assuming the site works.";
-    }else if(site.status==="healthy"){
-      sitePill.textContent="Reported reachable";
-      sitePill.classList.add("good");
-      siteCopy.textContent="The latest recorded check reached the website. Individual tool features are not verified.";
+    const normalize=(kind,arr,timeField)=>arr.map((x,i)=>({...x,_kind:kind,_key:`${kind}:${filled(x.id)?x.id:'at-'+i}`,_id:filled(x.id)?x.id:'at-'+i,_date:x[timeField]||x.observedAt||x.occurredAt||''}));
+    return [
+      ...normalize('finding',list(d,'findings'),'observedAt'),
+      ...normalize('opportunity',list(d,'opportunities'),'observedAt'),
+      ...normalize('change',list(d,'changes'),'occurredAt'),
+      ...normalize('activity',list(d,'activity'),'occurredAt')
+    ].sort((a,b)=>sortDate(b._date)-sortDate(a._date));
+  }
+  function pulseItems(){state.pulse=records().slice(0,20);return state.pulse.filter(x=>state.homeFilter==='all'|| (state.homeFilter==='alerts'&&x._kind==='finding') || (state.homeFilter==='research'&&x._kind==='opportunity') || (state.homeFilter==='changes'&&['change','activity'].includes(x._kind)));}
+  function queue(){return list(state.data.operating,'queue').slice(0,3);}
+  function latestJournal(){const map=new Map();for(const x of [...list(state.data.decisionJournal,'events')].sort((a,b)=>(Number(b.sequence)||0)-(Number(a.sequence)||0))){if(!map.has(x.thread))map.set(x.thread,x);}return map;}
+  function asRecord(queueItem){const kind=queueItem.type==='opportunity'?'opportunity':'finding';return list(state.data,files(kind)).find(x=>String(x.id)===String(queueItem.id))||queueItem;}
+  function permittedDecision(item,kind){const thread=`${kind}:${item.id}`;const event=latestJournal().get(thread);const previous=event?.state||'proposed';return {thread,event,previous,revision:Number(event?.revision??item.revision??0),actions:TRANSITIONS[previous]||[]};}
+  function canDecide(){return state.source==='live'&&state.data.decisionJournal?.available===true;}
+  function home(){
+    const d=state.data, q=queue(), pulse=pulseItems();
+    const s=ready()?status(website()?.status):'—';
+    const pulseBlock=pulse.length?pulse.map(x=>{const i=state.pulse.indexOf(x);return `<button type="button" class="pulse-row" data-detail="pulse" data-id="${i}"><span class="pulse-symbol">${icon(x._kind==='finding'?'shield':x._kind==='opportunity'?'compass':'clock')}</span><span class="pulse-text"><strong>${esc(cut(x.title||x.summary||'Update',105))}</strong><small>${esc(x._kind==='finding'?'Alert':x._kind==='opportunity'?'Research':'Update')}</small></span><span class="pulse-date">${date(x._date)}</span></button>`;}).join(''):blank('No updates');
+    return header('Home','Status · decisions · activity',importButton())+provenance()+
+      `<div class="stat-grid four">${stat('Website',s,'HTTP check','shield')}${stat('To review',num(d.operating?.pending),'Recommendations','check')}${stat('Research',ready()?list(d,'opportunities').length:'—','Unverified leads','compass')}${stat('Revenue','—','Source unavailable','chart')}</div>`+
+      `<div class="shortcut-row">${navlink('discover','Discover')}${navlink('team','AI Employees')}${navlink('decisions','Decisions')}${navlink('growth','Growth')}</div>`+
+      `<div class="content-grid home-grid">${card('YH Pulse',`<div class="filter-scroller compact-tabs">${[['all','All'],['alerts','Alerts'],['research','Research'],['changes','Changes']].map(([id,n])=>tab(n,id,state.homeFilter,'pulse-filter')).join('')}</div><div class="pulse-list">${pulseBlock}</div>`,badge('LATEST 20'))}`+
+      `<div class="vertical-stack">${card('Priorities',q.length?`<div class="record-list">${q.map((x,i)=>row(asRecord(x),'review',i,x.contract?.classification||x.status||'Review')).join('')}</div>`:blank('No recommendations'),badge('TOP 3')+navlink('decisions','Open'))}`+
+      `${card('Quick actions',`<div class="quick-grid">${button('import','Open report','upload')}${exportButton()}${button('copy-summary','Copy status','file')}${button('refresh','Refresh','refresh')}</div>`)}</div></div>`;
+  }
+  function discoveryItems(){const d=state.data;const items=[];
+    list(d,'products').forEach((x,i)=>items.push({...x,_kind:'product',_id:filled(x.id)?x.id:'at-'+i,_category:'apps',_date:x.firstSeen||x.lastChecked||''}));
+    list(d,'comparisons').forEach((x,i)=>items.push({...x,_kind:'comparison',_id:filled(x.id)?x.id:'at-'+i,_category:'competitors',_date:x.observedAt||'',title:x.competitor||x.product||'Comparison'}));
+    list(d,'opportunities').forEach((x,i)=>{const c=String(x.category||'').toLowerCase();const group=c==='technology'?'technology':c==='revenue'?'revenue':c==='product'?'apps':c==='market'||c==='markets'?'markets':'markets';items.push({...x,_kind:'opportunity',_id:filled(x.id)?x.id:'at-'+i,_category:group,_date:x.observedAt||''});});
+    return items;
+  }
+  function savedKey(x){return safeKey(x._kind,x._id);}
+  function discover(){
+    const all=discoveryItems();let filtered=all.filter(x=>(state.discoverFilter==='all'||state.discoverFilter===x._category) && (!state.savedOnly||state.saved.has(savedKey(x))) && `${x.title||x.name||''} ${x.description||''} ${x.evidenceSummary||''}`.toLowerCase().includes(state.discoverQuery.toLowerCase()));
+    filtered.sort(state.discoverSort==='name'?(a,b)=>String(a.title||a.name).localeCompare(String(b.title||b.name)):(a,b)=>sortDate(b._date)-sortDate(a._date));
+    const cards=filtered.map(x=>`<article class="lead-card"><div class="lead-top">${badge(x._kind==='product'?'Site inventory':x._kind==='comparison'?'Comparison':'Research')}<button type="button" class="save-btn ${state.saved.has(savedKey(x))?'is-saved':''}" data-save-kind="${esc(x._kind)}" data-save-id="${esc(x._id)}" aria-pressed="${state.saved.has(savedKey(x))}" aria-label="${state.saved.has(savedKey(x))?'Remove saved item':'Save item'}">${state.saved.has(savedKey(x))?'★':'☆'}</button></div><button class="lead-body" type="button" data-detail="${esc(x._kind)}" data-id="${esc(x._id)}"><strong>${esc(cut(x.title||x.name||'Item',100))}</strong><small>${esc(cut(x.description||x.evidenceSummary||x.qaReason||'Review evidence',110))}</small><span class="lead-footer">Details ${icon('arrow')}</span></button></article>`).join('');
+    const purpose=[['apps','Apps & tools','Open-source candidates','compass'],['technology','Technology','Models & standards','spark'],['markets','Markets','Customer needs','users'],['competitors','Competitors','Product comparisons','chart'],['revenue','Revenue','Business models','check']];
+    return header('Discover','Tools · markets · opportunities',importButton())+provenance()+
+      `<div class="filter-scroller">${CATEGORIES.map(([id,n])=>tab(n,id,state.discoverFilter,'discover-filter')).join('')}</div>`+
+      `<div class="toolbar"><label class="inline-search">${icon('search')}<input id="discover-query" type="search" placeholder="Search discoveries" value="${esc(state.discoverQuery)}" aria-label="Search discoveries" /></label><select id="discover-sort" class="select" aria-label="Sort discoveries"><option value="newest" ${state.discoverSort==='newest'?'selected':''}>Newest</option><option value="name" ${state.discoverSort==='name'?'selected':''}>A–Z</option></select><button type="button" class="button ${state.savedOnly?'button-active':'button-subtle'}" data-action="toggle-saved" aria-pressed="${state.savedOnly}">☆ Saved</button></div>`+
+      (all.length?`<div class="lead-grid">${cards||blank('No matching items')}</div>`:`<div class="purpose-grid">${purpose.filter(x=>state.discoverFilter==='all'||state.discoverFilter===x[0]).map(([id,n,s,i])=>`<button type="button" class="purpose-card purpose-button" data-discover-filter="${esc(id)}"><span class="purpose-icon">${icon(i)}</span><h2>${esc(n)}</h2><p>${esc(s)}</p></button>`).join('')}</div>`)+
+      `<div class="page-footnote">${all.length?`${filtered.length} shown · `:''}Research is not validated demand.</div>`;
+  }
+  function assignmentFor(name){const threads=list(state.data.operating,'threads');return threads.filter(x=>x.contract?.owner===name);}
+  function team(){const statusText=ready()?state.data.operating?.aiStatus||'Not connected':'Not connected';return header('AI Employees','Six departments · evidence routing')+provenance()+
+    `<div class="compact-info">${icon('info')} AI inference: ${esc(statusText)}</div>`+
+    `<div class="team-grid">${DEPARTMENTS.map((x,i)=>`<button class="member-card" type="button" data-detail="department" data-id="${i}"><span class="member-avatar">${esc(x.short)}</span><span class="member-text"><strong>${esc(x.name)}</strong><small>${esc(x.job)}</small><span class="member-status">${assignmentFor(x.name).length} routed records · Not proof of AI execution</span></span>${icon('chevron')}</button>`).join('')}</div>`+
+    `${card('Workflow',`<div class="steps"><span>Observe</span>${icon('arrow')}<span>Investigate</span>${icon('arrow')}<span>Review</span>${icon('arrow')}<span>Recommend</span>${icon('arrow')}<span>Founder</span></div>`)}`+
+    `<div class="page-footnote">No autonomous deployment or payment.</div>`;}
+  function decisions(){const d=state.data,q=queue(),journal=list(d.decisionJournal,'events'),latest=latestJournal(),threads=list(d.operating,'threads');
+    const filtered=threads.filter(x=>state.decisionFilter==='all'||(state.decisionFilter==='pending'?x.needsDecision:x.status===state.decisionFilter));
+    return header('Decisions','Approve · track · verify', journal.length?button('export-decisions','Export history','upload'):'' )+provenance()+
+      `<div class="stat-grid three">${stat('To review',num(d.operating?.pending),'Top 3','check')}${stat('Active',num(d.operating?.activeOpportunities),'Limit: 3','compass')}${stat('History',ready()&&d.decisionJournal?.available?journal.length:'—','Journal entries','clock')}</div>`+
+      `<div class="content-grid equal">${card('Review queue',q.length?`<div class="record-list">${q.map((x,i)=>row(asRecord(x),'review',i,x.contract?.freshness||x.status||'Review')).join('')}</div>`:blank('No recommendations'),badge('TOP 3'))}`+
+      `${card('Recent decisions',journal.length?`<div class="record-list">${journal.slice(0,12).map(x=>row(x,'decision',x.sequence??x.thread,STATE_LABELS[x.state]||x.state)).join('')}</div>`:blank('No saved decisions'), badge(canDecide()?'Connected':'Read-only'))}</div>`+
+      `${threads.length?card('All threads',`<div class="filter-scroller compact-tabs">${[['all','All'],['pending','To review'],['accepted','Accepted'],['implemented','Implemented'],['verified','Verified']].map(([id,n])=>tab(n,id,state.decisionFilter,'decision-filter')).join('')}</div><div class="record-list">${filtered.slice(0,60).map(x=>row(asRecord(x),'thread',x.thread,STATE_LABELS[x.status]||x.status||'Proposed')).join('')||blank('No matches')}</div>`, badge(`${filtered.length} THREADS`)):''}`+
+      `<div class="page-footnote">Accepting a recommendation never deploys changes.</div>`;
+  }
+  function growth(){const d=state.data;const all=list(d,'products');const visible=all.filter(x=>(state.productFilter==='all'||(state.productFilter==='published'&&x.discoveryConfidence==='published')||(state.productFilter==='candidate'&&x.discoveryConfidence==='candidate'))&&`${x.name||''} ${x.url||''}`.toLowerCase().includes(state.productQuery.toLowerCase()));
+    return header('Growth','Traffic · products · revenue')+provenance()+
+      `<div class="stat-grid four">${stat('Visitors','—','No analytics','users')}${stat('Revenue','—','No verified source','chart')}${stat('Products',ready()?all.length:'—','Inventory may be partial','compass')}${stat('Conversion','—','No analytics','check')}</div>`+
+      `<div class="content-grid equal">${card('Products',`<div class="toolbar small-toolbar"><label class="inline-search">${icon('search')}<input id="product-query" type="search" placeholder="Find product" aria-label="Search products" value="${esc(state.productQuery)}"/></label><select id="product-filter" class="select" aria-label="Product filter"><option value="all">All</option><option value="published" ${state.productFilter==='published'?'selected':''}>Published routes</option><option value="candidate" ${state.productFilter==='candidate'?'selected':''}>Candidates</option></select></div><div class="record-list">${visible.slice(0,60).map((x,i)=>row(x,'product',filled(x.id)?x.id:'at-'+all.indexOf(x),x.discoveryConfidence||'Unverified')).join('')||blank('No products')}</div><small class="minor">${all.length?`${visible.length} shown · `:''}HTTP status is not a tool functionality test.</small>`)}`+
+      `<div class="vertical-stack">${card('Audience',blank('Not connected','Visitors · engagement'))}${card('Revenue',blank('Not connected','Verified earnings'))}${card('Opportunities',`<div class="record-list">${list(d,'opportunities').slice(0,5).map((x,i)=>row(x,'opportunity',filled(x.id)?x.id:'at-'+i,x.category||'Research')).join('')||blank('No leads')}</div><div class="panel-footer">${navlink('discover','Discover')}</div>`)}</div></div>`;
+  }
+  function control(){const d=state.data,b=d.resourceBudget?.publicFetches||{},rawUsed=b.used,budgetUsed=ready()&&filled(rawUsed)&&Number.isFinite(Number(rawUsed))?Math.max(0,Number(rawUsed)):null,limit=Number(b.limit)>0?Number(b.limit):900;
+    const checked=d.briefing?.site?.lastCheck||d.verification?.generatedAt||d.pipeline?.generatedAt||d.generatedAt;
+    const tiles=[['Website',ready()?status(website()?.status):'Unknown','shield'],['Monitoring',checked?time(checked):'Not verified','clock'],['AI inference',d.operating?.aiStatus||'Not connected','users'],['Backup','Not verified','upload'],['Security',`${list(d,'securityWatch').length} public advisories`,'shield'],['Hosting','Migration pending','link']];
+    return header('HQ Control','Health · safety · preferences',importButton())+provenance()+
+      `<div class="system-grid">${tiles.map(([name,v,i])=>`<article class="system-card"><span class="system-icon">${icon(i)}</span><h2>${esc(name)}</h2><p>${esc(v)}</p></article>`).join('')}</div>`+
+      `<div class="content-grid equal">${card('Daily public requests',`<div class="budget-number"><strong>${budgetUsed===null?'—':budgetUsed.toLocaleString()}</strong><span>/ ${limit.toLocaleString()} GET</span></div><progress max="${limit}" value="${budgetUsed??0}" aria-label="Daily GET budget"></progress><small class="minor">Internal limit, not a billing guarantee.</small>`)}`+
+      `${card('Permissions',`<div class="setting-list"><div><span>Agent code changes</span>${badge('Blocked','green')}</div><div><span>Agent payments</span>${badge('Blocked','green')}</div><div><span>Founder journal</span>${badge(canDecide()?'Available':'Unavailable',canDecide()?'green':'amber')}</div></div><small class="minor">Reported policy · verify runtime independently.</small>`)}`+
+      `${card('Security advisories',list(d,'securityWatch').length?`<div class="record-list">${list(d,'securityWatch').slice(0,10).map((x,i)=>row(x,'security',filled(x.id)?x.id:'at-'+i,'Applicability unverified')).join('')}</div>`:blank('No advisory records'))}`+
+      `${card('Display & alerts',`<div class="setting-list"><label class="switch-row" for="compact-toggle"><span>Compact layout<small>Less spacing</small></span><input id="compact-toggle" type="checkbox" ${state.compact?'checked':''}></label><label class="switch-row" for="alerts-toggle"><span>Browser alerts<small>High priority · open tab</small></span><input id="alerts-toggle" type="checkbox" ${state.alerts?'checked':''}></label></div><div class="button-row">${exportButton()}${button('copy-summary','Copy status','file')}</div><small class="minor">Display settings stored in this browser only.</small>`)}</div>`;
+  }
+  const VIEWS={home,discover,team,decisions,growth,control};
+  function render({keepFocus=false}={}){
+    let focusId=null,start=null,end=null;
+    if(keepFocus && document.activeElement?.id){focusId=document.activeElement.id;start=document.activeElement.selectionStart;end=document.activeElement.selectionEnd;}
+    $('page-root').innerHTML=VIEWS[state.page]();
+    $('current-page-label').textContent=PAGES[state.page];document.title='YorpHives HQ — '+PAGES[state.page];
+    document.body.classList.toggle('compact-mode',state.compact);
+    document.querySelectorAll('[data-page]').forEach(el=>{const active=el.dataset.page===state.page;el.classList.toggle('active',active);if(active)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
+    const back=state.navHistory.length>0||state.page!=='home';$('back-button').hidden=!back;$('mobile-back-button').hidden=!back;
+    $('more-popover').hidden=true;$('more-button').setAttribute('aria-expanded','false');$('more-button').classList.toggle('active',['growth','control'].includes(state.page));
+    const pending=state.data.operating?.pending;$('decision-count').hidden=!ready()||!Number.isInteger(pending)||pending<1;if(ready()&&Number.isInteger(pending)&&pending>0)$('decision-count').textContent=pending>99?'99+':String(pending);
+    if(focusId && $(focusId)){try{$(focusId).focus();if(typeof start==='number')$(focusId).setSelectionRange(start,end);}catch{}}
+  }
+  function navigate(to,push=true){if(!PAGES[to])return; if(to!==state.page){state.navHistory.push(state.page);if(state.navHistory.length>30)state.navHistory.shift();state.page=to;}
+    if(push&&location.hash!=='#'+to)history.pushState({hqPage:to},'','#'+to);render();window.scrollTo(0,0);}
+  function goBack(){const prior=state.navHistory.pop()||'home';state.page=PAGES[prior]?prior:'home';history.replaceState({hqPage:state.page},'','#'+state.page);render();window.scrollTo(0,0);}
+  function browserRoute(){const to=location.hash.slice(1);if(!PAGES[to]||to===state.page)return;state.navHistory.push(state.page);state.page=to;render();window.scrollTo(0,0);}
+  function record(kind,id){if(kind==='department')return DEPARTMENTS[Number(id)]||null;if(kind==='pulse')return state.pulse[Number(id)]||null;if(kind==='review')return queue()[Number(id)]||null;
+    if(kind==='thread')return list(state.data.operating,'threads').find(x=>x.thread===id)||null;
+    if(kind==='decision')return list(state.data.decisionJournal,'events').find(x=>String(x.sequence??x.thread)===String(id))||null;
+    const arr=list(state.data,files(kind));return arr.find(x=>String(x.id)===String(id))||(String(id).startsWith('at-')?arr[Number(id.slice(3))]:null)||null;}
+  function sources(x,kind){const raw=[...(Array.isArray(x?.evidence)?x.evidence:[]),x.evidenceUrl,x.evidence_url,x.source_url,x.source,kind==='product'?x.url:null];return [...new Set(raw.map(link).filter(Boolean))].slice(0,8);}
+  function detailFields(items){return `<div class="detail-fields">${items.filter(([,v])=>filled(v)).map(([name,v])=>`<div class="detail-field"><small>${esc(name)}</small><p>${esc(String(v))}</p></div>`).join('')}</div>`;}
+  function openDetail(kind,id){let x=record(kind,id);if(!x){notify('Record unavailable');return;}
+    state.detail={kind,id};lastFocus=document.activeElement;
+    let target=x,actualKind=kind,discussion='';
+    if(kind==='review'||kind==='thread') {const k=(x.type||x.thread?.split(':')[0])==='opportunity'?'opportunity':'finding';target=asRecord({...x,type:k});actualKind=k;discussion=x.contract?.impact||'';}
+    if(kind==='pulse')actualKind=x._kind;
+    const title=target.title||target.name||target.competitor||x.title||'Details';
+    const fields=kind==='department'?[['Responsibility',x.job],['Independent review',x.review],['Routed records',`${assignmentFor(x.name).length} (not proof of AI work)`],['AI inference',state.data.operating?.aiStatus||'Not connected']]:
+      kind==='decision'?[['Status',STATE_LABELS[x.state]||x.state],['Date',time(x.created_at)],['Reason',x.note],['Feedback',x.feedback],['Success condition',x.success_condition],['Measured outcome',x.outcome]]:
+      [['Summary',target.description||target.evidenceSummary||target.summary||discussion],['Recommendation',target.recommendation],['Priority',target.priority],['Evidence',x.contract?.classification||'Unverified'],['Confidence',target.confidence||target.discoveryConfidence],['Observed',time(target.observedAt||target._date||target.occurredAt)],['Source status',state.source==='live'?'Live report':'Not live-verified']];
+    const urls=sources(target,actualKind);let extras='';
+    if(kind==='department'){
+      const tasks=assignmentFor(x.name);extras=card('Routed recommendations',tasks.length?`<div class="record-list">${tasks.slice(0,15).map(t=>row(asRecord(t),'thread',t.thread,t.status||'Review')).join('')}</div>`:blank('No routed records'),'','drawer-panel');
+    }else if(kind==='decision'){
+      const evidence=link(x.evidence_url);if(evidence)urls.push(evidence);extras=`<p class="minor">Stored founder decision · no automated execution</p>`;
     }else{
-      sitePill.textContent="Issue reported";
-      sitePill.classList.add("warning");
-      siteCopy.textContent="A recent check reported a problem. Open Alerts and review the evidence.";
+      const base=kind==='review'||kind==='thread'?x:(actualKind==='finding'||actualKind==='opportunity'?{id:target.id,type:actualKind}:null);
+      if(base && filled(base.id))extras=renderDecisionEditor(base,actualKind);
     }
-
-    const lead=[...d.findings].sort((a,b)=>(priorityRank[a.priority]??3)-(priorityRank[b.priority]??3))[0];
-    const actionableIdeas=d.opportunities.filter(item=>{const previous=currentDecision(item.id,"opportunity");const thread=d.operating?.threads.find(x=>x.thread==="opportunity:"+item.id);return !previous||!["rejected","snoozed","verified"].includes(previous.state)||thread?.changed;});
-    const opportunity=actionableIdeas[0];
-    const next=$("home-next-copy");
-    const nextButton=$("home-next-action");
-    if(lead){
-      next.textContent="Review: "+lead.title+". Headquarters can suggest what to investigate, not make changes.";
-      nextButton.dataset.nav="monitoring";
-      nextButton.replaceChildren(document.createTextNode("Review alert "),icon("chevron"));
-    }else if(["cloudflare","selfhost"].includes(state.origin) && !d.verification?.complete){
-      next.textContent="Your website tool list is incomplete. Review discovery before trusting comparisons.";
-      nextButton.dataset.nav="products";
-      nextButton.replaceChildren(document.createTextNode("See my tools "),icon("chevron"));
-    }else if(opportunity){
-      next.textContent="There is an idea worth looking at: "+opportunity.title+". Demand is not verified.";
-      nextButton.dataset.nav="opportunities";
-      nextButton.replaceChildren(document.createTextNode("Explore ideas "),icon("chevron"));
-    }else{
-      next.textContent="No decisions are listed in this report. Check coverage; an empty list isn't proof that all is well.";
-      nextButton.dataset.nav="monitoring";
-      nextButton.replaceChildren(document.createTextNode("Review coverage "),icon("chevron"));
-    }
-
-    const entries=[];
-    d.findings.forEach(item=>entries.push({
-      id:"alert-"+item.id,kind:"alerts",title:item.title,
-      text:item.description || "A monitoring observation may need your review.",
-      date:item.observedAt,chip:decisionLabels[currentDecision(item.id,"finding")?.state]||(item.priority==="high"?"Needs attention":"For review"),
-      source:"Monitoring",icon:"shield",action:"Read recommendation",open:()=>showDetail(item,"finding")
-    }));
-    actionableIdeas.forEach(item=>entries.push({
-      id:"idea-"+item.id,kind:"ideas",title:item.title,
-      text:item.description || "A research lead to investigate before investing.",
-      date:item.observedAt,chip:item.kind==="catalog-unverified"?"Catalog incomplete":"Unverified idea",
-      source:"Ideas",icon:"spark",action:"Explore idea",open:()=>showDetail(item,"opportunity")
-    }));
-    d.changes.forEach(item=>entries.push({
-      id:"change-"+item.id,kind:"changes",title:item.kind==="new-product"?"New tool spotted":"Website change noticed",
-      text:item.summary || "A change was observed. Review its source before drawing conclusions.",
-      date:item.occurredAt,chip:"Observation",source:"My tools",icon:"layers",action:"View tools",
-      open:()=>showView("products")
-    }));
-    meaningfulActivity.forEach(item=>entries.push({
-      id:"activity-"+item.id,kind:"changes",title:item.title,
-      text:item.summary || "An update was logged; see History for details.",
-      date:item.occurredAt,chip:"Activity log",source:"HQ history",icon:"clock",action:"View history",
-      open:()=>showView("activity")
-    }));
-    const groupOrder={alerts:0,changes:1,ideas:2};
-    entries.sort((a,b)=>{
-      const ad=Date.parse(a.date||""),bd=Date.parse(b.date||"");
-      const atime=Number.isFinite(ad)?ad:0,btime=Number.isFinite(bd)?bd:0;
-      return btime-atime || (groupOrder[a.kind]||0)-(groupOrder[b.kind]||0);
+    $('detail-content').innerHTML=`<h2 id="detail-title">${esc(title)}</h2>${detailFields(fields)}`+
+      (kind!=='department'?`<div class="detail-field"><small>Sources</small>${urls.length?`<ul class="source-links">${[...new Set(urls)].map(u=>`<li><a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(cut(u,130))} ${icon('external')}</a></li>`).join('')}</ul>`:'<p>None linked</p>'}</div>`:'')+
+      extras+`<div class="detail-buttons">${button('close-detail','Close','close')}</div>`;
+    $('detail-drawer').hidden=false;$('detail-scrim').hidden=false;document.body.classList.add('drawer-open');$('detail-close').focus();
+  }
+  function renderDecisionEditor(item,kind){const d=permittedDecision(item,kind),live=canDecide(),stateNow=d.previous,actions=d.actions;
+    const minDay=new Date(Date.now()+86400000).toISOString().slice(0,10);const maxDay=new Date(Date.now()+90*86400000).toISOString().slice(0,10);
+    if(!live||!actions.length||!/^[-a-zA-Z0-9_]{1,80}$/.test(String(item.id||'')))return `<p class="drawer-note">${live?'No further transition available.':'Review only · Decision saving needs live founder access.'}</p>`;
+    const exp=kind==='opportunity';
+    return `<section class="decision-editor"><h3>Founder decision</h3><p class="minor">Current: ${esc(STATE_LABELS[stateNow]||stateNow)} · Records intent only</p>
+      <form id="decision-form"><input type="hidden" name="kind" value="${kind}"><input type="hidden" name="id" value="${esc(item.id)}"><input type="hidden" name="revision" value="${d.revision}">
+        <label for="decision-state">Next step</label><select id="decision-state" class="select" name="state" required><option value="">Select</option>${actions.map(s=>`<option value="${s}">${esc(STATE_LABELS[s])}</option>`).join('')}</select>
+        <label for="decision-reason">Reason *</label><textarea id="decision-reason" name="note" rows="2" maxlength="800" required placeholder="Why?"></textarea>
+        <label for="decision-feedback">Feedback</label><select class="select" id="decision-feedback" name="feedback"><option value="">None</option><option value="useful">Useful</option><option value="incorrect">Incorrect</option><option value="too-noisy">Too noisy</option><option value="not-priority">Not a priority</option></select>
+        ${exp?`<fieldset id="decision-experiment" hidden><legend>Customer experiment · required to accept</legend>
+          <label>Audience <input name="audience" maxlength="400"></label><label>Problem <input name="problem" maxlength="400"></label>
+          <label>Hypothesis <input name="hypothesis" maxlength="400"></label><label>Success metric <input name="metric" maxlength="400"></label>
+          <label>Target <input name="target" type="number" step="any" min="0.00001"></label><label>Effort cap (hours) <input name="effortHours" type="number" min="0.1" max="40" step="any"></label>
+          <label>Review by <input name="reviewBy" type="date" min="${minDay}" max="${maxDay}"></label><label>Stop condition <input name="stopCondition" maxlength="400"></label>
+        </fieldset>`:''}
+        <fieldset id="decision-outcome-fields" hidden><legend>Outcome · required to verify</legend><label>Success condition <textarea name="successCondition" maxlength="500" rows="2"></textarea></label><label>Measured result <textarea name="outcome" maxlength="800" rows="2"></textarea></label><label>Evidence link (HTTPS) <input name="evidenceUrl" type="url" maxlength="1000" placeholder="https://"></label></fieldset>
+        <p id="decision-error" class="form-error" role="alert"></p><button class="button button-primary" type="submit" id="decision-submit">Save decision</button>
+      </form></section>`;
+  }
+  function updateDecisionFields(){const form=$('decision-form');if(!form)return;const st=form.elements.state.value, exp=$('decision-experiment'),out=$('decision-outcome-fields');
+    if(exp){exp.hidden=st!=='accepted';exp.querySelectorAll('input').forEach(x=>x.required=!exp.hidden);}
+    if(out){out.hidden=st!=='verified';out.querySelectorAll('input,textarea').forEach(x=>x.required=!out.hidden);}
+  }
+  async function submitDecision(form){if(state.saving||!canDecide()){notify('Live founder access required');return;}
+    const f=new FormData(form),kind=f.get('kind'),id=f.get('id'),next=f.get('state'),revision=Number(f.get('revision'));
+    if(!['finding','opportunity'].includes(kind)||!/^[-a-zA-Z0-9_]{1,80}$/.test(id)||!Number.isSafeInteger(revision)||revision<0){$('decision-error').textContent='Invalid decision record.';return;}
+    const body={kind,id,state:next,revision,note:String(f.get('note')||'').trim(),feedback:String(f.get('feedback')||''),outcome:String(f.get('outcome')||'').trim(),successCondition:String(f.get('successCondition')||'').trim(),evidenceUrl:String(f.get('evidenceUrl')||'').trim()};
+    if(next==='accepted'&&kind==='opportunity')body.experiment={audience:String(f.get('audience')||'').trim(),problem:String(f.get('problem')||'').trim(),hypothesis:String(f.get('hypothesis')||'').trim(),metric:String(f.get('metric')||'').trim(),target:Number(f.get('target')),effortHours:Number(f.get('effortHours')),reviewBy:String(f.get('reviewBy')),stopCondition:String(f.get('stopCondition')||'').trim()};
+    if(!next||!body.note){$('decision-error').textContent='Select a next step and add a reason.';return;}
+    if(body.state==='verified'&&(!body.outcome||!body.successCondition||!/^https:\/\/[^\s]+/i.test(body.evidenceUrl))){$('decision-error').textContent='Add outcome, success condition and HTTPS evidence.';return;}
+    state.saving=true;$('decision-submit').disabled=true;$('decision-error').textContent='';
+    try{const response=await fetch('/api/decisions',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json','x-hq-founder-action':'decision-v1','accept':'application/json'},body:JSON.stringify(body)});
+      const result=await response.json().catch(()=>({}));if(!response.ok||result.saved!==true)throw Error(result.error||'Save refused');
+      closeDetail();notify('Decision saved');await refresh(false);
+    }catch(e){if($('decision-error'))$('decision-error').textContent=cut(e.message||'Save failed',170);notify('Decision not saved');}finally{state.saving=false;if($('decision-submit'))$('decision-submit').disabled=false;}
+  }
+  function closeDetail(){if($('detail-drawer').hidden)return;$('detail-drawer').hidden=true;$('detail-scrim').hidden=true;state.detail=null;document.body.classList.remove('drawer-open');if(lastFocus?.isConnected)lastFocus.focus();}
+  function notify(msg){$('toast').textContent=msg;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),2700);}
+  function normalize(d){if(!d||d.schemaVersion!=='yorphives.hq-intelligence.v1')throw Error('Unsupported report');const out={...EMPTY(),...d};for(const k of ['assets','products','findings','opportunities','activity','changes','comparisons','securityWatch','agents'])out[k]=Array.isArray(out[k])?out[k].slice(0,200):[];
+    out.operating={...EMPTY().operating,...(d.operating&&typeof d.operating==='object'&&!Array.isArray(d.operating)?d.operating:{})};out.operating.queue=list(out.operating,'queue').slice(0,3);out.operating.threads=list(out.operating,'threads').slice(0,300);
+    out.decisionJournal={available:d.decisionJournal?.available===true,events:list(d.decisionJournal,'events').slice(0,2000)};
+    return out;
+  }
+  function highAlert(d){const high=list(d,'findings').filter(x=>['high','critical'].includes(x.priority));if(!high.length||!state.alerts||!('Notification' in window)||Notification.permission!=='granted')return;
+    const key=high.map(x=>x.id||x.title).join('|');if(!lastHighKey){lastHighKey=key;return;}if(key!==lastHighKey){lastHighKey=key;try{new Notification('HQ: new high-priority findings',{body:'Open Headquarters to review.',tag:'yh-high-priority'});}catch{}}}
+  async function refresh(manual=false){if(state.busy){return;}if(!/^https?:$/.test(location.protocol)){if(manual)notify('Open report locally');return;}
+    state.busy=true;try{const reply=await fetch('/api/report',{credentials:'same-origin',headers:{accept:'application/json'},cache:'no-store'});if(!reply.ok)throw Error('Report unavailable');const d=normalize(await reply.json());
+      const oldSource=state.source;state.data=d;state.source='live';if(oldSource==='live')highAlert(d);else lastHighKey=list(d,'findings').filter(x=>['high','critical'].includes(x.priority)).map(x=>x.id||x.title).join('|');
+      if(manual)notify('Report refreshed');
+    }catch{if(state.source==='live')state.source='stale';if(manual)notify('Live report unavailable');}
+    finally{state.busy=false;render();}
+  }
+  async function openLocal(file){if(!file)return;if(file.size>5*1024*1024){notify('Report limit: 5 MB');return;}try{const d=normalize(JSON.parse(await file.text()));state.data=d;state.source='imported';lastHighKey='';navigate('home');notify('Report opened locally');}catch{notify('Invalid HQ report');}}
+  function downloadJson(data,name){const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200);notify('Private export created');}
+  const summary=()=>`YorpHives HQ\nSource: ${state.source}\nWebsite HTTP: ${ready()?status(website()?.status):'Unknown'}\nTo review: ${num(state.data.operating?.pending)}\nResearch leads: ${ready()?list(state.data,'opportunities').length:'—'}\nRevenue: unavailable`;
+  async function copySummary(){try{await navigator.clipboard.writeText(summary());notify('Status copied');}catch{notify('Clipboard unavailable');}}
+  function searchItems(){const items=[...Object.entries(PAGES).map(([id,title])=>({kind:'page',id,title,label:'Page'})),...DEPARTMENTS.map((x,id)=>({kind:'department',id,title:x.name,label:'Department'}))];
+    for(const [kind,label] of [['finding','Alert'],['opportunity','Research'],['product','Product'],['comparison','Comparison'],['security','Advisory']]){
+      list(state.data,files(kind)).forEach((x,i)=>items.push({kind,id:filled(x.id)?x.id:'at-'+i,title:x.title||x.name||x.competitor||'Untitled',label}));}
+    return items;
+  }
+  function renderSearch(){const q=$('search-input').value.trim().toLowerCase();const match=searchItems().filter(x=>String(x.title).toLowerCase().includes(q)).slice(0,30);
+    $('search-results').innerHTML=match.length?match.map(x=>`<button class="search-result" type="button" ${x.kind==='page'?`data-page="${esc(x.id)}"`:`data-detail="${esc(x.kind)}" data-id="${esc(x.id)}"`}><span><strong>${esc(x.title)}</strong><small>${esc(x.label)}</small></span>${icon('arrow')}</button>`).join(''):blank('No matches');}
+  function openSearch(){const dlg=$('search-modal');if(!dlg.open)dlg.showModal();renderSearch();$('search-input').focus();}
+  async function toggleAlerts(checked){if(!checked){state.alerts=false;store.set('alerts',false);notify('Browser alerts off');return;}
+    if(!('Notification' in window)||!window.isSecureContext){state.alerts=false;notify('Browser alerts require a secure connection');return;}
+    let permission=Notification.permission;if(permission==='default')permission=await Notification.requestPermission();state.alerts=permission==='granted';store.set('alerts',state.alerts);notify(state.alerts?'Alerts on · open tab only':'Notification permission unavailable');}
+  function action(cmd){switch(cmd){case 'import':$('report-file').click();break;case 'refresh':refresh(true);break;case 'toggle-saved':state.savedOnly=!state.savedOnly;render();break;case 'export-report':if(ready())downloadJson(state.data,'hq-evidence-private.json');break;case 'export-decisions':downloadJson({exportedAt:today(),events:list(state.data.decisionJournal,'events')},'hq-decisions-private.json');break;case 'copy-summary':copySummary();break;case 'close-detail':closeDetail();break;}}
+  function bind(){document.addEventListener('click',e=>{
+      const nav=e.target.closest('[data-page]');if(nav){if($('search-modal').open)$('search-modal').close();if(!$('detail-drawer').hidden)closeDetail();navigate(nav.dataset.page);return;}
+      const detail=e.target.closest('[data-detail]');if(detail){if($('search-modal').open)$('search-modal').close();openDetail(detail.dataset.detail,detail.dataset.id);return;}
+      const d=e.target.closest('[data-discover-filter]');if(d){state.discoverFilter=d.dataset.discoverFilter;render();return;}
+      const p=e.target.closest('[data-pulse-filter]');if(p){state.homeFilter=p.dataset.pulseFilter;render();return;}
+      const f=e.target.closest('[data-decision-filter]');if(f){state.decisionFilter=f.dataset.decisionFilter;render();return;}
+      const s=e.target.closest('[data-save-kind]');if(s){const key=safeKey(s.dataset.saveKind,s.dataset.saveId);if(state.saved.has(key))state.saved.delete(key);else state.saved.add(key);try{sessionStorage.setItem('yh:saved',JSON.stringify([...state.saved].slice(0,500)));}catch{}render();notify(state.saved.has(key)?'Saved for this tab':'Removed from saved');return;}
+      const cmd=e.target.closest('[data-action]')?.dataset.action;if(cmd)action(cmd);
     });
-    const filtered=entries.filter(entry=>state.feedFilter==="all" || entry.kind===state.feedFilter).slice(0,8);
-    const parent=$("home-feed-list");
-    parent.replaceChildren();
-    if(!filtered.length){
-      parent.append(emptyState(state.feedFilter==="all"?"No updates in this report":"Nothing in this category yet",
-        "That doesn't mean everything is healthy. Check when your sources last reported, or choose another filter."));
-      return;
-    }
-    for(const item of filtered){
-      const card=node("article","feed-card feed-"+item.kind);
-      const avatar=node("span","feed-avatar");
-      avatar.append(icon(item.icon));
-      const head=node("div","feed-card-top");
-      const author=node("div","feed-author");
-      append(author,node("strong","",item.source),
-        node("small","",cleanDate(item.date)||"No timestamp"));
-      const status=node("span","feed-provenance",preview?"EXAMPLE":["cloudflare","selfhost"].includes(state.origin)?"REPORTED":"UNVERIFIED");
-      append(head,avatar,author,status);
-      const content=node("div","feed-card-content");
-      const badge=node("span","feed-badge",item.chip);
-      append(content,badge,node("h3","",item.title),
-        node("p","",item.text.length>220?item.text.slice(0,217)+"…":item.text));
-      const foot=node("div","feed-card-bottom");
-      const action=node("button","feed-open",item.action);
-      action.type="button";
-      action.append(icon("chevron"));
-      action.addEventListener("click",item.open);
-      append(foot,node("span","feed-safe-note","Read-only · Your decision"),action);
-      append(card,head,content,foot);
-      parent.append(card);
-    }
-  }
-
-  function renderBrief() {
-    const { findings, opportunities, assets } = state.data;
-    $("brief-summary").textContent = state.origin === "preview"
-      ? "A focused daily briefing will distill thousands of signals into a handful of decisions. This is an illustrative example, not evidence of checks performed."
-      : "This is a summary of the selected evidence report, not a guarantee of real-time monitoring. Confirm sources and scope before taking action.";
-    const items = [
-      state.origin === "preview"
-        ? "Review example monitoring signals to see how incidents are prioritized."
-        : findings.length + " observation(s) in the selected report are available for review.",
-      state.origin === "preview"
-        ? "Explore sample business leads for future product and revenue growth."
-        : opportunities.length + " growth lead(s) in the selected report may need validation.",
-      state.origin === "preview"
-        ? "Connect evidence from your own detectors before trusting status."
-        : assets.length + " asset(s) are represented. Imported status alone does not confirm uptime."
-    ];
-    const parent = $("brief-items");
-    parent.replaceChildren();
-    items.forEach((message, index) => {
-      const entry = node("div", "brief-task");
-      append(entry, node("span", "", String(index + 1).padStart(2, "0")), node("p", "", message));
-      parent.append(entry);
+    $('more-button').addEventListener('click',()=>{const open=$('more-popover').hidden;$('more-popover').hidden=!open;$('more-button').setAttribute('aria-expanded',String(open));});
+    $('import-menu-action').addEventListener('click',()=>{$('more-popover').hidden=true;$('more-button').setAttribute('aria-expanded','false');$('report-file').click();});
+    for(const id of ['global-search-button','mobile-search-button'])$(id).addEventListener('click',openSearch);
+    for(const id of ['refresh-button','mobile-refresh-button'])$(id).addEventListener('click',()=>refresh(true));
+    for(const id of ['back-button','mobile-back-button'])$(id).addEventListener('click',goBack);
+    $('search-input').addEventListener('input',renderSearch);$('search-close').addEventListener('click',()=>$('search-modal').close());
+    $('detail-close').addEventListener('click',closeDetail);$('detail-scrim').addEventListener('click',closeDetail);
+    $('report-file').addEventListener('change',e=>{openLocal(e.target.files[0]);e.target.value='';});
+    document.addEventListener('input',e=>{if(['discover-query','product-query'].includes(e.target.id)){state[e.target.id==='discover-query'?'discoverQuery':'productQuery']=e.target.value;render({keepFocus:true});}});
+    document.addEventListener('change',async e=>{if(e.target.id==='discover-sort'){state.discoverSort=e.target.value;render();}if(e.target.id==='product-filter'){state.productFilter=e.target.value;render();}if(e.target.id==='decision-state')updateDecisionFields();
+      if(e.target.id==='compact-toggle'){state.compact=e.target.checked;store.set('compact',state.compact);render();}if(e.target.id==='alerts-toggle'){await toggleAlerts(e.target.checked);render();}});
+    document.addEventListener('submit',e=>{if(e.target.getAttribute('id')==='decision-form'){e.preventDefault();submitDecision(e.target);}});
+    window.addEventListener('popstate',browserRoute);window.addEventListener('hashchange',browserRoute);
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){if(!$('detail-drawer').hidden)closeDetail();$('more-popover').hidden=true;$('more-button').setAttribute('aria-expanded','false');}
+      if(e.key==='Tab'&&!$('detail-drawer').hidden){const nodes=[...$('detail-drawer').querySelectorAll('button:not([disabled]),a[href],input:not([disabled]):not([type=hidden]),textarea:not([disabled]),select:not([disabled])')].filter(x=>!x.closest('[hidden]'));const i=nodes.indexOf(document.activeElement);if(e.shiftKey&&i===0){e.preventDefault();nodes.at(-1)?.focus();}else if(!e.shiftKey&&i===nodes.length-1){e.preventDefault();nodes[0]?.focus();}}
+      const typing=e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||e.target instanceof HTMLSelectElement;
+      if((e.key==='/'&&!typing)||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k')){e.preventDefault();openSearch();}
     });
+    document.addEventListener('pointerdown',e=>{if(!$('more-popover').hidden&&!e.target.closest('#more-popover')&&!e.target.closest('#more-button')){$('more-popover').hidden=true;$('more-button').setAttribute('aria-expanded','false');}});
   }
-
-  function assetStatus(asset) {
-    if (state.origin === "preview" || asset.status === "unknown") return { label: "Not verified", kind: "unknown" };
-    if (asset.status === "healthy") return { label: "Reported healthy", kind: "ok" };
-    return { label: "Reported issue", kind: "issue" };
-  }
-  function renderCoverage() {
-    const parent = $("system-health-grid");
-    parent.replaceChildren();
-    if (!state.data.assets.length) parent.append(emptyState("No assets listed", "Import asset inventory to populate this panel."));
-    state.data.assets.slice(0, 8).forEach(asset => {
-      const tile = node("div", "system-tile");
-      const head = node("div", "system-tile-header");
-      const status = assetStatus(asset);
-      const dot = node("span", "status-bubble " + status.kind);
-      append(head, icon("layers"), dot);
-      append(tile, head, node("strong", "", asset.name), node("small", "", status.label));
-      parent.append(tile);
-    });
-    $("coverage-note").textContent = state.origin === "preview"
-      ? "Your systems, monitored independently. Status will appear after a trusted evidence feed is connected."
-      : "Imported asset statuses are statements from the file, not independently checked measurements.";
-    $("connection-title").textContent = state.origin === "preview" ? "Awaiting live evidence" : "Imported report in view";
-    $("connection-subtitle").textContent = "No live detector is connected to this UI.";
-  }
-
-  function priorityPill(value) { return node("span", "severity-pill " + (value === "high" ? "" : value), label(value)); }
-
-  function renderPriorityInbox() {
-    const parent = $("priority-list");
-    parent.replaceChildren();
-    const findings = [...state.data.findings].sort((a,b) => (priorityRank[a.priority] ?? 3) - (priorityRank[b.priority] ?? 3)).slice(0, 4);
-    if (!findings.length) return parent.append(emptyState("No findings in this report", "That does not prove the systems are healthy. Check monitoring coverage."));
-    findings.forEach(item => {
-      const button = node("button", "priority-item");
-      button.type = "button";
-      const symbol = node("span", "priority-symbol"); symbol.append(icon(categoryIcons[item.category] || "info"));
-      const main = node("span", "priority-item-main");
-      append(main, node("strong", "", item.title), node("small", "", item.asset + " · " + originLabel()));
-      append(button, symbol, main, priorityPill(item.priority), icon("chevron"));
-      button.addEventListener("click", () => showDetail(item, "finding"));
-      parent.append(button);
-    });
-  }
-
-  function renderOpportunityPreview() {
-    const parent = $("opportunity-preview");
-    parent.replaceChildren();
-    if (!state.data.opportunities.length) return parent.append(emptyState("No leads in this report", "Your research agents can eventually fill the radar with sourced opportunities."));
-    state.data.opportunities.slice(0, 4).forEach(item => {
-      const button = node("button", "opportunity-mini"); button.type = "button";
-      const symbol = node("span", "opportunity-symbol"); symbol.append(icon(categoryIcons[item.category] || "radar"));
-      const main = node("span", "opportunity-mini-main");
-      append(main, node("strong", "", item.title), node("small", "", item.confidence + " · " + originLabel()));
-      append(button, symbol, main, node("span", "opportunity-label", label(item.category)), icon("chevron"));
-      button.addEventListener("click", () => showDetail(item, "opportunity"));
-      parent.append(button);
-    });
-  }
-
-  function renderFindings() {
-    const findings = [...state.data.findings]
-      .filter(item => state.findingFilter === "all" || item.category === state.findingFilter)
-      .sort((a,b) => (priorityRank[a.priority] ?? 3) - (priorityRank[b.priority] ?? 3));
-    const parent = $("findings-list");
-    parent.replaceChildren();
-    $("monitoring-count").textContent = findings.length + " record(s) · " + originLabel();
-    if (!findings.length) return parent.append(emptyState("No matching findings", "Try another filter. An empty list is not proof of a clean scan."));
-    findings.forEach(item => {
-      const button = node("button", "finding-row"); button.type = "button";
-      const primary = node("span", "finding-primary");
-      const symbol = node("span", "priority-symbol"); symbol.append(icon(categoryIcons[item.category] || "info"));
-      const details = node("span");
-      append(details, node("strong", "", item.title), node("small", "", label(item.category) + " · " + originLabel()));
-      append(primary, symbol, details);
-      const review = node("span", "row-open", "Review"); review.append(icon("chevron"));
-      append(button, primary, priorityPill(item.priority), node("span", "finding-asset", item.asset), review);
-      button.addEventListener("click", () => showDetail(item, "finding"));
-      parent.append(button);
-    });
-  }
-
-  function renderSecurityWatch() {
-    const parent = $("security-watch-list");
-    parent.replaceChildren();
-    const rows=state.data.securityWatch || [];
-    if (!rows.length) {
-      parent.append(emptyState("No verified advisory feed records",
-        "The public advisory watch may not have run yet, or its source was unavailable. This does not prove your dependencies are secure."));
-      return;
-    }
-    rows.forEach(record => {
-      const card=node("article","security-advisory-row");
-      const top=node("div","security-advisory-heading");
-      append(top,node("strong","",record.title),node("span","security-advisory-level",record.severity.toUpperCase()+" · PUBLIC ADVISORY"));
-      const body=node("p","",record.packages.length?"Named packages: "+record.packages.join(", "):"Affected package not established");
-      const caveat=node("small","","Applicability to YorpHives is not verified · "+(cleanDate(record.observedAt)||"Time unavailable"));
-      card.append(top,body,caveat);
-      if(record.source && record.source.startsWith("https://github.com/advisories/")) {
-        const link=node("a","source-link","View official advisory");
-        link.href=record.source;link.target="_blank";link.rel="noopener noreferrer";
-        card.append(link);
-      }
-      parent.append(card);
-    });
-  }
-
-  function renderOpportunities() {
-    const list = state.data.opportunities.filter(item => state.opportunityFilter === "all" || item.category === state.opportunityFilter);
-    const parent = $("opportunities-grid");
-    parent.replaceChildren();
-    $("opportunity-count").textContent = list.length + " lead(s) · " + originLabel();
-    if (!list.length) return parent.append(emptyState("No matching opportunities", "Try another filter, or import new research records."));
-    list.forEach(item => {
-      const card = node("article", "opportunity-card");
-      const top = node("div", "opportunity-card-top");
-      const category = node("span", "opportunity-category"); append(category, icon(categoryIcons[item.category] || "radar"), node("span", "", label(item.category)));
-      append(top, category, node("span", "outline-pill",
-        state.origin === "preview" ? "EXAMPLE" : ["cloudflare","selfhost"].includes(state.origin) ? (state.origin==="selfhost"?"SELF-HOSTED":"CLOUDFLARE") :
-        state.origin === "local" ? "LOCAL" : "IMPORTED"));
-      const bottom = node("div", "card-bottom");
-      const open = node("button", "", "Explore lead"); open.type = "button"; open.append(icon("arrow"));
-      open.addEventListener("click", () => showDetail(item, "opportunity"));
-      append(bottom, node("small", "", item.confidence), open);
-      const context = node("div", "lead-context", item.kind === "possible-existing-product" ?
-        "POSSIBLE EXISTING TOOL · CHECK FEATURE PARITY" : item.kind === "potential-missing-product" ?
-        "POSSIBLE NEW TOOL · VALIDATE DEMAND" : item.kind === "catalog-unverified" ?
-        "CATALOG NOT VERIFIED · RESEARCH MENTION ONLY" : "UNVALIDATED RESEARCH LEAD");
-      append(card, top, context, node("h3", "", item.title), node("p", "", item.description), bottom);
-      parent.append(card);
-    });
-  }
-
-  function renderWorkforce() {
-    const parent = $("workforce-grid");
-    parent.replaceChildren();
-    if (!state.data.agents.length) return parent.append(emptyState("No departments listed", "Import an agent inventory to see their defined responsibilities."));
-    state.data.agents.forEach((agent, index) => {
-      const card = node("article", "worker-card");
-      const top = node("div", "worker-card-top");
-      const avatar = node("span", "worker-avatar"); avatar.append(icon(workerIcons[index % workerIcons.length]));
-      append(top, avatar, node("span", "worker-id", "DEPT " + String(index + 1).padStart(2, "0")));
-      const status = node("div", "worker-state");
-      const bubble = node("span", "status-bubble unknown");
-      const current = agent.status === "not_connected" ? "Telemetry not connected" : "Reported state: " + label(agent.status);
-      append(status, bubble, node("span", "", current + (state.origin === "preview" ? " · example" : " · imported")));
-      append(card, top, node("h3", "", agent.name), node("p", "", agent.responsibility), status);
-      parent.append(card);
-    });
-  }
-
-  function renderActivity() {
-    const parent = $("activity-list");
-    parent.replaceChildren();
-    if (!state.data.activity.length) return parent.append(emptyState("No activity entries", "Connect an audit log or import an evidence report. No data does not mean no events."));
-    state.data.activity.forEach(event => {
-      const row = node("article", "activity-item");
-      const symbol = node("span", "activity-symbol"); symbol.append(icon(event.kind === "security" ? "shield" : "activity"));
-      const text = node("div");
-      append(text, node("strong", "", event.title), node("p", "", event.summary),
-        node("span", "activity-meta", (cleanDate(event.occurredAt) || "Time not provided") + " · " + originLabel()));
-      append(row, symbol, text); parent.append(row);
-    });
-  }
-
-
-  function renderProducts() {
-    const products = state.data.products || [];
-    const changes = state.data.changes || [];
-    const comparisons = state.data.comparisons || [];
-    const imported = state.origin !== "preview";
-    const local = state.origin === "local" || ["cloudflare","selfhost"].includes(state.origin);
-    const verifiedScan = imported && state.data.verification?.complete;
-    $("product-total").textContent = products.length;
-    $("product-new").textContent = changes.filter(item => item.kind === "new-product").length;
-    $("product-changes-total").textContent = changes.length;
-    $("product-comparisons-total").textContent = comparisons.length;
-    const checked = products.filter(p => p.qaCheckedAt);
-    const qaPassed = checked.filter(p => p.qaStatus === "passed").length;
-    const qaFailed = checked.filter(p => p.qaStatus === "failed").length;
-    const qaPending = checked.filter(p => p.qaStatus === "pending_confirmation").length;
-    $("product-qa-total").textContent = ["cloudflare","selfhost"].includes(state.origin) ? "HTTP" : checked.length ? qaPassed + "/" + checked.length : "—";
-    $("product-qa-caption").textContent = ["cloudflare","selfhost"].includes(state.origin)
-      ? "Passive monitoring · no browser testing"
-      : checked.length ? qaFailed + " confirmed alerts · " + qaPending + " awaiting confirmation"
-      : "No browser checks reported";
-
-    const spending = $("zero-cost-summary"); spending.replaceChildren();
-    const guard = state.data.resourceBudget;
-    if (!guard) {
-      spending.append(emptyState("Budget telemetry unavailable",
-        "Connect the isolated Cloudflare Free collector to see daily request counts and explicit disabled capabilities."));
-    } else {
-      const area = node("div", "budget-grid");
-      const stats = [
-        ["Public HTTP requests today", guard.used + " / " + (guard.limit || "not set"), guard.limit > 0 ? "Internal daily limit" : "No limit declared"],
-        ["AI inference", guard.aiDisabled ? "OFF" : "Not verified", "No paid model calls expected"],
-        ["Production browser testing", guard.browserDisabled ? "OFF" : "Not verified", "No browser sessions in this worker"]
-      ];
-      for (const [name, count, hint] of stats) {
-        const tile = node("div", "budget-record");
-        append(tile, node("span", "", name), node("strong", "", count), node("small", "", hint));
-        area.append(tile);
-      }
-      spending.append(area);
-    }
-    $("catalog-kind").textContent = ["cloudflare","selfhost"].includes(state.origin) ? "WEBSITE SOURCES" : local ? "LOCAL REPORT" : imported ? "IMPORTED" : "EXAMPLE";
-    $("discovery-status").textContent = !imported ? "Preview — not connected"
-      : verifiedScan ? (["cloudflare","selfhost"].includes(state.origin) ? "Owner manifest reports a complete catalog · functionality unverified" : "Collector reports complete coverage · verify independently")
-        : (["cloudflare","selfhost"].includes(state.origin) ? "Partial website catalog · some tools may be missing" : "Discovery incomplete or not independently verified");
-    $("discovery-explainer").textContent = !imported
-      ? "These are illustrative records. Actual monitoring begins after the scanner is installed on your server."
-      : (local ? "Private collector report" : "Imported report") +
-        (state.data.verification?.generatedAt ? " · " + (cleanDate(state.data.verification.generatedAt) || "undated") : "") +
-        (local ? " · Periodic refresh enabled; evidence remains reviewable." : " · No live connection is established in this browser.");
-
-    const inventory = $("product-catalog"); inventory.replaceChildren();
-    if (!products.length) inventory.append(emptyState("No tools found in public sources yet", "This does not mean your website has no tools. Published links or an owner-maintained manifest are needed for reliable automatic enrollment."));
-    products.forEach(p => {
-      const row = node("div", "product-record");
-      const symbol = node("span", "product-record-icon"); symbol.append(icon("layers"));
-      const main = node("div", "product-record-main");
-      append(main, node("strong", "", p.name), node("small", "",
-        (p.discoveryConfidence==="candidate" ? "Unverified route candidate" : "Published source") + " · " +
-        (p.source || "Source unspecified") + " · " + (p.features.length ? p.features.length + " declared feature(s)" : "Features not listed")));
-      const info = node("span", "product-record-info");
-      info.append(node("span", "product-state " + (p.status === "healthy" && p.active ? "product-state-reachable" : ""), p.active ? (
-        p.discoveryConfidence==="candidate" ? "Needs verification" : p.status === "healthy" ? "HTTP reachable" : p.status === "degraded" ? "HTTP issue reported" : "Status unverified"
-      ) : "No longer discoverable"));
-      const qaLabels = {
-        passed: "Browser rendered",
-        failed: "QA alert",
-        pending_confirmation: "Needs recheck",
-        unverified: "Tool features not tested"
-      };
-      const qa = node("span", "product-qa-badge qa-" + p.qaStatus,
-        ["cloudflare","selfhost"].includes(state.origin) ? "Read-only HTTP" : p.qaCheckedAt ? qaLabels[p.qaStatus] : "Tool features not tested");
-      qa.title = ["cloudflare","selfhost"].includes(state.origin) ? (p.qaReason || "Only public HTTP observations are available; features are not functionally verified.") :
-        p.qaCheckedAt ? "Browser observation: " + (cleanDate(p.qaCheckedAt) || "undated") +
-        " · " + (p.qaReason || "No reason provided") : "No functional testing evidence recorded";
-      info.append(qa);
-      if (p.url) {
-        const link = node("a", "product-url-link", "Open"); link.href = p.url; link.target = "_blank"; link.rel = "noopener noreferrer";
-        link.append(icon("external")); info.append(link);
-      }
-      append(row, symbol, main, info);
-      inventory.append(row);
-    });
-
-    const feed = $("product-change-feed"); feed.replaceChildren();
-    if (!changes.length) feed.append(emptyState("No recorded changes", "No change reports have been imported. That does not prove nothing changed."));
-    changes.slice(0, 20).forEach(c => {
-      const row = node("div", "product-change-record");
-      const symbol = node("span", "product-change-mark " + (c.severity === "high" ? "urgent" : ""));
-      symbol.append(icon(c.severity === "high" ? "shield" : c.kind === "new-product" ? "plus" : "refresh"));
-      const main = node("div", "product-change-copy");
-      append(main, node("strong", "", c.summary), node("small", "", label(c.kind) + " · " + (cleanDate(c.occurredAt) || originLabel())));
-      append(row, symbol, main);
-      feed.append(row);
-    });
-
-    const gaps = $("product-feature-gaps"); gaps.replaceChildren();
-    if (!comparisons.length) gaps.append(emptyState("No potential alternatives recorded", "Research sources may suggest similar tools. Headquarters only recommends comparing features after evidence is available."));
-    comparisons.forEach(c => {
-      const card = node("article", "feature-gap-card");
-      const top = node("div", "feature-gap-top");
-      append(top, node("strong", "", (c.product || "YorpHives product") + " → " + (c.competitor || "Competitor")),
-        node("span", "outline-pill", c.confidence || "Unverified"));
-      const text = node("p", "", c.evidenceSummary ||
-        (c.missingFeatures.length ? "Feature claims to verify: " + c.missingFeatures.join(" · ") :
-        "Possible alternative based on a public mention. No feature shortfall has been verified."));
-      const next = node("p", "gap-next", c.recommendation || "Verify with direct evidence before considering changes.");
-      append(card, top, text, next);
-      const links = node("div", "gap-evidence");
-      c.evidence.forEach(source => {
-        const a = node("a", "", "Evidence source"); a.href = source; a.target = "_blank"; a.rel = "noopener noreferrer"; links.append(a);
-      });
-      if (!c.evidence.length) links.append(node("small", "", "No independent evidence supplied"));
-      card.append(links);
-      gaps.append(card);
-    });
-  }
-
-  function renderAll() {
-    renderMetrics();
-    renderFounderBriefing();
-    renderDecisionQueue();
-    renderHomeFeed();
-    renderBrief();
-    renderCoverage();
-    renderPriorityInbox();
-    renderOpportunityPreview();
-    renderFindings();
-    renderSecurityWatch();
-    renderOpportunities();
-    renderProducts();
-    renderWorkforce();
-    renderActivity();
-  }
-
-  const decisionLabels={proposed:'Needs review',accepted:'Awaiting founder action',implemented:'Implemented · awaiting verification',verified:'Outcome recorded by founder',rejected:'Not pursuing',snoozed:'Paused'};
-  const decisionOptions={proposed:['accepted','rejected','snoozed'],accepted:['implemented','rejected','snoozed'],implemented:['verified','accepted'],verified:['proposed'],rejected:['proposed'],snoozed:['proposed']};
-  function currentDecision(id,type) {
-    return (state.data.decisionJournal?.events||[]).find(x=>x.thread===type+':'+id);
-  }
-  function renderDecisionQueue() {
-    const area=$("decision-queue");area.replaceChildren();
-    const operating=state.data.operating;
-    $("decision-summary").textContent=state.origin==='preview'?'Connect your private report to track decisions.':
-      !operating?'Decision tracking is not available in this report.':
-      operating.pending?operating.pending+' recommendations need review · showing up to three.':
-      'Nothing new requires a decision. Check monitoring freshness above.';
-    $("decision-limit").textContent=operating?operating.activeOpportunities+' / 3 active opportunities':'No active opportunity count available';
-    for(const record of operating?.queue||[]) {
-      const card=node('article','decision-card');
-      append(card,node('span','source-note',record.type==='finding'?'Monitoring':'Opportunity'),node('h3','',record.title),
-        node('p','',record.changed?'Evidence changed since your decision. Review the update.':record.contract.impact),
-        node('small','source-note',record.contract.freshness+' evidence · '+record.contract.owner));
-      const action=node('button','button button-secondary','Review recommendation');action.type='button';
-      action.addEventListener('click',()=>{const item=(record.type==='finding'?state.data.findings:state.data.opportunities).find(x=>x.id===record.id);if(item)showDetail(item,record.type);});
-      append(card,action);area.append(card);
-    }
-    const history=$("decision-history");history.replaceChildren();
-    const seen=new Set();
-    for(const event of state.data.decisionJournal?.events||[]) {
-      if(seen.has(event.thread)||seen.size>=12)continue;seen.add(event.thread);
-      const button=node('button','decision-history-item',event.title+' — '+(decisionLabels[event.state]||event.state));
-      button.type='button';button.addEventListener('click',()=>{
-        const items=event.kind==='finding'?state.data.findings:state.data.opportunities;
-        const item=items.find(x=>x.id===event.record_id)||{id:event.record_id,title:event.title,category:'quality',priority:'low',asset:'Archived recommendation',description:'The original source record is no longer in this report. Decision history is retained.',recommendation:'Review the retained decision and outcome evidence.',evidence:event.evidence_url?[event.evidence_url]:[],observedAt:event.created_at};
-        showDetail(item,event.kind);
-      });history.append(button);
-    }
-    if(!seen.size)history.append(node('p','source-note','No founder decisions recorded.'));
-    $("decision-export").disabled=!(state.data.decisionJournal?.events?.length);
-  }
-  function renderDecisionDetail(item,type) {
-    const current=currentDecision(item.id,type),status=current?.state||'proposed';
-    const record=state.data.operating?.threads.find(x=>x.thread===type+':'+item.id);
-    const facts=$("decision-facts");facts.replaceChildren();
-    const contract=record?.contract;
-    if(contract)for(const [name,value] of [['Evidence',contract.classification+' · '+contract.freshness],['Confidence',contract.confidence],['Business impact',contract.impact],['Owner',contract.owner],['Independent review',contract.reviewer],['Success condition',contract.successCondition],['Effort',contract.effort],['Risk',contract.risk]]){
-      append(facts,node('dt','',name),node('dd','',value));
-    }
-    $("decision-state").textContent=decisionLabels[status];
-    $("decision-notice").textContent=['cloudflare','selfhost'].includes(state.origin)&&state.data.decisionJournal?.available?
-      'Your decision is saved privately. It never triggers code, deployment, spending or a website change.':
-      'Viewing only. Saving needs the authenticated founder journal; examples and imported reports cannot write decisions.';
-    const select=$("decision-next");select.replaceChildren();
-    for(const value of decisionOptions[status]||[]) {const option=node('option','',decisionLabels[value]);option.value=value;select.append(option);}
-    $("decision-note").value='';$("decision-outcome").value=current?.outcome||'';
-    $("decision-success").value=current?.success_condition||contract?.successCondition||'';
-    $("decision-evidence").value=current?.evidence_url||'';$("decision-feedback").value='';
-    $("decision-save").disabled=!['cloudflare','selfhost'].includes(state.origin)||!state.data.decisionJournal?.available;
-    $("decision-error").textContent='';
-    $("experiment-brief").hidden=type!=='opportunity';
-    let experiment={};try{experiment=JSON.parse(current?.experiment_json||'{}');}catch{}
-    for(const key of ['audience','problem','hypothesis','metric','target','effortHours','stopCondition','reviewBy']){
-      const input=document.getElementById('experiment-'+key);
-      input.value=key==='reviewBy'?(experiment[key]||'').slice(0,10):(experiment[key]??'');
-    }
-    const history=$("decision-detail-history");history.replaceChildren();
-    for(const event of (state.data.decisionJournal?.events||[]).filter(x=>x.thread===type+':'+item.id).slice(0,20)) {
-      const row=node('li','');append(row,node('strong','',decisionLabels[event.state]),
-        node('p','',event.note),node('small','source-note',cleanDate(event.created_at)));
-      if(event.feedback)row.append(node('p','','Feedback: '+label(event.feedback)));
-      if(event.outcome)row.append(node('p','','Outcome: '+event.outcome));
-      if(event.evidence_url){const link=node('a','','Outcome evidence');link.href=event.evidence_url;link.target='_blank';link.rel='noopener noreferrer';row.append(link);}
-      history.append(row);
-    }
-  }
-  async function submitDecision() {
-    const selected=state.selectedDetail;
-    if(!selected||!['cloudflare','selfhost'].includes(state.origin)||!state.data.decisionJournal?.available)return;
-    const {item,type}=selected,current=currentDecision(item.id,type);
-    const input={kind:type,id:item.id,revision:current?.revision||0,state:$("decision-next").value,
-      note:$("decision-note").value,feedback:$("decision-feedback").value,outcome:$("decision-outcome").value,
-      successCondition:$("decision-success").value,evidenceUrl:$("decision-evidence").value};
-    if(type==='opportunity')input.experiment=Object.fromEntries(['audience','problem','hypothesis','metric','target','effortHours','stopCondition','reviewBy'].map(key=>{
-      const value=document.getElementById('experiment-'+key).value;
-      return [key,['target','effortHours'].includes(key)?Number(value):value];
-    }));
-    if(!input.note.trim()){ $("decision-error").textContent='Add a short reason before saving.';return; }
-    $("decision-save").disabled=true;
-    try {
-      const response=await fetch('/api/decisions',{method:'POST',credentials:'same-origin',redirect:'error',
-        headers:{'Content-Type':'application/json','X-HQ-Founder-Action':'decision-v1'},body:JSON.stringify(input)});
-      const result=await response.json();
-      if(!response.ok||!result.saved)throw Error(result.error||'Decision was not saved.');
-      if(!await loadLocalReport(false))throw Error("Decision saved, but the updated report could not be loaded. Refresh before another decision.");
-      renderDecisionDetail(item,type);showToast('Decision saved. No changes were executed.');
-    }catch(error){$("decision-error").textContent=cleanText(error.message,350)||'Could not confirm the save. Refresh before retrying.';}
-    finally{$("decision-save").disabled=!['cloudflare','selfhost'].includes(state.origin)||!state.data.decisionJournal?.available;}
-  }
-
-  function showDetail(item, type) {
-    state.selectedDetail = { item, type };
-    $("detail-type").textContent = (type === "finding" ? "MONITORING FINDING" : "GROWTH OPPORTUNITY") + " · " + originLabel().toUpperCase();
-    $("detail-title").textContent = item.title;
-    $("detail-description").textContent = item.description;
-    $("detail-action").textContent = item.recommendation || "No next step provided. Review the source evidence before acting.";
-    const tags = $("detail-tags"); tags.replaceChildren();
-    [
-      label(item.category),
-      type === "finding" ? "Priority: " + label(item.priority) : item.confidence,
-      ...(type === "finding" ? [item.asset] : [])
-    ].forEach(value => tags.append(node("span", "detail-tag", value)));
-    const evidence = $("detail-evidence"); evidence.replaceChildren();
-    const date = cleanDate(item.observedAt);
-    evidence.append(node("p", "source-note", (date ? "Reported at " + date + ". " : "No observation timestamp provided. ") + (state.origin === "preview" ? "This is fictitious demonstration content." : "This record was supplied by a local or imported report and has not been independently verified.")));
-    if (item.evidence.length) {
-      item.evidence.forEach(url => {
-        const link = node("a", "", url); link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer"; evidence.append(link, document.createElement("br"));
-      });
-    } else evidence.append(node("p", "source-note", "No evidence links included. Treat this as a hypothesis until verified."));
-    renderDecisionDetail(item,type);
-    if(!$("detail-dialog").open)$("detail-dialog").showModal();
-  }
-
-  function showToast(message) {
-    const toast = $("toast");
-    toast.textContent = message;
-    toast.classList.add("show");
-    clearTimeout(showToast.timer);
-    showToast.timer = setTimeout(() => toast.classList.remove("show"), 3200);
-  }
-
-  function normalizeData(raw) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("The JSON root must be an object.");
-    const arrays = ["assets", "findings", "opportunities", "products", "changes", "comparisons", "agents", "activity", "securityWatch"];
-    for (const key of arrays) if (raw[key] !== undefined && !Array.isArray(raw[key])) throw new Error("'" + key + "' must be an array.");
-    const items = (key) => (raw[key] || []).filter(x => x && typeof x === "object" && !Array.isArray(x)).slice(0, 200);
-    const evidence = (item) => Array.isArray(item.evidence) ? item.evidence.slice(0, 10).map(safeUrl).filter(Boolean) : [];
-    const normal = {
-      assets: items("assets").map((a, i) => ({
-        id: cleanText(a.id, 80) || "asset" + i, name: cleanText(a.name, 150) || "Unnamed asset",
-        kind: cleanText(a.kind, 100), summary: cleanText(a.summary, 400),
-        status: ["healthy", "degraded", "unknown"].includes(a.status) ? a.status : "unknown"
-      })),
-      findings: items("findings").map((f, i) => ({
-        id: cleanText(f.id, 80) || "finding" + i, title: cleanText(f.title, 160) || "Untitled finding",
-        category: ["security", "dependencies", "reliability", "quality"].includes(f.category) ? f.category : "quality",
-        priority: ["high", "medium", "low"].includes(f.priority) ? f.priority : "medium",
-        asset: cleanText(f.asset, 120) || "Unspecified asset", description: cleanText(f.description, 3000),
-        recommendation: cleanText(f.recommendation, 3000), observedAt: cleanText(f.observedAt, 45), evidence: evidence(f)
-      })),
-      opportunities: items("opportunities").map((o, i) => ({
-        id: cleanText(o.id, 80) || "opportunity" + i, title: cleanText(o.title, 160) || "Untitled lead",
-        category: ["product", "revenue", "technology"].includes(o.category) ? o.category : "product",
-        confidence: cleanText(o.confidence, 70) || "Unassessed",
-        kind: ["potential-missing-product", "possible-existing-product", "catalog-unverified"].includes(o.kind) ? o.kind : "unvalidated-lead",
-        description: cleanText(o.description, 3000), recommendation: cleanText(o.recommendation, 3000),
-        observedAt: cleanText(o.observedAt, 45), evidence: evidence(o)
-      })),
-      securityWatch: items("securityWatch").map((a,i) => ({
-        id: cleanText(a.id,60) || "public-advisory"+i,
-        title: cleanText(a.title,180) || "Public security advisory",
-        severity: ["high","critical"].includes(a.severity) ? a.severity : "unverified",
-        packages: Array.isArray(a.packages) ? a.packages.slice(0,5).map(p => cleanText(p?.name,100)).filter(Boolean) : [],
-        source: safeUrl(a.source), observedAt: cleanText(a.observedAt,45),
-        applicability: "Not verified against YorpHives dependencies"
-      })),
-      products: items("products").map((p, i) => ({
-        id: cleanText(p.id, 80) || "product" + i, name: cleanText(p.name, 160) || "Unnamed product",
-        url: safeUrl(p.url) || "", source: cleanText(p.source, 80),
-        discoveryConfidence: cleanText(p.discoveryConfidence, 30), evidenceUrl: safeUrl(p.evidenceUrl) || "",
-        status: ["healthy", "degraded", "unknown", "not_discoverable"].includes(p.status) ? p.status : "unknown",
-        active: p.active !== false, firstSeen: cleanText(p.firstSeen, 45), lastChecked: cleanText(p.lastChecked, 45),
-        qaStatus: ["passed", "failed", "pending_confirmation", "unverified"].includes(p.qaStatus) ? p.qaStatus : "unverified",
-        qaCheckedAt: cleanText(p.qaCheckedAt, 45), qaReason: cleanText(p.qaReason, 100),
-        features: Array.isArray(p.features) ? p.features.slice(0, 60).map(x => cleanText(x, 120)).filter(Boolean) : []
-      })),
-      changes: items("changes").map((c, i) => ({
-        id: cleanText(c.id, 80) || "change" + i, kind: cleanText(c.kind, 80),
-        summary: cleanText(c.summary, 600), url: safeUrl(c.url) || "",
-        severity: cleanText(c.severity, 30), occurredAt: cleanText(c.occurredAt, 45)
-      })),
-      comparisons: items("comparisons").map((c, i) => ({
-        id: cleanText(c.id, 80) || "gap" + i, product: cleanText(c.product, 160),
-        competitor: cleanText(c.competitor, 160),
-        missingFeatures: Array.isArray(c.missingFeatures) ? c.missingFeatures.slice(0, 40).map(x => cleanText(x, 130)).filter(Boolean) : [],
-        confidence: cleanText(c.confidence, 100), evidenceSummary: cleanText(c.evidenceSummary, 400),
-        recommendation: cleanText(c.recommendation, 800),
-        evidence: evidence(c)
-      })),
-      agents: items("agents").map((a, i) => ({
-        id: cleanText(a.id, 80) || "agent" + i, name: cleanText(a.name, 160) || "Unnamed department",
-        responsibility: cleanText(a.responsibility, 1000),
-        status: ["not_connected", "running", "idle", "error"].includes(a.status) ? a.status : "not_connected"
-      })),
-      activity: items("activity").map((a, i) => ({
-        id: cleanText(a.id, 80) || "event" + i, title: cleanText(a.title, 160) || "Untitled activity",
-        summary: cleanText(a.summary, 1000), kind: cleanText(a.kind, 30),
-        occurredAt: cleanText(a.occurredAt, 45)
-      }))
-    };
-    const eventFields=['thread','kind','record_id','title','state','note','feedback','outcome','success_condition','evidence_url','created_at','experiment_json','snapshot'];
-    normal.decisionJournal={available:raw.decisionJournal?.available===true,events:
-      (Array.isArray(raw.decisionJournal?.events)?raw.decisionJournal.events:[]).slice(0,2000)
-      .filter(e=>e&&['finding','opportunity'].includes(e.kind)&&Object.hasOwn(decisionLabels,e.state))
-      .map(e=>{const row=Object.fromEntries(eventFields.map(k=>[k,cleanText(e[k],k==='title'?160:k==='experiment_json'?3000:k==='snapshot'?10000:1000)]));
-        row.evidence_url=safeUrl(e.evidence_url);row.revision=Number.isSafeInteger(e.revision)&&e.revision>0?e.revision:0;return row;})};
-    if(raw.operating&&typeof raw.operating==='object'){
-      const count=x=>Number.isSafeInteger(x)&&x>=0?Math.min(x,9999):0;
-      const cleanRecord=x=>({id:cleanText(x.id,80),thread:cleanText(x.thread,100),title:cleanText(x.title,160),
-        type:x.type==='finding'?'finding':'opportunity',changed:x.changed===true,
-        contract:Object.fromEntries(['impact','freshness','owner','classification','confidence','reviewer','successCondition','effort','risk']
-          .map(k=>[k,cleanText(x.contract?.[k],500)||'Not supplied']))});
-      normal.operating={pending:count(raw.operating.pending),activeOpportunities:count(raw.operating.activeOpportunities),
-        queue:(Array.isArray(raw.operating.queue)?raw.operating.queue:[]).filter(x=>x&&typeof x==='object').slice(0,3).map(cleanRecord),
-        threads:(Array.isArray(raw.operating.threads)?raw.operating.threads:[]).filter(x=>x&&typeof x==='object').slice(0,200).map(cleanRecord)};
-    }
-    const rawBudget = raw.resourceBudget;
-    if (rawBudget && typeof rawBudget === "object" && !Array.isArray(rawBudget)) {
-      const publicFetches = rawBudget.publicFetches || {};
-      const number = value => Number.isSafeInteger(value) && value >= 0 ? Math.min(value, 1_000_000) : 0;
-      normal.resourceBudget = {
-        used: number(publicFetches.used),
-        limit: number(publicFetches.limit),
-        aiDisabled: rawBudget.aiCalls?.disabled === true,
-        browserDisabled: rawBudget.browserMinutes?.disabled === true
-      };
-    }
-    const rBrief=raw.briefing;
-    if(rBrief && typeof rBrief==="object" && !Array.isArray(rBrief)) {
-      const number=value=>Number.isSafeInteger(value)&&value>=0?Math.min(value,999999):0;
-      const section=value=>["overview","monitoring","products","opportunities","activity"].includes(value)?value:"products";
-      const siteStatus=["reported-reachable","issue-reported"].includes(rBrief.site?.status)?
-        rBrief.site.status:"not-verified";
-      const coverage=rBrief.coverage||{},alerts=rBrief.alerts||{},research=rBrief.research||{};
-      normal.briefing={
-        collector:{current:rBrief.collector?.current===true,lastSeen:cleanText(rBrief.collector?.lastSeen,45)},
-        site:{status:siteStatus,lastCheck:cleanText(rBrief.site?.lastCheck,45)},
-        coverage:{checked:number(coverage.checked),discovered:number(coverage.discovered),
-          awaitingFirstCheck:number(coverage.awaitingFirstCheck),
-          checkedPercent:Math.min(number(coverage.checkedPercent),100),
-          httpUnverified:number(coverage.httpUnverified)},
-        alerts:{open:number(alerts.open),highPriority:number(alerts.highPriority)},
-        research:{leads:number(research.leads),alternatives:number(research.alternatives)},
-        usage:{used:number(rBrief.usage?.used),limit:number(rBrief.usage?.limit)},
-        nextAction:{label:cleanText(rBrief.nextAction?.label,120)||"Review current evidence",
-          description:cleanText(rBrief.nextAction?.description,360)||
-            "Check source evidence before making changes.",
-          section:section(rBrief.nextAction?.section)}
-      };
-    }
-    normal.verification = {
-      complete: raw.pipeline?.products?.complete === true || raw.verification?.complete === true,
-      generatedAt: cleanText(raw.pipeline?.generatedAt || raw.generatedAt, 45),
-      method: cleanText(raw.pipeline?.products?.method || raw.verification?.method, 100),
-      notes: Array.isArray(raw.pipeline?.errors) ? raw.pipeline.errors.slice(0, 5).map(x => cleanText(x, 200)) : []
-    };
-    if (arrays.every(key => normal[key].length === 0)) throw new Error("The report contains no dashboard records.");
-    return normal;
-  }
-
-  function notifyNewHighPriority(previous, normal, origin) {
-    if(!state.browserAlertsOn || !["cloudflare","selfhost"].includes(origin) || previous!==origin) return;
-    for(const finding of normal.findings){
-      if(!["high"].includes(finding.priority) || state.seenFindingIds.has(finding.id)) continue;
-      state.seenFindingIds.add(finding.id);
-      if(document.visibilityState!=="hidden" ||
-         typeof Notification==="undefined" || Notification.permission!=="granted")continue;
-      try {
-        new Notification("YorpHives Headquarters: new alert",{
-          body:"Open your private Headquarters to review new evidence.",
-          tag:"yorphives-hq-new-alert",silent:true
-        });
-      }catch{ /* Unsupported mobile browsers simply use the in-app Alerts feed. */ }
-    }
-  }
-  function refreshBrowserAlertButton(){
-    const button=$("browser-alert-toggle");
-    button.textContent=state.browserAlertsOn?"Disable alerts":"Enable alerts";
-    button.setAttribute("aria-pressed",String(state.browserAlertsOn));
-  }
-
-  function applyReport(raw, origin) {
-    const normal = normalizeData(raw);
-    const previousOrigin=state.origin;
-    notifyNewHighPriority(previousOrigin,normal,origin);
-    state.data = normal;
-    state.origin = origin;
-    state.findingFilter = "all";
-    state.opportunityFilter = "all";
-    state.feedFilter = "all";
-    document.querySelectorAll("[data-feed-filter]").forEach(button=>{
-      const active=button.dataset.feedFilter==="all";
-      button.classList.toggle("is-selected",active);
-      button.setAttribute("aria-pressed",String(active));
-    });
-    document.querySelectorAll("[data-finding-filter], [data-opportunity-filter]").forEach(button => {
-      button.classList.toggle("is-selected", button.dataset.findingFilter === "all" || button.dataset.opportunityFilter === "all");
-    });
-    renderAll();
-  }
-
-  async function importFile(file) {
-    if (!file) return;
-    if (file.size > 2_000_000) return showToast("That report is larger than the 2 MB limit.");
-    try {
-      const raw = JSON.parse(await file.text());
-      applyReport(raw, "imported");
-      showView("overview");
-      showToast("Report opened locally. Data is not independently verified.");
-    } catch (error) {
-      showToast("Could not open report: " + cleanText(error.message, 110));
-    } finally {
-      $("report-upload").value = "";
-    }
-  }
-
-  function markReportUnavailable() {
-    if(!['cloudflare','local','selfhost'].includes(state.origin))return;
-    state.data.assets.forEach(asset=>{asset.status='unknown';});
-    if(state.data.briefing){state.data.briefing.collector.current=false;state.data.briefing.site.status='not-verified';}
-    if(state.data.decisionJournal)state.data.decisionJournal.available=false;
-    renderAll();
-    $("decision-summary").textContent='Current report unavailable. Retained evidence may be stale; refresh before deciding.';
-    $("decision-save").disabled=true;
-  }
-  async function loadLocalReport(notify = false) {
-    if (!["http:", "https:"].includes(location.protocol)) {
-      if (notify) showToast("Private evidence viewer is not connected in this preview.");
-      return false;
-    }
-    try {
-      const response = await fetch("/api/report", { credentials: "same-origin", cache: "no-store" });
-      const mode = response.headers.get("X-YorpHives-HQ-Evidence");
-      if (response.status !== 200 || !["readonly-local", "readonly-cloudflare", "readonly-selfhost"].includes(mode)) {
-        markReportUnavailable();
-        if (notify) showToast("No fresh, authenticated private report is available.");
-        return false;
-      }
-      const raw = await response.json();
-      if (raw.schemaVersion !== "yorphives.hq-intelligence.v1" ||
-          raw.pipeline?.readOnly !== true || !raw.pipeline?.generatedAt) {
-        markReportUnavailable();
-        if (notify) showToast("Local evidence contract is invalid; no report applied.");
-        return false;
-      }
-      if (state.origin === "imported" && !notify) return true;
-      applyReport(raw, mode === "readonly-cloudflare" ? "cloudflare" : mode === "readonly-selfhost" ? "selfhost" : "local");
-      if (notify) showToast("Read-only evidence refreshed. Check timestamps and sources.");
-      return true;
-    } catch (error) {
-      markReportUnavailable();
-      if (notify) showToast("Private evidence unavailable: " + cleanText(error.message, 90));
-      return false;
-    }
-  }
-
-  function openSearch() {
-    $("search-dialog").showModal();
-    $("global-search").value = "";
-    renderSearch("");
-    $("global-search").focus();
-  }
-
-  function renderSearch(query) {
-    const target = $("search-results"); target.replaceChildren();
-    const term = query.trim().toLowerCase();
-    const categories = [
-      ...state.data.findings.map(item => ({ item, type: "finding", hint: "Monitoring · " + item.asset })),
-      ...state.data.opportunities.map(item => ({ item, type: "opportunity", hint: "Opportunity · " + label(item.category) })),
-      ...state.data.agents.map(item => ({ item, type: "agent", hint: "AI workforce" })),
-      ...state.data.products.map(item => ({ item, type: "product", hint: "Product inventory" }))
-    ];
-    const results = categories.filter(({ item }) =>
-      !term || [item.title, item.name, item.description, item.responsibility, item.asset].some(value => typeof value === "string" && value.toLowerCase().includes(term))
-    ).slice(0, 14);
-    if (!results.length) return target.append(emptyState("Nothing found", "Try another word, or import additional records."));
-    results.forEach(({ item, type, hint }) => {
-      const button = node("button", "search-result"); button.type = "button";
-      append(button, node("strong", "", item.title || item.name), node("small", "", hint + " · " + originLabel()));
-      button.addEventListener("click", () => {
-        $("search-dialog").close();
-        if (type === "agent") showView("workforce");
-        else if (type === "product") showView("products");
-        else { showView(type === "finding" ? "monitoring" : "opportunities"); showDetail(item, type); }
-      });
-      target.append(button);
-    });
-  }
-
-  function initialize() {
-    $("decision-save").addEventListener('click',submitDecision);
-    $("decision-export").addEventListener('click',()=>{
-      const data={schemaVersion:'yorphives.founder-decisions.v1',exportedAt:new Date().toISOString(),origin:originLabel(),events:state.data.decisionJournal?.events||[]};
-      const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
-      const link=document.createElement('a');link.href=url;link.download='yorphives-founder-decisions.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-    });
-    $("browser-alert-toggle").addEventListener("click",async()=>{
-      if(state.browserAlertsOn){
-        state.browserAlertsOn=false;
-        refreshBrowserAlertButton();
-        showToast("Browser alerts are off. The private Alerts feed still works.");
-        return;
-      }
-      if(typeof Notification==="undefined" || !window.isSecureContext){
-        showToast("This browser does not support private tab alerts here.");
-        return;
-      }
-      try{
-        const permission=await Notification.requestPermission();
-        if(permission!=="granted"){
-          showToast("Notification permission not enabled. All alerts remain inside Headquarters.");
-          return;
-        }
-        state.browserAlertsOn=true;
-        // Existing findings are NOT a new incident and must not notify.
-        state.seenFindingIds=new Set(state.data.findings.map(x=>x.id));
-        refreshBrowserAlertButton();
-        showToast("Alerts enabled for new high-priority findings while this tab stays open.");
-      }catch{showToast("Browser alerts are unavailable on this device.");}
-    });
-    document.querySelectorAll("[data-nav]").forEach(button => button.addEventListener("click", () => showView(button.dataset.nav)));
-    window.addEventListener("hashchange", () => showView(location.hash.replace("#", "")));
-    document.querySelectorAll("[data-feed-filter]").forEach(chip=>chip.addEventListener("click",()=>{
-      state.feedFilter=chip.dataset.feedFilter;
-      document.querySelectorAll("[data-feed-filter]").forEach(button=>{
-        const active=button===chip;
-        button.classList.toggle("is-selected",active);
-        button.setAttribute("aria-pressed",String(active));
-      });
-      renderHomeFeed();
-    }));
-    $("mobile-more").addEventListener("click",()=>{
-      const open=document.body.classList.toggle("nav-open");
-      $("sidebar-scrim").hidden=!open;
-      $("mobile-menu").setAttribute("aria-expanded",String(open));
-      $("mobile-more").setAttribute("aria-expanded",String(open));
-    });
-    document.querySelectorAll("[data-finding-filter]").forEach(button => button.addEventListener("click", () => {
-      state.findingFilter = button.dataset.findingFilter;
-      document.querySelectorAll("[data-finding-filter]").forEach(chip => chip.classList.toggle("is-selected", chip === button));
-      renderFindings();
-    }));
-    document.querySelectorAll("[data-opportunity-filter]").forEach(button => button.addEventListener("click", () => {
-      state.opportunityFilter = button.dataset.opportunityFilter;
-      document.querySelectorAll("[data-opportunity-filter]").forEach(chip => chip.classList.toggle("is-selected", chip === button));
-      renderOpportunities();
-    }));
-    $("mobile-menu").addEventListener("click", () => {
-      const open = document.body.classList.toggle("nav-open");
-      $("sidebar-scrim").hidden = !open;
-      $("mobile-menu").setAttribute("aria-expanded", String(open));
-    });
-    $("sidebar-scrim").addEventListener("click", () => {
-      document.body.classList.remove("nav-open");
-      $("sidebar-scrim").hidden = true;
-      $("mobile-menu").setAttribute("aria-expanded", "false");
-    });
-    $("import-trigger").addEventListener("click", () => $("report-upload").click());
-    $("report-upload").addEventListener("change", (event) => importFile(event.target.files?.[0]));
-    $("product-import-trigger").addEventListener("click", () => $("report-upload").click());
-    $("product-refresh-trigger").addEventListener("click", () => loadLocalReport(true));
-    $("how-trigger").addEventListener("click", () => $("help-dialog").showModal());
-    $("help-close").addEventListener("click", () => $("help-dialog").close());
-    $("help-done").addEventListener("click", () => $("help-dialog").close());
-    $("notice-dismiss").addEventListener("click", () => { $("data-notice").hidden = true; });
-    $("detail-close").addEventListener("click", () => $("detail-dialog").close());
-    $("dialog-done").addEventListener("click", () => $("detail-dialog").close());
-    // The keyboard hint is a label only; functionality supports both
-    // Control+K and Command+K on all platforms.
-    const shortcut=$("search-shortcut");
-    if(shortcut){
-      const platform=String(navigator.userAgentData?.platform || navigator.platform || "");
-      shortcut.textContent=/Mac|iPad|iPhone/i.test(platform)?"⌘ K":"Ctrl K";
-    }
-    // Logout is a normal top-level navigation to Cloudflare Access's
-    // documented revocation endpoint. No client-side-only pseudo logout.
-    document.querySelectorAll('a[href="/cdn-cgi/access/logout"]').forEach(link=>{
-      link.addEventListener("click",event=>{
-        if(event.defaultPrevented || event.button!==0 || event.metaKey || event.ctrlKey ||
-           event.shiftKey || event.altKey) return;
-        document.body.classList.add("session-ending");
-      });
-    });
-    // Never expose a cached, previously signed-in private dashboard when the
-    // user hits Back from Cloudflare Access logout (BFCache restoration).
-    window.addEventListener("pageshow",event=>{
-      if(event.persisted) window.location.reload();
-    });
-    $("search-trigger").addEventListener("click", openSearch);
-    $("global-search").addEventListener("input", (event) => renderSearch(event.target.value));
-    $("copy-record").addEventListener("click", async () => {
-      const selected = state.selectedDetail;
-      if (!selected) return;
-      const { item, type } = selected;
-      const summary = [
-        "YorpHives Headquarters — " + originLabel(),
-        "Type: " + type, "Title: " + item.title, "Category: " + label(item.category),
-        "Description: " + item.description, "Recommended next step: " + item.recommendation,
-        "Evidence: " + (item.evidence.join(", ") || "None provided"),
-        "Do not treat this as a verified finding without independent corroboration."
-      ].join("\n");
-      try {
-        await navigator.clipboard.writeText(summary);
-        showToast("Summary copied. Verify evidence before acting.");
-      } catch (_) { showToast("Copy is unavailable in this browser context."); }
-    });
-    document.addEventListener("keydown", event => {
-      const isSearchShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
-      if (isSearchShortcut) {
-        event.preventDefault();
-        if (!$("search-dialog").open) openSearch();
-      }
-    });
-    [$("detail-dialog"), $("help-dialog"), $("search-dialog")].forEach(dialog => dialog.addEventListener("click", (event) => {
-      if (event.target === dialog) dialog.close();
-    }));
-    renderAll();
-    showView(location.hash.slice(1) || "overview");
-    // Read from the private same-origin viewer only; a static preview returns
-    // 404 and does not enable periodic polling or contact a third party.
-    loadLocalReport(false).then(available => {
-      if (available) setInterval(() => {
-        if (state.origin !== "imported") loadLocalReport(false);
-      }, 60_000);
-    });
-  }
-
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initialize, { once: true });
-  else initialize();
+  bind();history.replaceState({hqPage:state.page},'','#'+state.page);render();refresh();
 })();
