@@ -159,7 +159,10 @@ async function checkSite(env) {
   if(fails===2) await addFinding(env,{key:"website-down",category:"reliability",priority:"high",asset:SITE,
     title:"YorpHives website repeatedly unavailable",
     description:"Two consecutive GET checks failed; HTTP "+result.status+" "+reason,evidence:SITE+"/"});
-  if(ok && Number(rows?.failures||0)>=2) await saveStatus(env,"site_recovery","Website returned a successful response after repeated failures");
+  if(ok && Number(rows?.failures||0)>=2) {
+    await env.DB.prepare("UPDATE findings SET status='resolved' WHERE id=?").bind(fnv("website-down")).run();
+    await saveStatus(env,"site_recovery","Website responded after previous repeated failures; verify independently");
+  }
   return {status:result.status,failures:fails};
 }
 async function discoverTools(env) {
@@ -192,6 +195,8 @@ async function discoverTools(env) {
     await env.DB.prepare("UPDATE assets SET last_seen=? WHERE url=?").bind(nowIso(),url).run();
   }
   await saveStatus(env,"discovery",sources===0?"unverified:no-readable-sources":
+    candidates.size===0?"partial:no-discoverable-tool-routes":
+    candidates.size>=MAX_ROUTES_PER_DISCOVERY?"partial:inventory-cap-reached:" + candidates.size:
     "observed:"+candidates.size+":sources:"+sources);
   // No automatic deletions. Missing sitemap entries are NOT proof a tool was removed.
   return {discovered:candidates.size,newlyEnrolled:inserted,validSources:sources};
@@ -207,6 +212,10 @@ async function checkProducts(env) {
     const fails=ok?0:Number(item.failures||0)+1;
     await env.DB.prepare("UPDATE assets SET last_checked=?,http_status=?,failures=?,status=? WHERE url=?")
       .bind(nowIso(),status,fails,ok?"reachable":fails>=2?"degraded":"pending",item.url).run();
+    if(ok && Number(item.failures||0)>=2) {
+      await env.DB.prepare("UPDATE findings SET status='resolved' WHERE id=?")
+        .bind(fnv("tool-down:"+item.url)).run();
+    }
     if(fails===2) await addFinding(env,{key:"tool-down:"+item.url,category:"reliability",priority:"high",
       asset:item.name,title:"Tool appears repeatedly unavailable: "+item.name,
       description:"Two consecutive read-only requests failed. Last observed HTTP "+status,
@@ -294,7 +303,7 @@ async function verifyAccess(request,env) {
 async function report(env) {
   const [assets,findings,leads,quota,status]=await Promise.all([
     env.DB.prepare("SELECT * FROM assets ORDER BY kind ASC,name ASC LIMIT 150").all(),
-    env.DB.prepare("SELECT * FROM findings ORDER BY observed_at DESC LIMIT 80").all(),
+    env.DB.prepare("SELECT * FROM findings WHERE status='open' ORDER BY observed_at DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM opportunities ORDER BY observed_at DESC LIMIT 50").all(),
     env.DB.prepare("SELECT kind,used FROM quota WHERE day=?").bind(nowIso().slice(0,10)).all(),
     env.DB.prepare("SELECT key,value,checked_at FROM status ORDER BY checked_at DESC LIMIT 30").all()
