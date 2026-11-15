@@ -114,7 +114,7 @@ test("scheduled passive check uses GET only and writes evidence without any proj
     await pending;
     assert(calls.some(x=>x.sql.includes("INSERT INTO assets")),"Website record was not stored");
     assert(calls.some(x=>x.sql.includes("INSERT INTO quota")),"Cost guard was not evaluated");
-    assert(calls.some(x=>x.sql.includes("last_cron")),"Heartbeat was not saved");
+    assert(calls.some(x=>x.sql.includes("INSERT INTO status") && x.args.includes("last_cron")),"Heartbeat was not saved");
     assert(!calls.some(x=>/DELETE FROM assets|UPDATE.*repository|DROP TABLE/i.test(x.sql)));
   }finally{globalThis.fetch=originalFetch;}
 });
