@@ -5,6 +5,8 @@ on:
       - 'cloudflare/**'
       - 'dashboard.js'
       - 'index.html'
+      - 'styles.css'
+      - 'assets/**'
       - '.github/workflows/cloudflare-free-tests.yml'
   workflow_dispatch:
 permissions:
@@ -43,10 +45,13 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           root=Path('cloudflare/dist')
-          actual={p.name for p in root.iterdir() if p.is_file()}
-          required={'index.html','styles.css','dashboard.js'}
+          actual={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()}
+          required={'index.html','styles.css','dashboard.js','assets/yorphives-logo.webp','assets/yorphives-mark.webp'}
           assert actual == required,(actual, required)
-          print('PASS: only three vetted UI files would be published')
+          for name in ('yorphives-logo.webp','yorphives-mark.webp'):
+              p=root/'assets'/name
+              assert p.read_bytes()[:4]==b'RIFF' and p.read_bytes()[8:12]==b'WEBP'
+          print('PASS: only three UI files and two approved official brand assets')
           PY
       - name: Validate SQLite-compatible schema
         run: |
