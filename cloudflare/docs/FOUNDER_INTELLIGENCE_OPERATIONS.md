@@ -38,8 +38,8 @@ Cloudflare is managed infrastructure. Free-tier limits can change; the account o
 - Dedicated D1, one existing 5-minute Cron, and the **exact one-founder Cloudflare Access policy** were re-checked immediately before deployment. No paid services, public evidence endpoints or production website changes were introduced.
 - [Cloudflare Free unit/architecture CI — PASS](https://github.com/solopreneursid/YorHives_Headquarters/actions/runs/43684042595).
 - [Headquarters offline and isolated browser regression CI — PASS](https://github.com/solopreneursid/YorHives_Headquarters/actions/runs/43684042596).
-- Before the new monitoring cadence's first independently observed scheduled run, the latest D1 snapshot was **22 discovered, 6 HTTP-checked, 16 awaiting first check**, with 107/900 of the internal daily public-fetch budget recorded. These earlier checks belong to the prior schedule; do not misrepresent them as proof the new rotation has run.
-- Next verification must inspect a later D1 heartbeat and confirm `last_checked` advances by up to two routes per ordinary 5-minute slot. Incomplete or stale checks must never be presented as a healthy tool.
+- **First live upgraded cycle verified:** D1 recorded `last_cron = cycle:2026-11-15T06:10:46.129Z`, with the latest tool check at `06:10:45.492Z`. Coverage increased from **6/22 to 8/22 HTTP-checked**, and internal public-fetch usage from **107 to 109/900**—exactly two additional public GET observations without a new website deploy. This verifies the new five-minute rotation, **not** functional product correctness.
+- **Remaining coverage at that snapshot:** **14 of 22** routes await their first check. Their status must stay unverified until observed. First-pass completion and external competitor-source retrieval need their own evidence before being claimed successful.
 
 ## Public competitor source restrictions
 
