@@ -22,6 +22,12 @@ The Cloudflare Access policy permits the Cloudflare-account founder only. Worker
 
 No API keys, model credentials, website-write tokens or deployment privileges are bound to the monitoring Worker. The D1 database is separate from website data.
 
+## First verified growth-collector observation
+
+At `2026-11-15T01:25:46.440Z`, the live Worker reported `research = sources:2/2:new:2`. Two mentions were stored in D1, bringing the internal public-fetch counter to **13 requests** for the day. A content review identified that these first mentions were not strong product leads, so the source filter was tightened and the **empty-catalog classification** was corrected. Earlier mentions remain traceable but are not claims of missing products.
+
+This verifies execution and storage of public research **only**. It does not validate any user's market need or identify a profitable product.
+
 ## First verified live monitoring evidence
 
 A real scheduled invocation completed and wrote these records to the dedicated D1 database on **2026-11-15**:
@@ -72,7 +78,7 @@ The new read-only add-on uses **only public GET sources**:
 
 All sources are fixed, allowlisted, subject to the same hard 900 public-fetch/day cap, and run only on the daily schedule or a staged first invocation. The new collector **staggers discovery, growth feeds and security-feed requests over successive five-minute Cron cycles** after initial deployment to limit Worker CPU pressure.
 
-A product research lead is marked `possible-existing-product` only when multiple title keywords resemble an enrolled product; all other results remain `potential-missing-product`. These are triage labels, **not** proof of demand, feature parity or organic search volume. Actual competitor feature tests are not performed.
+A product research lead is marked `possible-existing-product` only when multiple title keywords resemble an enrolled product; a nonmatching mention is `potential-missing-product` **only when a nonempty catalog is available**. When the catalog is empty or unverified, the classification is `catalog-unverified`, never a declaration that YorpHives lacks the product. Generic personal discussions and unrelated entertainment launches are filtered conservatively. These are triage labels, **not** proof of demand, feature parity or organic search volume. Actual competitor feature tests are not performed.
 
 The new `security_watch` table stores publicly available advisory metadata with `applicability='unverified'`. The dashboard displays it in a separate **Security advisories to review** panel; it never silently converts a general advisory into an active vulnerability finding.
 
