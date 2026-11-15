@@ -95,7 +95,18 @@ def main():
                     "changes": [{"kind": "new-product", "summary": '<img src=x onerror="window.ATTACKED=true">'}],
                     "comparisons": [{"product": "Image converter", "competitor": "Example",
                                      "missingFeatures": ['<iframe src=javascript:alert(1)>'],
-                                     "evidence": ["javascript:alert(1)"]}]
+                                     "evidenceSummary": "<svg/onload=window.ATTACKED=true>",
+                                     "evidence": ["javascript:alert(1)"]}],
+                    "briefing": {"collector": {"current": True},
+                                 "site": {"status": "reported-reachable", "lastCheck": "2026-11-15T06:55:00Z"},
+                                 "coverage": {"discovered": 22, "checked": 3, "awaitingFirstCheck": 19,
+                                              "checkedPercent": 14, "httpUnverified": 0},
+                                 "alerts": {"open": 1, "highPriority": 1},
+                                 "research": {"leads": 2, "alternatives": 0},
+                                 "usage": {"used": 91, "limit": 900},
+                                 "nextAction": {"label": "<img src=x onerror=window.ATTACKED=true>",
+                                                "description": "Review source evidence",
+                                                "section": "javascript:alert(1)"}}
                 }
                 page.locator("#report-upload").set_input_files({
                     "name": "local-report.json", "mimeType": "application/json",
@@ -115,6 +126,9 @@ def main():
 
                 assert page.locator("img[src='x']").count() == 0, "Unsafe HTML element created"
                 assert page.evaluate("window.ATTACKED === true") is False
+                assert "3 / 22" in page.locator("#brief-coverage").inner_text()
+                assert page.locator("#brief-next-button").get_attribute("data-nav") == "products"
+                assert "<img src=x" in page.locator("#brief-next-title").inner_text()
                 page.locator("#priority-list .priority-item").first.click()
                 assert page.locator("#detail-dialog").is_visible()
                 assert page.locator("#detail-evidence a").count() == 1, "Unsafe URL protocol was not filtered"
@@ -164,7 +178,18 @@ def main():
                                       "source": "sitemap", "status": "healthy",
                                       "active": True, "features": ["resize image"]}],
                         "changes": [], "comparisons": [],
-                        "findings": [], "opportunities": [], "agents": [], "activity": []
+                        "findings": [], "opportunities": [], "agents": [], "activity": [],
+                        "briefing": {"collector": {"current": True, "lastSeen": now},
+                                     "site": {"status": "reported-reachable", "lastCheck": now},
+                                     "coverage": {"discovered": 1, "checked": 1,
+                                                  "awaitingFirstCheck": 0,
+                                                  "checkedPercent": 100, "httpUnverified": 0},
+                                     "alerts": {"open": 0, "highPriority": 0},
+                                     "research": {"leads": 0, "alternatives": 0},
+                                     "usage": {"used": 2, "limit": 900},
+                                     "nextAction": {"label": "Review catalog completeness",
+                                                    "description": "Verify source evidence",
+                                                    "section": "products"}}
                     }
                     evidence = state / "headquarters-report.json"
                     evidence.write_text(json.dumps(report), encoding="utf-8")
@@ -186,6 +211,9 @@ def main():
                         private_page.locator('button[data-nav="products"]').first.click()
                         assert private_page.locator("#product-catalog .product-record").count() == 1
                         assert "Synthetic New Tool" in private_page.locator("#product-catalog").inner_text()
+                        assert "1 / 1" in private_page.locator("#brief-coverage").inner_text()
+                        assert private_page.locator("#brief-progress").get_attribute("value") == "100"
+                        assert "Review catalog completeness" in private_page.locator("#brief-next-title").inner_text()
                         assert "Collector reports complete coverage" in private_page.locator("#discovery-status").inner_text()
                         private_page.locator("#product-refresh-trigger").click()
                         private_page.wait_for_function(
