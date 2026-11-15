@@ -62,6 +62,22 @@ def main():
                 page.locator('button[data-nav="monitoring"]').first.click()
                 assert page.locator("#view-monitoring").is_visible(), "Monitoring inaccessible"
                 assert page.locator("#findings-list .finding-row").count() == 3
+                assert page.locator("#browser-alert-toggle").get_attribute("aria-pressed") == "false"
+                page.evaluate("""() => {
+                    window.Notification = class {
+                        static permission = 'granted';
+                        static async requestPermission(){return 'granted';}
+                        constructor(){window.__ALERT_CREATED=true;}
+                    };
+                }""")
+                page.locator("#browser-alert-toggle").click()
+                assert page.locator("#browser-alert-toggle").get_attribute("aria-pressed") == "true"
+                assert page.evaluate("window.__ALERT_CREATED === true") is False, (
+                    "Existing findings must not trigger a new browser notification"
+                )
+                page.locator("#browser-alert-toggle").click()
+                assert page.locator("#browser-alert-toggle").get_attribute("aria-pressed") == "false"
+
                 page.locator('[data-finding-filter="security"]').click()
                 assert page.locator("#findings-list .finding-row").count() == 1, "Findings filter failed"
 
