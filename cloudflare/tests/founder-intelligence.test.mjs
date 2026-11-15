@@ -119,3 +119,25 @@ test("robots refusal never fetches competitor product pages",async()=>{
     assert.equal(fixture.statuses.get("competitor_watch_ezgif-image-resize"),"robots-unavailable-or-disallowed");
   }finally{globalThis.fetch=original;}
 });
+
+test("daily resource envelope keeps all scheduled sources under the hard 900 public GET budget",()=>{
+  let uptime=0,toolRounds=0,discovery=0,research=0,security=0,competitor=0;
+  const start=Date.parse("2026-11-15T00:00:00Z");
+  for(let minutes=0;minutes<24*60;minutes+=5){
+    const plan=schedulePlan(start+minutes*60000);
+    uptime+=Number(plan.uptime);toolRounds+=Number(plan.products);
+    discovery+=Number(plan.discovery);research+=Number(plan.research);
+    security+=Number(plan.security);competitor+=Number(plan.competitorIndex>=0);
+    assert(!(plan.products && plan.competitorIndex>=0),"Heavy competitor scan must avoid tool checks");
+  }
+  assert.equal(uptime,96);
+  assert.equal(toolRounds,280);
+  assert.equal(discovery,4);
+  assert.equal(research,1);
+  assert.equal(security,1);
+  assert.equal(competitor,2);
+  // Deliberately generous discovery ceiling (more than typical 10-14 calls).
+  const modelled=uptime+toolRounds*2+discovery*18+research*2+security*2+competitor*2;
+  assert(modelled<800,`Estimated public GETs (${modelled}) must leave a free-tier buffer`);
+  assert(modelled<900,"The application hard limit is 900 external fetches/day");
+});
