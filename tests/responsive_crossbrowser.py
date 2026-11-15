@@ -71,6 +71,15 @@ def run_engine(browser_type,base):
                 assert not page.evaluate("document.body.classList.contains('nav-open')")
                 assert page.locator("#sidebar-scrim").is_hidden()
 
+    # Rotated phones/tablets should not force sideways scrolling.
+    for width,height in ((667,375),(844,390),(1024,768),(1180,820)):
+        page.set_viewport_size({"width":width,"height":height})
+        for view in ("overview","monitoring","products"):
+            page.evaluate("(view) => [...document.querySelectorAll('.sidebar [data-nav]')].find(el=>el.dataset.nav===view).click()",view)
+            layout=is_non_overflowing(page)
+            assert layout["okay"], f"{browser_type.name} landscape {width}x{height} {view}: {layout}"
+    page.evaluate("document.querySelector('.sidebar [data-nav=overview]').click()")
+
     page.set_viewport_size({"width":390,"height":844})
     page.locator("#home-full-report > summary").click()
     assert page.locator("#home-full-report").evaluate("(e)=>e.open")
