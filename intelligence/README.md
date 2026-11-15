@@ -140,6 +140,53 @@ The example above is a **format example only**: it is not in the default config 
 - Production should run with filesystem-level read-only project mounts, no repository write tokens, no deployment credentials, restricted egress, and an independent watchdog.
 - The dashboard distinguishes example data, imported files and private local reports. The loopback-only viewer provides authentication, but collector identity is **not yet cryptographically verified**. Signed collector identity, evidence hashes, authentication hardening, and external watchdogs remain necessary before wider network deployment.
 
+## Read-only browser assurance for automatically discovered tools
+
+`intelligence/assurance.py` adds another level of observation beyond HTTP 200 checks. It uses an isolated local Playwright/Chromium browser to visit each **active discovered YorpHives tool** and record:
+
+- Whether the document responds successfully and renders visible content.
+- Whether immediate uncaught JavaScript errors occurred.
+- Whether requests were blocked because they were off-origin or used a non-GET/HEAD method.
+- The check timestamp, confirmation streak and evidence URL.
+
+**This does not prove that a calculator, image editor or other interactive tool works correctly.** It does not click, submit forms, log in, upload files, or generate fixes. Function-level validation needs later founder-approved, non-destructive test contracts.
+
+To enable this optional worker after installing the open-source Playwright Python package and Chromium:
+
+```bash
+python3 -m pip install "playwright==1.65.2"
+python3 -m playwright install chromium
+python3 intelligence/run_pipeline.py --base-url https://yorphives.com \
+  --loop --interval-minutes 60 --research-every 6 --compare-every 24 \
+  --browser-discovery --browser-every 6 --assurance-browser --assurance-every 6
+```
+
+New tools appear in the browser QA queue automatically after discovery. The worker checks up to 60 tools in one cycle, prioritizing untested tools, then first failures awaiting confirmation, then those checked least recently. **Tools beyond that cycle's limit are not permanently skipped**; their status remains unverified until covered in future runs.
+
+An alert is confirmed after **two consecutive observed browser failures**. Unavailable browsers do not count as successful checks or fix previously confirmed incidents. The private dashboard shows browser QA coverage and per-tool status, distinct from HTTP reachability.
+
+The private `browser-assurance-report.json` stores results outside all project directories and is combined with the product inventory only when sufficiently fresh.
+
+## Independent Headquarters watchdog
+
+`intelligence/watchdog.py` should run as a **separate non-root, founder-supervised process**, not as one of the Headquarters analysis agents. It makes two safe observations:
+
+1. A HEAD request to `127.0.0.1:8765/api/report` must receive the Headquarters viewer's expected authentication challenge. No credentials are transmitted.
+2. The combined collector report must be recent (default within 120 minutes) and explicitly report a complete product discovery scan.
+
+Use a **separate external private state directory**, independent of the Headquarters evidence store:
+
+```bash
+python3 intelligence/watchdog.py --viewer-port 8765 \
+  --collector-report ~/.local/state/yorphives-hq/headquarters-report.json \
+  --state-dir ~/.local/state/yorphives-watchdog \
+  --loop --interval-minutes 5 --max-age-minutes 120
+```
+
+Two consecutive failed observations produce an evidence-backed recommendation. The watchdog writes only to its own private directory and process output; it does **not** restart services, deploy changes, or modify HQ files.
+
+**External alert delivery is not connected.** The watchdog's own process must be supervised and its logs monitored. For resilience against a full-machine outage, install an independent copy on a separate controlled machine in a later phase.
+
 ## Important limitations and next milestones
 
 - The core HTTP scanner does not execute JavaScript. The optional browser adapter reads links rendered by JavaScript but does not click through workflows or prove functionality. An HTTP 200 can still serve a broken tool.
@@ -149,7 +196,7 @@ The example above is a **format example only**: it is not in the default config 
 - The competitor watchlist starts empty. **No live competitor gaps have been validated.**
 - Even the browser adapter cannot discover completely unlinked/unlisted routes. These require an owner-published manifest or explicit inventory feed.
 - No persistent server or scheduler has been installed, and no collector is currently running.
-- The next production phase should add independent Playwright checks on newly discovered routes, hardened private authenticated evidence provenance, private alerts, and periodic result verification.
+- The next production phase should define safe functional tests for individual product types, harden private authenticated evidence provenance, add independent alert delivery, and verify periodic execution on the owner's machine.
 
 ## Files
 
@@ -160,6 +207,11 @@ The example above is a **format example only**: it is not in the default config 
 | `intelligence/research.py` | Public RSS discovery, de-duplication and limited-confidence triage |
 | `intelligence/compare.py` | Allowlisted robots-aware text feature comparison |
 | `intelligence/run_pipeline.py` | Combines periodic observations into one founder-readable JSON report |
+| `intelligence/assurance.py` | Optional read-only Chromium browser checks and confirmation-based findings |
+| `intelligence/watchdog.py` | Independent heartbeat observer for the private viewer and collector evidence |
+| `tests/test_assurance.py` | Confirmation and fair-scheduling tests for browser QA |
+| `tests/test_assurance_browser.py` | Real isolated browser safety/health tests |
+| `tests/test_watchdog.py` | Independent watchdog reliability and permission tests |
 | `intelligence/viewer.py` | Authenticated, loopback-only report viewer with no write endpoints |
 | `tests/test_viewer.py` | Offline tests for viewer permissions, freshness and route restrictions |
 | `intelligence/research_sources.json` | Replaceable data sources and competitor allowlist |
