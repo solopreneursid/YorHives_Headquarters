@@ -128,7 +128,7 @@
             <button class="home-story story-history" type="button" data-nav="activity">
               <span class="story-icon"><svg class="icon"><use href="#i-clock"/></svg></span>
               <span class="story-number" id="home-update-count">—</span>
-              <span class="story-label">New updates</span>
+              <span class="story-label">Updates logged</span>
             </button>
           </div>
 
@@ -200,7 +200,7 @@
 
           <div class="dashboard-columns lower-columns">
             <section class="panel list-panel" aria-labelledby="priority-heading">
-              <div class="panel-heading"><div class="panel-title-wrap"><div><span class="small-eyebrow">WHAT NEEDS A DECISION</span><h2 id="priority-heading">Priority inbox</h2></div></div><button class="subtle-link" data-nav="monitoring">All findings <svg class="icon"><use href="#i-arrow"/></svg></button></div>
+              <div class="panel-heading"><div class="panel-title-wrap"><div><span class="small-eyebrow">WHAT NEEDS A DECISION</span><h2 id="priority-heading">Priority inbox</h2></div></div><button class="subtle-link" data-nav="monitoring">All alerts <svg class="icon"><use href="#i-arrow"/></svg></button></div>
               <div id="priority-list" class="priority-list"></div>
             </section>
             <section class="panel list-panel" aria-labelledby="radar-heading">
@@ -213,44 +213,44 @@
         </section>
 
         <section id="view-monitoring" class="view" aria-labelledby="monitoring-heading" hidden>
-          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> ENGINEERING & ASSURANCE</div><h1 id="monitoring-heading">See issues <em>before they grow.</em></h1><p>Security, reliability, code quality, and dependency intelligence — with a traceable reason behind every recommendation.</p></div><span class="header-emblem"><svg class="icon"><use href="#i-shield"/></svg></span></div>
+          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> KEEPING AN EYE ON THINGS</div><h1 id="monitoring-heading">What needs <em>your attention?</em></h1><p>Potential problems Headquarters noticed. Open any alert to see why it matters and what you can do next.</p></div><span class="header-emblem"><svg class="icon"><use href="#i-shield"/></svg></span></div>
           <div class="inner-insight"><svg class="icon"><use href="#i-lock"/></svg><span>Observation only. No agent can edit code, change configuration, or deploy a fix.</span></div>
-          <div class="filter-bar"><div class="filter-chips" role="group" aria-label="Filter findings"><button class="filter-chip is-selected" data-finding-filter="all">All findings</button><button class="filter-chip" data-finding-filter="security">Security</button><button class="filter-chip" data-finding-filter="dependencies">Dependencies</button><button class="filter-chip" data-finding-filter="reliability">Reliability</button><button class="filter-chip" data-finding-filter="quality">Quality</button></div><span class="filter-detail" id="monitoring-count"></span></div>
+          <div class="filter-bar"><div class="filter-chips" role="group" aria-label="Filter findings"><button class="filter-chip is-selected" data-finding-filter="all">All findings</button><button class="filter-chip" data-finding-filter="security">Security</button><button class="filter-chip" data-finding-filter="dependencies">App packages</button><button class="filter-chip" data-finding-filter="reliability">Reliability</button><button class="filter-chip" data-finding-filter="quality">Quality</button></div><span class="filter-detail" id="monitoring-count"></span></div>
           <div class="records-panel"><div class="records-head"><span>OBSERVATION</span><span>PRIORITY</span><span>SYSTEM</span><span>REVIEW</span></div><div id="findings-list"></div></div>
           <section class="panel security-watch-panel" aria-labelledby="security-watch-heading">
-            <div class="panel-heading"><div><span class="small-eyebrow">PUBLIC SECURITY INTELLIGENCE · FREE SOURCES</span>
-              <h2 id="security-watch-heading">Security advisories to review</h2></div><span class="outline-pill">SOURCE-BASED</span></div>
-            <p class="intel-caption">Public npm advisories are not proof of a vulnerability in YorpHives. Relevance and affected versions require a verified dependency inventory.</p>
+            <div class="panel-heading"><div><span class="small-eyebrow">PUBLIC ADVISORIES</span>
+              <h2 id="security-watch-heading">Security news to check</h2></div><span class="outline-pill">SOURCE-BASED</span></div>
+            <p class="intel-caption">These are public warnings about software packages. They do not mean YorpHives is affected.</p>
             <div id="security-watch-list" aria-live="polite"></div>
           </section>
         </section>
 
         <section id="view-opportunities" class="view" aria-labelledby="opportunities-heading" hidden>
-          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> RESEARCH, PRODUCT & REVENUE</div><h1 id="opportunities-heading">Find the <em>next advantage.</em></h1><p>New products, underserved problems, partnerships, open-source building blocks, and pathways to sustainable revenue.</p></div><span class="header-emblem mint"><svg class="icon"><use href="#i-radar"/></svg></span></div>
+          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> NEW POSSIBILITIES</div><h1 id="opportunities-heading">Ideas worth <em>exploring.</em></h1><p>Discover useful things to build or improve. Each idea needs more research before it's worth your time.</p></div><span class="header-emblem mint"><svg class="icon"><use href="#i-radar"/></svg></span></div>
           <div class="inner-insight"><svg class="icon"><use href="#i-info"/></svg><span>Ideas are leads, not guaranteed income. Verify demand, licensing, cost, and sources before investing.</span></div>
-          <div class="filter-bar"><div class="filter-chips" role="group" aria-label="Filter opportunities"><button class="filter-chip is-selected" data-opportunity-filter="all">All leads</button><button class="filter-chip" data-opportunity-filter="product">Products</button><button class="filter-chip" data-opportunity-filter="revenue">Revenue</button><button class="filter-chip" data-opportunity-filter="technology">Technology</button></div><span class="filter-detail" id="opportunity-count"></span></div>
+          <div class="filter-bar"><div class="filter-chips" role="group" aria-label="Filter opportunities"><button class="filter-chip is-selected" data-opportunity-filter="all">All ideas</button><button class="filter-chip" data-opportunity-filter="product">Products</button><button class="filter-chip" data-opportunity-filter="revenue">Revenue</button><button class="filter-chip" data-opportunity-filter="technology">Technology</button></div><span class="filter-detail" id="opportunity-count"></span></div>
           <div id="opportunities-grid" class="opportunities-grid"></div>
         </section>
 
 
         <section id="view-products" class="view" aria-labelledby="products-heading" hidden>
           <div class="page-heading">
-            <div><div class="eyebrow"><span class="eyebrow-line"></span> CONTINUOUS PRODUCT INTELLIGENCE</div>
-              <h1 id="products-heading">Know what's new.<br><em>Never miss a tool.</em></h1>
-              <p>Automatically discover published YorpHives tools, notice meaningful changes, check availability, and investigate competitive feature gaps — all without editing your projects.</p>
+            <div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR TOOL COLLECTION</div>
+              <h1 id="products-heading">Your tools,<br><em>all in one place.</em></h1>
+              <p>See which tools Headquarters knows about, which ones changed, and what may need attention. Missing entries mean discovery needs checking.</p>
             </div><span class="header-emblem mint"><svg class="icon"><use href="#i-layers"/></svg></span>
           </div>
           <div class="inner-insight"><svg class="icon"><use href="#i-lock"/></svg><span>Read-only by design. A tool's HTTP response and visible controls are observations, not proof that all features work. Research leads require independent validation.</span></div>
           <div class="discovery-strip">
             <div class="discovery-live-icon"><svg class="icon"><use href="#i-radar"/></svg></div>
-            <div class="discovery-strip-copy"><span class="small-eyebrow">AUTO-DISCOVERY ENGINE</span><strong id="discovery-status">Preview — not connected</strong><small id="discovery-explainer">Automatic enrollment starts when a read-only scanner is installed and scheduled on your own server.</small></div>
-            <div class="discovery-actions"><button class="button button-secondary" id="product-refresh-trigger"><svg class="icon"><use href="#i-refresh"/></svg> Refresh local evidence</button><button class="button button-secondary" id="product-import-trigger"><svg class="icon"><use href="#i-upload"/></svg> Import report</button></div>
+            <div class="discovery-strip-copy"><span class="small-eyebrow">AUTOMATIC TOOL WATCH</span><strong id="discovery-status">Preview — not connected</strong><small id="discovery-explainer">Automatic enrollment starts when a read-only scanner is installed and scheduled on your own server.</small></div>
+            <div class="discovery-actions"><button class="button button-secondary" id="product-refresh-trigger"><svg class="icon"><use href="#i-refresh"/></svg> Refresh updates</button><button class="button button-secondary" id="product-import-trigger"><svg class="icon"><use href="#i-upload"/></svg> Open report</button></div>
           </div>
           <div class="product-stat-grid">
-            <article class="product-stat"><span>Discovered products</span><strong id="product-total">0</strong><small>Website tools & applications</small></article>
+            <article class="product-stat"><span>Tools listed</span><strong id="product-total">0</strong><small>Website tools & applications</small></article>
             <article class="product-stat"><span>Recently added</span><strong id="product-new">0</strong><small>Automatically enrolled</small></article>
-            <article class="product-stat"><span>Change observations</span><strong id="product-changes-total">0</strong><small>Requires review, not auto-fix</small></article>
-            <article class="product-stat"><span>Feature comparisons</span><strong id="product-comparisons-total">0</strong><small>Evidence-based hypotheses</small></article>
+            <article class="product-stat"><span>Changes noticed</span><strong id="product-changes-total">0</strong><small>Requires review, not auto-fix</small></article>
+            <article class="product-stat"><span>Feature ideas</span><strong id="product-comparisons-total">0</strong><small>Evidence-based hypotheses</small></article>
             <article class="product-stat"><span>Observation mode</span><strong id="product-qa-total">—</strong><small id="product-qa-caption">Evidence source not connected</small></article>
           </div>
           <div class="product-intel-grid">
@@ -279,19 +279,19 @@
         </section>
 
         <section id="view-workforce" class="view" aria-labelledby="workforce-heading" hidden>
-          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> THE PEOPLELESS COMPANY, WITH ACCOUNTABILITY</div><h1 id="workforce-heading">Meet your <em>AI departments.</em></h1><p>Six focused areas of responsibility, designed to monitor, investigate, learn, and bring the founder actionable proposals.</p></div><span class="header-emblem blue"><svg class="icon"><use href="#i-bots"/></svg></span></div>
+          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> MEET YOUR HELPERS</div><h1 id="workforce-heading">Your <em>AI team.</em></h1><p>See each department's job and whether it has actually connected. A listed role isn't proof an AI agent is running.</p></div><span class="header-emblem blue"><svg class="icon"><use href="#i-bots"/></svg></span></div>
           <div class="inner-insight"><svg class="icon"><use href="#i-info"/></svg><span>These are example roles, not evidence that agents are running. Actual execution state requires signed or auditable telemetry.</span></div>
           <div id="workforce-grid" class="workforce-grid"></div>
         </section>
 
         <section id="view-activity" class="view" aria-labelledby="activity-heading" hidden>
-          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> TRACEABLE INTELLIGENCE</div><h1 id="activity-heading">Every signal. <em>Every source.</em></h1><p>A readable trail of observations, research, and decisions. No invisible claims of work performed.</p></div><span class="header-emblem"><svg class="icon"><use href="#i-clock"/></svg></span></div>
+          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR ACTIVITY HISTORY</div><h1 id="activity-heading">Everything HQ <em>noticed.</em></h1><p>A simple history of observations, with dates and sources when available.</p></div><span class="header-emblem"><svg class="icon"><use href="#i-clock"/></svg></span></div>
           <div class="inner-insight"><svg class="icon"><use href="#i-shield"/></svg><span>Evidence links are displayed only when included in an imported report. An absence of entries does not prove all systems are healthy.</span></div>
           <div id="activity-list" class="activity-panel"></div>
         </section>
 
         <section id="view-governance" class="view" aria-labelledby="governance-heading" hidden>
-          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> TRUST & CONTROL</div><h1 id="governance-heading">Powerful insight.<br><em>Human authority.</em></h1><p>Headquarters exists to make better decisions possible — not to take control of your business away from you.</p></div><span class="header-emblem mint"><svg class="icon"><use href="#i-lock"/></svg></span></div>
+          <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> ONLY YOU DECIDE</div><h1 id="governance-heading">You're always<br><em>in charge.</em></h1><p>Headquarters watches and suggests. You approve every real change.</p></div><span class="header-emblem mint"><svg class="icon"><use href="#i-lock"/></svg></span></div>
           <div class="governance-hero"><div class="governance-stamp"><svg class="icon"><use href="#i-shield"/></svg></div><div><span class="small-eyebrow">PERMANENT BOUNDARY</span><h2>Read-only intelligence. Founder-executed change.</h2><p>HQ workers may monitor, research, analyze, test in isolated read-only contexts, and recommend. They must not hold credentials that allow source edits, production changes, infrastructure mutation, or deployment.</p></div></div>
           <div class="rules-grid">
             <article class="rule-card"><span class="rule-number">01 / PERMISSION</span><svg class="icon"><use href="#i-eye"/></svg><h3>Observe, don't modify</h3><p>Read-only credentials, narrowly scoped APIs, and separate service identities for each agent.</p></article>
@@ -327,11 +327,11 @@
   <dialog id="help-dialog" class="detail-dialog" aria-labelledby="help-title">
     <div class="dialog-top"><span class="small-eyebrow">GETTING STARTED</span><button class="icon-button" id="help-close" aria-label="Close help"><svg class="icon"><use href="#i-close"/></svg></button></div>
     <h2 id="help-title">Your AI office, explained.</h2>
-    <p class="dialog-description">This first version is an interactive, local-first command center. It comes with example records so you can inspect the design without pretending that any checks have run.</p>
+    <p class="dialog-description">Headquarters brings monitoring updates and research ideas together. Anything marked EXAMPLE is just sample content—not a real observation.</p>
     <div class="help-step"><span>01</span><div><strong>Observe</strong><p>Detectors and specialist agents gather read-only evidence about your systems and market.</p></div></div>
     <div class="help-step"><span>02</span><div><strong>Understand</strong><p>Findings and opportunities are organized by priority, affected asset, and supporting source.</p></div></div>
     <div class="help-step"><span>03</span><div><strong>Decide</strong><p>You review recommendations and make changes outside Headquarters using founder-owned credentials.</p></div></div>
-    <p class="helper-note">To try your data, use <strong>Import intelligence report</strong> and select a local JSON file following the schema in the repository README. File contents remain in the browser; nothing is uploaded by this interface.</p>
+    <p class="helper-note">You can open a JSON report to explore its records locally. Reports marked Cloudflare were collected by the private scheduled monitoring service.</p>
     <div class="dialog-footer"><button class="button button-primary" id="help-done">Got it</button></div>
   </dialog>
   <dialog id="search-dialog" class="search-dialog" aria-label="Search headquarters">
