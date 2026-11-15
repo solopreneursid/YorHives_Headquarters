@@ -62,7 +62,8 @@ def run_engine(browser_type,base):
                 assert page.locator("#sidebar").is_visible()
                 assert page.locator(".sidebar-signout").is_visible()
                 page.locator("#sidebar-scrim").click()
-                assert not page.locator("#sidebar").is_visible()
+                assert not page.evaluate("document.body.classList.contains('nav-open')")
+                assert page.locator("#sidebar-scrim").is_hidden()
 
     page.set_viewport_size({"width":390,"height":844})
     page.locator("#home-full-report > summary").click()
