@@ -896,3 +896,15 @@ body.session-ending::after {
   .mode-chip {max-width:162px;min-width:0;}
   .mode-chip #mode-label {display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 }
+
+
+/* Narrow landscape phones: reserve enough header space for the actual logout
+   hit target and constrain the report chip rather than widening the page. */
+@media (min-width:641px) and (max-width:700px) {
+  .topbar {padding-left:10px;padding-right:10px;column-gap:4px;}
+  .topbar-left,.topbar-right {gap:5px;}
+  .topbar .breadcrumb-current {max-width:98px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .topbar .mode-chip {max-width:105px;padding:6px 7px;}
+  .topbar .quick-search,.topbar-signout {min-width:44px;width:44px;flex:0 0 44px;}
+  .home-feed-filters {width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;}
+}
