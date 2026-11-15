@@ -10,6 +10,9 @@ const ORIGIN_SET = new Set(["https://yorphives.com", "https://www.yorphives.com"
 const PATH_ROOTS = ["/tools/", "/tool/", "/free-tools/", "/apps/", "/app/", "/explore/", "/products/"];
 const HUBS = ["/", "/free-tools", "/tools", "/explore"];
 const RESEARCH = "https://hnrss.org/show";
+const RESEARCH_SOURCES = [RESEARCH, "https://hnrss.org/ask"];
+// Strictly allowlisted, public, anonymous, GET-only; not an applicability assessment.
+const ADVISORY_SOURCE = "https://api.github.com/advisories?type=reviewed&ecosystem=npm&per_page=5";
 const MAX_ROUTES_PER_DISCOVERY = 45;
 const MAX_CHECKS_PER_HOUR = 4;
 const FETCH_BUDGET_DAY = 900; // intentionally far below platform ceilings
@@ -61,11 +64,14 @@ async function boundedText(response, max = MAX_TEXT_BYTES) {
   for (const part of chunks) { bytes.set(part,index); index+=part.byteLength; }
   return new TextDecoder().decode(bytes);
 }
-async function limitedFetch(url, {allowResearch = false, body = false} = {}) {
+async function limitedFetch(url, {allowResearch = false, allowSecurity = false, body = false} = {}) {
   const parsed = new URL(url);
-  if (allowResearch ? url !== RESEARCH : !ORIGIN_SET.has(parsed.origin)) throw Error("target-not-allowlisted");
+  const allowed = allowSecurity ? url === ADVISORY_SOURCE :
+    allowResearch ? RESEARCH_SOURCES.includes(url) : ORIGIN_SET.has(parsed.origin);
+  if (!allowed) throw Error("target-not-allowlisted");
   const response = await fetch(url, {method:"GET", redirect:"manual", cache:"no-store",
-    headers: {"user-agent":"YorpHivesHQ-ReadOnly/1.0 (+founder owned research)"}});
+    headers: {"user-agent":"YorpHivesHQ-ReadOnly/1.0 (+founder owned research)",
+      "accept":allowSecurity?"application/vnd.github+json":"text/html, application/xml, application/rss+xml, application/json;q=0.9"}});
   const status=response.status;
   if (!body) { await response.body?.cancel(); return {status, text:null}; }
   if (status !== 200) { await response.body?.cancel(); return {status, text:null}; }
@@ -131,6 +137,45 @@ function feedLeads(xml) {
   }
   return found;
 }
+// Only compares words in titles to the observed catalog; does NOT establish feature parity.
+function classifyLead(title, catalog) {
+  const tokenize = value => new Set(String(value||"").toLowerCase()
+    .replace(/^(show|ask) hn\s*:\s*/,"")
+    .split(/[^a-z0-9]+/).filter(word => word.length >= 3 &&
+    !["the","for","and","with","from","that","this","using","best","new","free","open","source","app","tool","build","built"].includes(word)));
+  const requested=tokenize(title);
+  let best=null,score=0;
+  for(const product of catalog){
+    const known=tokenize(product.name);
+    if(!known.size || !requested.size) continue;
+    const matched=[...known].filter(x=>requested.has(x)).length;
+    const similarity=matched/known.size;
+    if(matched>=2 && similarity>score){best=product;score=similarity;}
+  }
+  if(best && score >= .6) return {kind:"possible-existing-product",related:best.name,
+    recommendation:"Review the public evidence for "+best.name+" before assessing feature differences; no feature gap is verified."};
+  return {kind:"potential-missing-product",related:null,
+    recommendation:"Validate user need, competing products, search demand and differentiation before proposing a new tool."};
+}
+function parseAdvisories(text) {
+  let parsed; try { parsed=JSON.parse(text); }catch{return [];}
+  if(!Array.isArray(parsed)) return [];
+  const output=[];
+  for(const row of parsed.slice(0,6)){
+    const ghsa=String(row?.ghsa_id||"");
+    if(!/^GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$/i.test(ghsa) || row?.withdrawn_at) continue;
+    const severity=String(row?.severity||"").toLowerCase();
+    if(!["critical","high"].includes(severity)) continue;
+    const affected=(Array.isArray(row?.vulnerabilities)?row.vulnerabilities:[])
+      .map(x=>({ecosystem:clampText(x?.package?.ecosystem,25),name:clampText(x?.package?.name,120)}))
+      .filter(x=>x.ecosystem==="npm" && x.name).slice(0,4);
+    if(!affected.length) continue;
+    output.push({id:ghsa, title:clampText(row?.summary,170),severity,
+      publishedAt:clampText(row?.published_at,35),packages:affected,
+      url:"https://github.com/advisories/"+ghsa});
+  }
+  return output;
+}
 async function saveStatus(env,key,value) {
   await env.DB.prepare("INSERT INTO status(key,value,checked_at) VALUES(?,?,?) "+
   "ON CONFLICT(key) DO UPDATE SET value=excluded.value,checked_at=excluded.checked_at")
@@ -140,7 +185,7 @@ async function addFinding(env,{key,category,priority,asset,title,description,evi
   const id=fnv(key);
   await env.DB.prepare(
     "INSERT INTO findings(id,category,priority,asset,title,description,recommendation,evidence,observed_at) " +
-    "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET description=excluded.description,observed_at=excluded.observed_at"
+    "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET description=excluded.description,observed_at=excluded.observed_at,status=\'open\'"
   ).bind(id,category,priority,asset,clampText(title,220),clampText(description,450),
     basicRecommendation(category),evidence,nowIso()).run();
 }
@@ -226,30 +271,59 @@ async function checkProducts(env) {
   return (list.results||[]).length;
 }
 async function research(env) {
-  try{
-    const response=await getPublic(env,RESEARCH,{body:true,allowResearch:true});
-    if(response.status!==200 || response.text===null) {
-      await saveStatus(env,"research","unavailable"); return 0;
-    }
-    const leads=feedLeads(response.text);
-    let created=0;
-    for(const item of leads){
-      const result=await env.DB.prepare(
-        "INSERT OR IGNORE INTO opportunities(id,title,description,recommendation,source_url,observed_at,score,kind) "+
-        "VALUES(?,?,?,?,?,?,?,'unvalidated-lead')"
-      ).bind(fnv(item.link),item.title,"Public product mention; user demand and traffic are unverified.",
-        basicRecommendation("product"),item.link,nowIso(),15).run();
-      created += Number(result.meta?.changes||0);
-    }
-    await saveStatus(env,"research","sources:1:leads:"+leads.length+":new:"+created);
-    return created;
-  }catch{await saveStatus(env,"research","unavailable");return 0;}
+  const catalog=await env.DB.prepare("SELECT url,name FROM assets WHERE kind='tool' LIMIT 150").all();
+  const products=catalog.results||[];
+  let created=0, successful=0;
+  for(const feed of RESEARCH_SOURCES) {
+    try {
+      const response=await getPublic(env,feed,{body:true,allowResearch:true});
+      if(response.status!==200 || response.text===null) continue;
+      successful++;
+      const leads=feedLeads(response.text);
+      for(const item of leads){
+        const classification=classifyLead(item.title,products);
+        const result=await env.DB.prepare(
+          "INSERT OR IGNORE INTO opportunities(id,title,description,recommendation,source_url,observed_at,score,kind) "+
+          "VALUES(?,?,?,?,?,?,?,?)"
+        ).bind(fnv(item.link),item.title,
+          "Public "+(feed.endsWith("/ask")?"problem discussion":"product mention")+
+          "; audience demand, traffic, features and revenue remain unverified.",
+          classification.recommendation,item.link,nowIso(),15,classification.kind).run();
+        created+=Number(result.meta?.changes||0);
+      }
+    } catch { /* Each source is optional; always expose partial research status. */ }
+  }
+  await saveStatus(env,"research",successful?"sources:"+successful+"/"+RESEARCH_SOURCES.length+
+    ":new:"+created:"unavailable:no-public-feeds");
+  return created;
+}
+async function securityWatch(env) {
+  let response;
+  try { response=await getPublic(env,ADVISORY_SOURCE,{body:true,allowSecurity:true}); }
+  catch { await saveStatus(env,"security_watch","unavailable"); return 0; }
+  if(response.status!==200 || response.text===null) {
+    await saveStatus(env,"security_watch","unavailable:http-"+response.status);
+    return 0;
+  }
+  const items=parseAdvisories(response.text);
+  for(const item of items) {
+    await env.DB.prepare(
+      "INSERT INTO security_watch(id,title,severity,packages,source_url,published_at,observed_at,applicability)"+
+      " VALUES(?,?,?,?,?,?,?,'unverified')"+
+      " ON CONFLICT(id) DO UPDATE SET title=excluded.title,severity=excluded.severity,"+
+      "packages=excluded.packages,observed_at=excluded.observed_at"
+    ).bind(item.id,item.title,item.severity,JSON.stringify(item.packages),
+      item.url,item.publishedAt,nowIso()).run();
+  }
+  await saveStatus(env,"security_watch","observed:"+items.length+
+    ":applicability-unverified");
+  return items.length;
 }
 function schedulePlan(scheduledTime){
   const time=new Date(scheduledTime);
   const minute=time.getUTCMinutes(),hour=time.getUTCHours();
   return {uptime:true,products:minute===0,discovery:minute===0 && hour%6===0,
-    research:minute===0 && hour===3, retention:minute===0 && hour===3};
+    research:minute===0 && hour===3, security:minute===0 && hour===4, retention:minute===0 && hour===3};
 }
 async function scheduledCycle(env, scheduledTime) {
   if(!env.DB) throw Error("Missing D1 binding");
@@ -258,12 +332,21 @@ async function scheduledCycle(env, scheduledTime) {
   // no paid API, AI binding, browser use, writable GitHub credential or deployment tool.
   await checkSite(env);
   if(plan.products) await checkProducts(env);
-  if(plan.discovery) await discoverTools(env);
-  if(plan.research) await research(env);
+  // On a newly initialized HQ database, discover/research immediately rather
+  // than waiting up to six hours or one day for the first scheduled window.
+  const first = await env.DB.prepare(
+    "SELECT key FROM status WHERE key IN ('discovery','research','security_watch')"
+  ).all();
+  const observed=new Set((first.results||[]).map(x=>x.key));
+  if(plan.discovery || !observed.has("discovery")) await discoverTools(env);
+  if(plan.research || !observed.has("research")) await research(env);
+  if(plan.security || !observed.has("security_watch")) await securityWatch(env);
   if(plan.retention) {
     await env.DB.prepare("DELETE FROM quota WHERE day < ?").bind(nowIso().slice(0,10)).run();
     await env.DB.prepare("DELETE FROM opportunities WHERE observed_at < ?")
       .bind(new Date(Date.now()-90*86400000).toISOString()).run();
+    await env.DB.prepare("DELETE FROM security_watch WHERE observed_at < ?")
+      .bind(new Date(Date.now()-120*86400000).toISOString()).run();
   }
   await saveStatus(env,"last_cron","cycle:"+nowIso());
 }
@@ -303,12 +386,13 @@ async function verifyAccess(request,env) {
   }catch{return false;}
 }
 async function report(env) {
-  const [assets,findings,leads,quota,status]=await Promise.all([
+  const [assets,findings,leads,quota,status,security]=await Promise.all([
     env.DB.prepare("SELECT * FROM assets ORDER BY kind ASC,name ASC LIMIT 150").all(),
     env.DB.prepare("SELECT * FROM findings WHERE status='open' ORDER BY observed_at DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM opportunities ORDER BY observed_at DESC LIMIT 50").all(),
     env.DB.prepare("SELECT kind,used FROM quota WHERE day=?").bind(nowIso().slice(0,10)).all(),
-    env.DB.prepare("SELECT key,value,checked_at FROM status ORDER BY checked_at DESC LIMIT 30").all()
+    env.DB.prepare("SELECT key,value,checked_at FROM status ORDER BY checked_at DESC LIMIT 30").all(),
+    env.DB.prepare("SELECT * FROM security_watch ORDER BY observed_at DESC LIMIT 15").all()
   ]);
   const a=assets.results||[],f=findings.results||[],o=leads.results||[],metadata=status.results||[];
   const last=metadata.find(x=>x.key==="last_cron");
@@ -335,6 +419,9 @@ async function report(env) {
     opportunities:o.map(x=>({id:x.id,title:x.title,category:"product",priority:"medium",
       description:x.description,recommendation:x.recommendation,observedAt:x.observed_at,evidence:[x.source_url],
       confidence:"Public mention only; not validated market demand",score:x.score})),
+    securityWatch:(security.results||[]).map(x=>({id:x.id,title:x.title,severity:x.severity,
+      packages:JSON.parse(x.packages||"[]"),source:x.source_url,observedAt:x.observed_at,
+      applicability:"Not evaluated against YorpHives dependencies"})),
     comparisons:[],agents:[],
     activity:metadata.slice(0,25).map(x=>({id:x.key,title:x.key.replaceAll("_"," "),
       summary:x.value,kind:"observation",occurredAt:x.checked_at})),
@@ -344,6 +431,8 @@ async function report(env) {
       products:{complete:Boolean(discovery?.value.startsWith("observed:")),method:"cloudflare-scheduled-http",
         discovered:tools.length,notes:[]},
       research:{status:metadata.find(x=>x.key==="research")?.value||"not-yet-observed"},
+      security:{status:metadata.find(x=>x.key==="security_watch")?.value||"not-yet-observed",
+        limitation:"Public npm advisories; applicability to YorpHives is not established"},
       errors:fresh?[]:["Collector heartbeat stale or absent"]}
   };
 }
@@ -385,4 +474,4 @@ export default {
     }));
   }
 };
-export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,schedulePlan,verifyAccess,report};
+export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,schedulePlan,verifyAccess,report};
