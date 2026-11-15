@@ -51,7 +51,9 @@
     findingFilter: "all",
     opportunityFilter: "all",
     selectedDetail: null,
-    feedFilter: "all"
+    feedFilter: "all",
+    browserAlertsOn: false,
+    seenFindingIds: new Set()
   };
 
   const $ = (id) => document.getElementById(id);
@@ -782,8 +784,31 @@
     return normal;
   }
 
+  function notifyNewHighPriority(previous, normal, origin) {
+    if(!state.browserAlertsOn || origin!=="cloudflare" || previous!=="cloudflare") return;
+    for(const finding of normal.findings){
+      if(!["high"].includes(finding.priority) || state.seenFindingIds.has(finding.id)) continue;
+      state.seenFindingIds.add(finding.id);
+      if(document.visibilityState!=="hidden" ||
+         typeof Notification==="undefined" || Notification.permission!=="granted")continue;
+      try {
+        new Notification("YorpHives Headquarters: new alert",{
+          body:"Open your private Headquarters to review new evidence.",
+          tag:"yorphives-hq-new-alert",silent:true
+        });
+      }catch{ /* Unsupported mobile browsers simply use the in-app Alerts feed. */ }
+    }
+  }
+  function refreshBrowserAlertButton(){
+    const button=$("browser-alert-toggle");
+    button.textContent=state.browserAlertsOn?"Disable alerts":"Enable alerts";
+    button.setAttribute("aria-pressed",String(state.browserAlertsOn));
+  }
+
   function applyReport(raw, origin) {
     const normal = normalizeData(raw);
+    const previousOrigin=state.origin;
+    notifyNewHighPriority(previousOrigin,normal,origin);
     state.data = normal;
     state.origin = origin;
     state.findingFilter = "all";
@@ -877,6 +902,30 @@
   }
 
   function initialize() {
+    $("browser-alert-toggle").addEventListener("click",async()=>{
+      if(state.browserAlertsOn){
+        state.browserAlertsOn=false;
+        refreshBrowserAlertButton();
+        showToast("Browser alerts are off. The private Alerts feed still works.");
+        return;
+      }
+      if(typeof Notification==="undefined" || !window.isSecureContext){
+        showToast("This browser does not support private tab alerts here.");
+        return;
+      }
+      try{
+        const permission=await Notification.requestPermission();
+        if(permission!=="granted"){
+          showToast("Notification permission not enabled. All alerts remain inside Headquarters.");
+          return;
+        }
+        state.browserAlertsOn=true;
+        // Existing findings are NOT a new incident and must not notify.
+        state.seenFindingIds=new Set(state.data.findings.map(x=>x.id));
+        refreshBrowserAlertButton();
+        showToast("Alerts enabled for new high-priority findings while this tab stays open.");
+      }catch{showToast("Browser alerts are unavailable on this device.");}
+    });
     document.querySelectorAll("[data-nav]").forEach(button => button.addEventListener("click", () => showView(button.dataset.nav)));
     window.addEventListener("hashchange", () => showView(location.hash.replace("#", "")));
     document.querySelectorAll("[data-feed-filter]").forEach(chip=>chip.addEventListener("click",()=>{
