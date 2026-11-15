@@ -68,4 +68,5 @@ jobs:
         run: |
           python3 tests/hq_six_page_browser.py
           python3 tests/hq_home_browser.py
+          python3 tests/hq_discover_browser.py
           python3 tests/test_assurance_browser.py
