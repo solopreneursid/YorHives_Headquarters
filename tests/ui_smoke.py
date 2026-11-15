@@ -133,6 +133,9 @@ def main():
                 mobile_page = mobile.new_page()
                 mobile_page.goto(base + "/", wait_until="networkidle")
                 assert mobile_page.locator(".home-mobile-tabs").is_visible()
+                assert mobile_page.evaluate(
+                    "document.documentElement.scrollWidth <= window.innerWidth + 2"
+                ), "Home page has sideways scrolling on a small screen"
                 mobile_page.locator('.home-mobile-tabs [data-nav="opportunities"]').click()
                 assert mobile_page.locator("#view-opportunities").is_visible(), "Bottom navigation failed"
                 mobile_page.locator('.home-mobile-tabs [data-nav="overview"]').click()
