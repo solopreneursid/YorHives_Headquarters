@@ -13,7 +13,7 @@
 | Opportunity scout | Limited public Show HN / Ask HN RSS read-only GET | External mention; not demand, profit or traffic | Validate opportunity before building |
 | Competitor evidence scout | Two strictly pre-approved official public pages, each sampled daily with robots check | Public advertised claim, never a confirmed YorpHives feature gap | Compare actual functionality yourself |
 | Founder briefing | Deterministic summary from private D1 rows, rendered after founder sign-in | Freshness, checked/total counts, provenance and uncertainty | Choose one supported next step |
-| In-app alert feed | Existing private monitoring findings / history and briefing | Only evidence from the collector | Open Alerts and verify |
+| In-app alert feed + optional browser notifications | Existing private findings, with an explicit browser-permission button for **new high-priority findings while the tab remains open** | Generic privacy-preserving title; no full incident details in OS notification | Open Alerts and verify |
 | Public security watch | Small sample of reviewed npm advisories; applicability unverified | Not actual deployed vulnerability inventory | Review against exact package versions |
 
 A displayed 'AI department' is not proof that an LLM agent is running. These modules are lightweight deterministic watchers and recommendations, not deployed autonomous coding workers.
@@ -65,7 +65,7 @@ The dashboard normalizes each field to small bounded text/numbers and renders vi
 
 ## Not implemented / future owner-controlled work
 
-- **External alerts while the browser is closed:** no Telegram, email, push provider or independent off-Cloudflare watcher installed. The private in-app alerts are available only on viewing Headquarters. An external alert requires a separately approved, independently operated endpoint and secret; it must not gain website-write access.
+- **External alerts while the browser is closed:** no Telegram, email, push provider or independent off-Cloudflare watcher installed. A founder can **opt in** to native browser notifications for new high-priority findings while the authenticated tab remains open; the permission is requested only on click, notifications are generic and no private details are sent to a push provider. This is **not** a 24/7 offline alert. A true external alert requires a separately approved, independently operated endpoint and secret; it must not gain website-write access.
 - **Complete product inventory:** until the website publishes an accurate complete manifest, the discovered routes are a partial list; an unlinked SPA may still be absent.
 - **Verified features or user demand:** public HTTP GETs and competitor page descriptions do not prove interactive functionality, comparative quality, actual website traffic, revenue or customer demand.
 - **Self-hosted private AI employee:** no persistent model server installed; six department labels are organizational, not six running AI models.
