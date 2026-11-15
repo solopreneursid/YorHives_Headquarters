@@ -423,7 +423,9 @@ async function discoverTools(env) {
   let enrolled=0;
   for(const item of [...choices.values()].slice(0,MAX_ROUTES_PER_DISCOVERY)){
     const path=new URL(item.url).pathname.split("/").pop()||"Product";
-    const name=item.name||clampText(decodeURIComponent(path).replace(/[-_]/g," "),90);
+    let readable=path;
+    try{readable=decodeURIComponent(path);}catch{}
+    const name=item.name||clampText(readable.replace(/[-_]/g," "),90);
     const data=await env.DB.prepare(
       "INSERT OR IGNORE INTO assets(url,name,kind,first_seen,last_seen,status,discovery_source,evidence_url,inventory_confidence,features_json)"+
       " VALUES(?,?,'tool',?,?,'unverified',?,?,?,?)"
@@ -587,8 +589,16 @@ async function scheduledCycle(env, scheduledTime) {
   const observed=new Set((first.results||[]).map(x=>x.key));
   // Stagger expensive first-run discovery/research/watch across separate Cron
   // invocations. Never try to run all public collectors in one Free-tier event.
-  if(plan.discovery || !observed.has("discovery")) await discoverTools(env);
-  else if(plan.research || !observed.has("research")) await research(env);
+  // A newly deployed discovery engine gets one immediate scheduled scan,
+  // preserving earlier records instead of waiting six hours or rewriting
+  // website files. Versioned scan state is D1 observation metadata only.
+  const version=await env.DB.prepare(
+    "SELECT value FROM status WHERE key='discovery_engine_version'"
+  ).first();
+  if(plan.discovery || !observed.has("discovery") || version?.value!=="v3") {
+    await discoverTools(env);
+    await saveStatus(env,"discovery_engine_version","v3");
+  }else if(plan.research || !observed.has("research")) await research(env);
   else if(plan.security || !observed.has("security_watch")) await securityWatch(env);
   if(plan.retention) {
     await env.DB.prepare("DELETE FROM quota WHERE day < ?").bind(nowIso().slice(0,10)).run();
@@ -714,7 +724,7 @@ async function report(env) {
       recommendation:x.recommendation,evidence:[x.product_url,x.competing_url],
       observedAt:x.observed_at
     })),agents:[],
-    activity:metadata.filter(x=>x.key!=="site_bundle_fingerprint").slice(0,25).map(x=>({id:x.key,title:x.key.replaceAll("_"," "),
+    activity:metadata.filter(x=>x.key!=="site_bundle_fingerprint" && x.key!=="discovery_engine_version").slice(0,25).map(x=>({id:x.key,title:x.key.replaceAll("_"," "),
       summary:x.value,kind:"observation",occurredAt:x.checked_at})),
     resourceBudget:{publicFetches:{used:quotaUsed.public_fetches||0,limit:FETCH_BUDGET_DAY},
       aiCalls:{used:0,limit:0,disabled:true},browserMinutes:{used:0,limit:0,disabled:true}},
