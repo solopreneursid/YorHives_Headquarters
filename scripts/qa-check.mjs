@@ -30,7 +30,8 @@ if (syntactic.status !== 0) {
   report("dashboard.js", 1, "ERROR", "javascript-syntax", (syntactic.stderr || "JavaScript syntax validation failed").slice(0, 800));
 }
 
-const ids = new Set([...html.matchAll(/\bid\s*=\s*["']([^"']+)["']/g)].map(m => m[1]));
+// Runtime-rendered form controls are declared in trusted dashboard templates.
+const ids = new Set([...html.matchAll(/\bid\s*=\s*["']([^"']+)["']/g), ...js.matchAll(/\bid\s*=\s*["']([^"']+)["']/g)].map(m => m[1]));
 const used = [...js.matchAll(/\$\(\s*["']([^"']+)["']\s*\)/g)];
 for (const match of used) {
   if (!ids.has(match[1])) report("dashboard.js", lineAt(js, match.index), "ERROR", "missing-dom-target", 'JavaScript references absent DOM id "' + match[1] + '"');
