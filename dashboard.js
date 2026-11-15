@@ -262,6 +262,31 @@
     });
   }
 
+  function renderSecurityWatch() {
+    const parent = $("security-watch-list");
+    parent.replaceChildren();
+    const rows=state.data.securityWatch || [];
+    if (!rows.length) {
+      parent.append(emptyState("No verified advisory feed records",
+        "The public advisory watch may not have run yet, or its source was unavailable. This does not prove your dependencies are secure."));
+      return;
+    }
+    rows.forEach(record => {
+      const card=node("article","security-advisory-row");
+      const top=node("div","security-advisory-heading");
+      append(top,node("strong","",record.title),node("span","security-advisory-level",record.severity.toUpperCase()+" · PUBLIC ADVISORY"));
+      const body=node("p","",record.packages.length?"Named packages: "+record.packages.join(", "):"Affected package not established");
+      const caveat=node("small","","Applicability to YorpHives is not verified · "+(cleanDate(record.observedAt)||"Time unavailable"));
+      card.append(top,body,caveat);
+      if(record.source && record.source.startsWith("https://github.com/advisories/")) {
+        const link=node("a","source-link","View official advisory");
+        link.href=record.source;link.target="_blank";link.rel="noopener noreferrer";
+        card.append(link);
+      }
+      parent.append(card);
+    });
+  }
+
   function renderOpportunities() {
     const list = state.data.opportunities.filter(item => state.opportunityFilter === "all" || item.category === state.opportunityFilter);
     const parent = $("opportunities-grid");
@@ -272,12 +297,17 @@
       const card = node("article", "opportunity-card");
       const top = node("div", "opportunity-card-top");
       const category = node("span", "opportunity-category"); append(category, icon(categoryIcons[item.category] || "radar"), node("span", "", label(item.category)));
-      append(top, category, node("span", "outline-pill", state.origin === "preview" ? "EXAMPLE" : state.origin === "local" ? "LOCAL" : "IMPORTED"));
+      append(top, category, node("span", "outline-pill",
+        state.origin === "preview" ? "EXAMPLE" : state.origin === "cloudflare" ? "CLOUDFLARE" :
+        state.origin === "local" ? "LOCAL" : "IMPORTED"));
       const bottom = node("div", "card-bottom");
       const open = node("button", "", "Explore lead"); open.type = "button"; open.append(icon("arrow"));
       open.addEventListener("click", () => showDetail(item, "opportunity"));
       append(bottom, node("small", "", item.confidence), open);
-      append(card, top, node("h3", "", item.title), node("p", "", item.description), bottom);
+      const context = node("div", "lead-context", item.kind === "possible-existing-product" ?
+        "POSSIBLE EXISTING TOOL · CHECK FEATURE PARITY" : item.kind === "potential-missing-product" ?
+        "POSSIBLE NEW TOOL · VALIDATE DEMAND" : "UNVALIDATED RESEARCH LEAD");
+      append(card, top, context, node("h3", "", item.title), node("p", "", item.description), bottom);
       parent.append(card);
     });
   }
@@ -434,6 +464,7 @@
     renderPriorityInbox();
     renderOpportunityPreview();
     renderFindings();
+    renderSecurityWatch();
     renderOpportunities();
     renderProducts();
     renderWorkforce();
@@ -473,7 +504,7 @@
 
   function normalizeData(raw) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("The JSON root must be an object.");
-    const arrays = ["assets", "findings", "opportunities", "products", "changes", "comparisons", "agents", "activity"];
+    const arrays = ["assets", "findings", "opportunities", "products", "changes", "comparisons", "agents", "activity", "securityWatch"];
     for (const key of arrays) if (raw[key] !== undefined && !Array.isArray(raw[key])) throw new Error("'" + key + "' must be an array.");
     const items = (key) => (raw[key] || []).filter(x => x && typeof x === "object" && !Array.isArray(x)).slice(0, 200);
     const evidence = (item) => Array.isArray(item.evidence) ? item.evidence.slice(0, 10).map(safeUrl).filter(Boolean) : [];
@@ -494,8 +525,17 @@
         id: cleanText(o.id, 80) || "opportunity" + i, title: cleanText(o.title, 160) || "Untitled lead",
         category: ["product", "revenue", "technology"].includes(o.category) ? o.category : "product",
         confidence: cleanText(o.confidence, 70) || "Unassessed",
+        kind: ["potential-missing-product", "possible-existing-product"].includes(o.kind) ? o.kind : "unvalidated-lead",
         description: cleanText(o.description, 3000), recommendation: cleanText(o.recommendation, 3000),
         observedAt: cleanText(o.observedAt, 45), evidence: evidence(o)
+      })),
+      securityWatch: items("securityWatch").map((a,i) => ({
+        id: cleanText(a.id,60) || "public-advisory"+i,
+        title: cleanText(a.title,180) || "Public security advisory",
+        severity: ["high","critical"].includes(a.severity) ? a.severity : "unverified",
+        packages: Array.isArray(a.packages) ? a.packages.slice(0,5).map(p => cleanText(p?.name,100)).filter(Boolean) : [],
+        source: safeUrl(a.source), observedAt: cleanText(a.observedAt,45),
+        applicability: "Not verified against YorpHives dependencies"
       })),
       products: items("products").map((p, i) => ({
         id: cleanText(p.id, 80) || "product" + i, name: cleanText(p.name, 160) || "Unnamed product",
