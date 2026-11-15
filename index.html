@@ -160,6 +160,11 @@
             <p class="brief-caveat" id="brief-caveat">No code changes, browser testing or paid AI can be initiated from this briefing.</p>
           </section>
 
+          <section class="founder-briefing decision-workspace" aria-labelledby="decision-heading">
+            <header class="founder-brief-header"><div><span class="home-kicker subtle">YOUR DECISIONS</span><h2 id="decision-heading">Focus on what matters</h2><p id="decision-summary">Connect your private report to track decisions.</p></div><span class="brief-origin" id="decision-limit">Evidence pending</span></header>
+            <div id="decision-queue" class="decision-grid"></div>
+            <details><summary>Decision history</summary><p class="source-note">Accepted, implemented and verified outcomes are recorded separately.</p><div id="decision-history"></div><button type="button" class="button button-secondary" id="decision-export" disabled>Export decision history</button></details>
+          </section>
           <div class="home-layout">
             <div class="home-main-feed">
               <section class="home-feed-section" aria-labelledby="home-feed-heading">
@@ -355,6 +360,29 @@
     <p id="detail-description" class="dialog-description"></p>
     <div class="detail-section"><span class="small-eyebrow">RECOMMENDED NEXT STEP</span><p id="detail-action"></p></div>
     <div class="detail-section"><span class="small-eyebrow">EVIDENCE & PROVENANCE</span><div id="detail-evidence"></div></div>
+    <div class="detail-section"><h3>Evidence assessment</h3><dl id="decision-facts" class="decision-facts"></dl></div>
+    <div class="detail-section decision-editor"><h3 id="decision-state">Needs review</h3><p id="decision-notice" class="source-note"></p>
+      <label for="decision-next">Next state</label><select id="decision-next"></select>
+      <details id="experiment-brief" hidden><summary>Customer experiment (required to accept an opportunity)</summary>
+        <p class="source-note">Define a small test before committing effort. These are your targets, not proven demand.</p>
+        <label for="experiment-audience">Audience</label><input id="experiment-audience" maxlength="400">
+        <label for="experiment-problem">Customer problem</label><input id="experiment-problem" maxlength="400">
+        <label for="experiment-hypothesis">Hypothesis to test</label><input id="experiment-hypothesis" maxlength="400">
+        <label for="experiment-metric">Success metric</label><input id="experiment-metric" maxlength="400">
+        <label for="experiment-target">Target value</label><input id="experiment-target" type="number" min="0.01" step="any">
+        <label for="experiment-effortHours">Maximum effort (hours, up to 40)</label><input id="experiment-effortHours" type="number" min="0.1" max="40" step="any">
+        <label for="experiment-reviewBy">Review date (within 90 days)</label><input id="experiment-reviewBy" type="date">
+        <label for="experiment-stopCondition">When should this experiment stop?</label><input id="experiment-stopCondition" maxlength="400">
+      </details>
+      <label for="decision-note">Your reason (required)</label><textarea id="decision-note" maxlength="800" rows="2"></textarea>
+      <label for="decision-feedback">Feedback for future review</label><select id="decision-feedback"><option value="">No feedback</option><option value="useful">Useful</option><option value="incorrect">Incorrect</option><option value="too-noisy">Too noisy</option><option value="not-priority">Not a priority</option></select>
+      <details><summary>Success condition and outcome</summary><p class="source-note">All three fields are required to record a verified outcome. This is your assessment, not automatic verification.</p>
+      <label for="decision-success">Success condition</label><textarea id="decision-success" maxlength="500" rows="2"></textarea>
+      <label for="decision-outcome">Measured result</label><textarea id="decision-outcome" maxlength="800" rows="2"></textarea>
+      <label for="decision-evidence">Outcome evidence (HTTPS URL)</label><input id="decision-evidence" type="url" maxlength="1000"></details>
+      <p id="decision-error" role="alert"></p><button type="button" class="button button-primary" id="decision-save" disabled>Save decision</button>
+      <details><summary>Previous decisions</summary><ol id="decision-detail-history"></ol></details>
+    </div>
     <div class="dialog-footer"><button class="button button-secondary" id="copy-record"><svg class="icon"><use href="#i-file"/></svg> Copy summary</button><button class="button button-primary" id="dialog-done">Done</button></div>
   </dialog>
   <dialog id="help-dialog" class="detail-dialog" aria-labelledby="help-title">

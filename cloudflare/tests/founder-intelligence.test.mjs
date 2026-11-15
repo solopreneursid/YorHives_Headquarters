@@ -34,7 +34,7 @@ test("briefing prioritizes source-backed incidents and treats stale heartbeat as
   assert.equal(b.nextAction.section,"monitoring");
   assert.equal(b.alerts.highPriority,1);
   assert.equal(b.research.alternatives,1);
-  assert.equal(b.research.verifiedRevenue,0);
+  assert.equal(b.research.verifiedRevenue,null);
 });
 test("robots rules honor public host restrictions and reject unreadable rules",()=>{
   assert.equal(robotsAllowsPath("User-agent: *\nDisallow: /", "/resize"),false);

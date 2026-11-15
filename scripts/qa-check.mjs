@@ -53,7 +53,7 @@ for (const [expr, rule, message] of [
   [/\.innerHTML\s*=/g, "unsafe-html", "Prefer textContent or DOM construction for untrusted findings"],
   [/\beval\s*\(/g, "eval", "Avoid evaluating imported code"],
   [/\bnew\s+Function\s*\(/g, "dynamic-function", "Avoid runtime source compilation"],
-  [/\bfetch\s*\(\s*(?!["\x27]\/api\/report["\x27])/g, "external-network", "Only the authenticated same-origin /api/report endpoint is permitted"]
+  [/\bfetch\s*\(\s*(?!["\x27]\/api\/(?:report|decisions)["\x27])/g, "external-network", "Only authenticated same-origin evidence and founder-decision endpoints are permitted"]
 ]) {
   for (const match of js.matchAll(expr)) report("dashboard.js", lineAt(js, match.index), "WARNING", rule, message);
 }

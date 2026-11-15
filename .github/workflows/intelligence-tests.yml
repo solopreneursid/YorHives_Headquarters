@@ -40,6 +40,7 @@ jobs:
           python3 tests/test_viewer.py
           python3 tests/test_assurance.py
           python3 tests/test_watchdog.py
+          python3 tests/test_private_operations.py
       - name: Parse frontend JS and run deterministic checks
         run: |
           node --check dashboard.js
@@ -66,5 +67,6 @@ jobs:
       - name: Exercise navigation, sample provenance, imports, and XSS checks
         run: |
           python3 tests/ui_smoke.py
+          python3 tests/decision_browser.py
           python3 tests/test_assurance_browser.py
           python3 tests/responsive_crossbrowser.py

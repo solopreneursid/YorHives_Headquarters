@@ -90,15 +90,15 @@ Supported values: asset status = `unknown | healthy | degraded`; finding categor
 
 The import is restricted to a 2 MB file and at most 200 records in each array. Text is rendered with `textContent`; linked evidence URLs are accepted only for `https:` and `http:`; the data is kept in browser memory and is **not** transmitted by the application.
 
-## Recommended next engineering phases
+## Current operating plan
 
-1. **Private access and trusted evidence.** Protect the HQ UI with self-hosted authentication. Set up a read-only, authenticated adapter to a locally controlled append-only evidence store, signed event metadata, trusted timestamps, and scoped collectors.
-2. **Independent operational checks.** Connect self-hosted Uptime Kuma for uptime/TLS, GlitchTip for exceptions, Playwright for synthetic journeys, Trivy for dependencies/secrets/images, and tightly scoped passive vulnerability scanners. Review upstream licenses, maintenance, and minimum resource needs before installation.
-3. **Evidence-first intelligence agents.** Use self-hosted open-weight inference on an event-driven basis to triage verified observations and research product/market/monetization leads. Preserve source URLs, timestamps, confidence, costs, and memory.
-4. **Founder review and feedback.** Add a separate durable review queue, feedback labels, verified outcome tracking, and explicit founder approval. Workers remain strictly **read-only**; the separate founder-owned execution path may apply changes when directed.
-5. **Service health and operational resilience.** Add independent checks of Headquarters itself, backups, restore tests, incident alerts, audit trails, and dependency inventory including the detectors/agents.
-
-An eventual private dashboard API should support records with stable identifiers, evidence links, observation times, source IDs, risk classification, and status. Prefer a versioned JSON contract over framework-specific coupling.
+[HQ operating plan](docs/HQ_OPERATING_PLAN.md) defines the founder briefing,
+evidence assessment, decision lifecycle, focused research and controlled learning.
+The new founder-only journal records decisions and outcomes inside the dedicated HQ
+database. It cannot execute recommendations. Observation endpoints and collectors
+remain read-only; a narrowly scoped authenticated journal endpoint writes only
+founder metadata. Models, external watchdog installation, verified revenue and the
+self-hosting migration remain explicit pending work.
 
 ## Security invariants
 
