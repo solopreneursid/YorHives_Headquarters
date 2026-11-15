@@ -24,7 +24,12 @@ def is_non_overflowing(page):
       okay: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2,
       scroll: document.documentElement.scrollWidth,
       viewport: document.documentElement.clientWidth,
-      body: document.body.scrollWidth
+      body: document.body.scrollWidth,
+      offenders:[...document.querySelectorAll('body *')]
+        .filter(el => {const r=el.getBoundingClientRect();return r.width>0 && r.right>innerWidth+2 &&
+          getComputedStyle(el).display!=='none';})
+        .slice(0,5).map(el => ({tag:el.tagName,id:el.id,cls:String(el.className).slice(0,75),
+          right:Math.round(el.getBoundingClientRect().right)}))
     })""")
 
 def run_engine(browser_type,base):
