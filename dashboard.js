@@ -859,6 +859,27 @@
     $("notice-dismiss").addEventListener("click", () => { $("data-notice").hidden = true; });
     $("detail-close").addEventListener("click", () => $("detail-dialog").close());
     $("dialog-done").addEventListener("click", () => $("detail-dialog").close());
+    // The keyboard hint is a label only; functionality supports both
+    // Control+K and Command+K on all platforms.
+    const shortcut=$("search-shortcut");
+    if(shortcut){
+      const platform=String(navigator.userAgentData?.platform || navigator.platform || "");
+      shortcut.textContent=/Mac|iPad|iPhone/i.test(platform)?"⌘ K":"Ctrl K";
+    }
+    // Logout is a normal top-level navigation to Cloudflare Access's
+    // documented revocation endpoint. No client-side-only pseudo logout.
+    document.querySelectorAll('a[href="/cdn-cgi/access/logout"]').forEach(link=>{
+      link.addEventListener("click",event=>{
+        if(event.defaultPrevented || event.button!==0 || event.metaKey || event.ctrlKey ||
+           event.shiftKey || event.altKey) return;
+        document.body.classList.add("session-ending");
+      });
+    });
+    // Never expose a cached, previously signed-in private dashboard when the
+    // user hits Back from Cloudflare Access logout (BFCache restoration).
+    window.addEventListener("pageshow",event=>{
+      if(event.persisted) window.location.reload();
+    });
     $("search-trigger").addEventListener("click", openSearch);
     $("global-search").addEventListener("input", (event) => renderSearch(event.target.value));
     $("copy-record").addEventListener("click", async () => {
