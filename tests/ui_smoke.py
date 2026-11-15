@@ -48,6 +48,15 @@ def main():
                 page.goto(base + "/", wait_until="networkidle")
                 assert page.locator("#view-overview").is_visible(), "Overview hidden"
                 assert "Preview" in page.locator("#data-notice").inner_text(), "Missing sample-data label"
+                assert page.locator(".home-story").count() == 4, "Expected four quick shortcuts"
+                assert page.locator("#home-feed-list .feed-card").count() >= 3, "Founder feed is missing"
+                assert "Hello, founder" in page.locator("#overview-heading").inner_text()
+                assert not page.locator("#home-full-report").evaluate("(el) => el.open"), "Full report should start collapsed"
+                page.locator('[data-feed-filter="ideas"]').click()
+                assert page.locator("#home-feed-list .feed-card").count() == 3, "Ideas filter broken"
+                page.locator('[data-feed-filter="all"]').click()
+                assert page.locator("#home-feed-list .feed-card").count() >= 3
+
                 page.screenshot(path=str(REPORTS / "headquarters-desktop.png"), full_page=True)
 
                 page.locator('button[data-nav="monitoring"]').first.click()
@@ -100,6 +109,9 @@ def main():
                     "Import never completed: " + page.locator("#toast").inner_text()
                 )
                 assert page.locator("#priority-list .priority-item").count() == 1
+                page.locator("#home-full-report > summary").click()
+                assert page.locator("#home-full-report").evaluate("(el) => el.open")
+
                 assert page.locator("img[src='x']").count() == 0, "Unsafe HTML element created"
                 assert page.evaluate("window.ATTACKED === true") is False
                 page.locator("#priority-list .priority-item").first.click()
@@ -120,6 +132,11 @@ def main():
                 mobile = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True)
                 mobile_page = mobile.new_page()
                 mobile_page.goto(base + "/", wait_until="networkidle")
+                assert mobile_page.locator(".home-mobile-tabs").is_visible()
+                mobile_page.locator('.home-mobile-tabs [data-nav="opportunities"]').click()
+                assert mobile_page.locator("#view-opportunities").is_visible(), "Bottom navigation failed"
+                mobile_page.locator('.home-mobile-tabs [data-nav="overview"]').click()
+                assert mobile_page.locator("#view-overview").is_visible()
                 mobile_page.locator("#mobile-menu").click()
                 assert mobile_page.locator("#sidebar").is_visible()
                 mobile_page.locator('button[data-nav="governance"]').first.click()
