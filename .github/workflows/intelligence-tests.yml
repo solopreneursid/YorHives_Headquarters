@@ -38,6 +38,7 @@ jobs:
         run: |
           python3 tests/test_intelligence.py
           python3 tests/test_viewer.py
+          python3 tests/test_assurance.py
       - name: Parse frontend JS and run deterministic checks
         run: |
           node --check dashboard.js
@@ -62,4 +63,6 @@ jobs:
           python3 -m pip install --user "playwright==1.65.2"
           python3 -m playwright install chromium
       - name: Exercise navigation, sample provenance, imports, and XSS checks
-        run: python3 tests/ui_smoke.py
+        run: |
+          python3 tests/ui_smoke.py
+          python3 tests/test_assurance_browser.py
