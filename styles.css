@@ -863,3 +863,9 @@ body.session-ending::after {
   .mobile-tab.is-active,.nav-item.is-active,.feed-filter.is-selected {outline:2px solid Highlight;}
   .home-site-pill:before,.home-kicker-dot {forced-color-adjust:auto;}
 }
+
+/* Legacy filter scroller used -17px gutters while 320px phones use 12px page gutters.
+   Match actual page padding so the scroller cannot stick 5px offscreen. */
+@media (max-width:360px) {
+  .filter-chips { margin-left:-12px; margin-right:-12px; padding-left:12px; padding-right:12px; }
+}
