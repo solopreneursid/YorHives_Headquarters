@@ -27,6 +27,16 @@ Cloudflare's current Worker Access integration exposes a platform-verified signe
 
 **Verification:** [Cloudflare Free access security regression](https://github.com/solopreneursid/YorHives_Headquarters/actions/runs/43664315615) and [Headquarters regression](https://github.com/solopreneursid/YorHives_Headquarters/actions/runs/43664315624) passed. Unit tests cover founder identity, wrong email, wrong audience, no identity, thrown identity lookups and forged headers. Cloudflare reports one allowed founder address, matching Access audience, the `ACCESS_OWNER_EMAIL` binding and one five-minute Cron. **A successful browser sign-in still requires confirmation from the founder**; no one-time access code or account session was collected.
 
+## Responsive interface and founder sign-out (November 15, 2026)
+
+The private UI uses only local HTML, CSS, and JavaScript and keeps the founder-supplied YorpHives logo. Its social-style Home feed and detailed HQ screens have responsive constraints spanning 320px phones, tablets, laptops, and wide desktops; viewport-fit=cover handles safe-area notches; system fonts, focus indicators, touch targets, reduced motion, and high-contrast preferences are supported.
+
+**Sign out is a real Cloudflare Access logout, not a client-side disguise:** the header and sidebar link to the application's own /cdn-cgi/access/logout URL. Cloudflare documents that this clears the application session cookie and revokes the current Access session **across apps in the same Access team**, with previously issued tokens ceasing acceptance shortly afterward. A Back-Forward Cache restore triggers a reload rather than re-showing private dashboard state. A static file or local development preview is not backed by Cloudflare Access and cannot truly sign out using this link.
+
+The GitHub read-only CI tests 14 responsive widths and seven sections in isolated Chromium, Firefox and WebKit (Safari browser engine). These are representative browser-engine simulations on Linux; **they do not certify every physical device or operating-system combination**, and a founder should still check their own logged-in browser. The sign-out test intercepts the Access logout URL to validate navigation; it does not use the founder's session or revoke real tokens during CI.
+
+The monitoring collectors, evidence schema, backend runtime, login allowlist and access-restricted deployment remain unchanged by this frontend-only improvement.
+
 ## Pilot access
 
 Private URL: https://yorphives-hq-free-pilot.solopreneursid-proy.workers.dev/
