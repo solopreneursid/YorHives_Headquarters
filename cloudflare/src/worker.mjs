@@ -959,6 +959,20 @@ async function saveDecision(request,env) {
   return json({saved:true,revision:input.revision+1,state:input.state,executionTriggered:false},201);
 }
 
+// Report proves authenticated API+D1 response, not external network uptime.
+function headquartersHealth(metadata,at=nowIso()) {
+  const cron=metadata.find(x=>x.key==="last_cron");
+  const age=Date.parse(at)-Date.parse(cron?.checked_at||"");
+  const valid=Number.isFinite(age)&&age>=0;
+  const fresh=valid&&age<20*60*1000;
+  return {
+    status:!valid?"unknown":fresh?"responding":"delayed",
+    api:"responding",database:"responding",collector:!valid?"unknown":fresh?"current":"stale",
+    lastCollectorCheck:cron?.checked_at||null,checkedAt:at,staleAfterMinutes:20,
+    independentCheck:"external-access-gate-only",
+    note:"Authenticated report verifies API and database; scheduled heartbeat is not independent uptime."
+  };
+}
 async function report(env) {
   const [assets,findings,leads,quota,status,security,hypotheses]=await Promise.all([
     env.DB.prepare("SELECT * FROM assets ORDER BY kind ASC,name ASC LIMIT 150").all(),
@@ -985,6 +999,7 @@ async function report(env) {
   return {
     decisionJournal:journal, operating:operatingBrief(f,o,journal,now),
     schemaVersion:"yorphives.hq-intelligence.v1", generatedAt:now,
+    hqHealth:headquartersHealth(metadata,now),
     briefing:makeFounderBriefing(a,f,o,hypotheses.results||[],metadata,quotaUsed.public_fetches||0,now),
     verification:{method:"cloudflare-worker-readonly-http",complete:discoveryComplete,
       limitations:"Public GET evidence only. A complete catalog requires an explicit owner manifest; page changes and functionality need independent verification.",
@@ -1085,4 +1100,4 @@ export default {
     }));
   }
 };
-export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report,decisionTransition,evidenceContract,operatingBrief,saveDecision,validateExperiment};
+export {headquartersHealth,safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report,decisionTransition,evidenceContract,operatingBrief,saveDecision,validateExperiment};

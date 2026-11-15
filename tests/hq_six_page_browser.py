@@ -32,6 +32,7 @@ def report():
                    "threads":[]},
       "decisionJournal":{"available":True,"events":[]},
       "resourceBudget":{"publicFetches":{"used":8,"limit":900}},
+      "hqHealth":{"status":"responding","api":"responding","database":"responding","collector":"current","lastCollectorCheck":"2026-11-15T11:59:00Z","staleAfterMinutes":20,"independentCheck":"external-access-gate-only"},
       "verification":{"complete":False}
     }
 
@@ -71,6 +72,7 @@ with sync_playwright() as pw:
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth+2"),(engine.name,width,slug,"overflow")
       page.evaluate("location.hash='home'")
       page.wait_for_timeout(25)
+      assert page.locator(".stat").filter(has_text="Headquarters").filter(has_text="Responding").count()==1
       assert page.locator(".pulse-row").count()==20
       page.evaluate("location.hash='discover'")
       page.wait_for_timeout(25)
@@ -103,6 +105,9 @@ with sync_playwright() as pw:
       assert page.locator('.record-row[data-detail="product"]').count()==1
       page.evaluate("location.hash='control'")
       page.wait_for_timeout(25)
+      assert page.locator(".system-card").filter(has_text="HQ API").filter(has_text="Responding").count()==1
+      assert page.locator(".system-card").filter(has_text="HQ database").filter(has_text="Responding").count()==1
+      assert page.locator(".system-card").filter(has_text="HQ scheduler").filter(has_text="Current").count()==1
       page.locator("#compact-toggle").check()
       assert page.locator("body").evaluate("(e)=>e.classList.contains('compact-mode')")
       assert not errors,(engine.name,width,errors)

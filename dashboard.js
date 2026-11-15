@@ -37,6 +37,8 @@
   const badge = (s,t='plain') => `<span class="tag tag-${t}">${esc(s)}</span>`;
   const ready = () => state.source !== 'preview';
   const website = () => list(state.data,'assets').find(x=>x.kind==='website');
+  const hqState=()=>state.source==='live'?state.data.hqHealth:null;
+  const hqLabel=()=>hqState()?.status==='responding'?'Responding':hqState()?.status==='delayed'?'Delayed':'Not verified';
   const status = x => ({healthy:'HTTP OK',reachable:'HTTP OK',degraded:'Needs review',unknown:'Unknown'})[x]||'Unknown';
   const header=(t,s,act='')=>`<header class="page-header"><div><h1>${esc(t)}</h1><p>${esc(s)}</p></div>${act?`<div class="header-action">${act}</div>`:''}</header>`;
   const button=(id,label,iconName,cls='button-subtle',extra='')=>`<button type="button" class="button ${cls}" data-action="${esc(id)}" ${extra}>${icon(iconName)} ${esc(label)}</button>`;
@@ -74,7 +76,7 @@
     const s=ready()?status(website()?.status):'—';
     const pulseBlock=pulse.length?pulse.map(x=>{const i=state.pulse.indexOf(x);return `<button type="button" class="pulse-row" data-detail="pulse" data-id="${i}"><span class="pulse-symbol">${icon(x._kind==='finding'?'shield':x._kind==='opportunity'?'compass':'clock')}</span><span class="pulse-text"><strong>${esc(cut(x.title||x.summary||'Update',105))}</strong><small>${esc(x._kind==='finding'?'Alert':x._kind==='opportunity'?'Research':'Update')}</small></span><span class="pulse-date">${date(x._date)}</span></button>`;}).join(''):blank('No updates');
     return header('Home','Status · decisions · activity',importButton())+provenance()+
-      `<div class="stat-grid four">${stat('Website',s,'HTTP check','shield')}${stat('To review',num(d.operating?.pending),'Recommendations','check')}${stat('Research',ready()?list(d,'opportunities').length:'—','Unverified leads','compass')}${stat('Revenue','—','Source unavailable','chart')}</div>`+
+      `<div class="stat-grid four">${stat('YorpHives.com',s,'HTTP check','shield')}${stat('Headquarters',hqLabel(),'API · DB · scheduler','clock')}${stat('To review',num(d.operating?.pending),'Recommendations','check')}${stat('Research',ready()?list(d,'opportunities').length:'—','Unverified leads','compass')}</div>`+
       `<div class="shortcut-row">${navlink('discover','Discover')}${navlink('team','AI Employees')}${navlink('decisions','Decisions')}${navlink('growth','Growth')}</div>`+
       `<div class="content-grid home-grid">${card('YH Pulse',`<div class="filter-scroller compact-tabs">${[['all','All'],['alerts','Alerts'],['research','Research'],['changes','Changes']].map(([id,n])=>tab(n,id,state.homeFilter,'pulse-filter')).join('')}</div><div class="pulse-list">${pulseBlock}</div>`,badge('LATEST 20'))}`+
       `<div class="vertical-stack">${card('Priorities',q.length?`<div class="record-list">${q.map((x,i)=>row(asRecord(x),'review',i,x.contract?.classification||x.status||'Review')).join('')}</div>`:blank('No recommendations'),badge('TOP 3')+navlink('decisions','Open'))}`+
@@ -120,10 +122,19 @@
       `<div class="vertical-stack">${card('Audience',blank('Not connected','Visitors · engagement'))}${card('Revenue',blank('Not connected','Verified earnings'))}${card('Opportunities',`<div class="record-list">${list(d,'opportunities').slice(0,5).map((x,i)=>row(x,'opportunity',filled(x.id)?x.id:'at-'+i,x.category||'Research')).join('')||blank('No leads')}</div><div class="panel-footer">${navlink('discover','Discover')}</div>`)}</div></div>`;
   }
   function control(){const d=state.data,b=d.resourceBudget?.publicFetches||{},rawUsed=b.used,budgetUsed=ready()&&filled(rawUsed)&&Number.isFinite(Number(rawUsed))?Math.max(0,Number(rawUsed)):null,limit=Number(b.limit)>0?Number(b.limit):900;
-    const checked=d.briefing?.site?.lastCheck||d.verification?.generatedAt||d.pipeline?.generatedAt||d.generatedAt;
-    const tiles=[['Website',ready()?status(website()?.status):'Unknown','shield'],['Monitoring',checked?time(checked):'Not verified','clock'],['AI inference',d.operating?.aiStatus||'Not connected','users'],['Backup','Not verified','upload'],['Security',`${list(d,'securityWatch').length} public advisories`,'shield'],['Hosting','Migration pending','link']];
-    return header('HQ Control','Health · safety · preferences',importButton())+provenance()+
+    const h=hqState();
+    const checked=d.briefing?.site?.lastCheck;
+    const tiles=[['YorpHives.com',ready()?status(website()?.status):'Unknown','shield'],
+      ['Website check',checked?time(checked):'Not verified','clock'],
+      ['Headquarters',hqLabel(),'shield'],
+      ['HQ API',h?.api==='responding'?'Responding':'Not verified','link'],
+      ['HQ database',h?.database==='responding'?'Responding':'Not verified','chart'],
+      ['HQ scheduler',h?.collector==='current'?'Current':h?.collector==='stale'?'Delayed':'Not verified','clock'],
+      ['Last HQ check',h?.lastCollectorCheck?time(h.lastCollectorCheck):'Not verified','clock'],
+      ['AI inference',d.operating?.aiStatus||'Not connected','users']];
+    return header('HQ Control','Site · HQ · security',importButton())+provenance()+
       `<div class="system-grid">${tiles.map(([name,v,i])=>`<article class="system-card"><span class="system-icon">${icon(i)}</span><h2>${esc(name)}</h2><p>${esc(v)}</p></article>`).join('')}</div>`+
+      `<div class="page-footnote">HQ health: API, database and scheduler. External availability: login gate only.</div>`+
       `<div class="content-grid equal">${card('Daily public requests',`<div class="budget-number"><strong>${budgetUsed===null?'—':budgetUsed.toLocaleString()}</strong><span>/ ${limit.toLocaleString()} GET</span></div><progress max="${limit}" value="${budgetUsed??0}" aria-label="Daily GET budget"></progress><small class="minor">Internal limit, not a billing guarantee.</small>`)}`+
       `${card('Permissions',`<div class="setting-list"><div><span>Agent code changes</span>${badge('Blocked','green')}</div><div><span>Agent payments</span>${badge('Blocked','green')}</div><div><span>Founder journal</span>${badge(canDecide()?'Available':'Unavailable',canDecide()?'green':'amber')}</div></div><small class="minor">Reported policy · verify runtime independently.</small>`)}`+
       `${card('Security advisories',list(d,'securityWatch').length?`<div class="record-list">${list(d,'securityWatch').slice(0,10).map((x,i)=>row(x,'security',filled(x.id)?x.id:'at-'+i,'Applicability unverified')).join('')}</div>`:blank('No advisory records'))}`+
