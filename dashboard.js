@@ -19,12 +19,12 @@
   const sessionSaved=()=>{try{const x=JSON.parse(sessionStorage.getItem('yh:saved')||'[]');return Array.isArray(x)?x.filter(y=>typeof y==='string').slice(0,500):[];}catch{return [];}};
   const state = {
     page: PAGES[location.hash.slice(1)] ? location.hash.slice(1) : 'home', data:EMPTY(), source:'preview',
-    navHistory:[], homeFilter:'all', discoverFilter:'all', discoverQuery:'', discoverSort:'newest', savedOnly:false,
+    navHistory:[], homeFilter:'all', pulseQuery:'', discoverFilter:'all', discoverQuery:'', discoverSort:'newest', savedOnly:false,
     productFilter:'all', productQuery:'', decisionFilter:'all', busy:false, detail:null,
     compact:store.get('compact',false) === true, alerts:store.get('alerts',false) === true,
     saved:new Set(sessionSaved()), pulse:[], searchQuery:'', saving:false
   };
-  let lastFocus=null, toastTimer, lastHighKey='';
+  let lastFocus=null, toastTimer, lastHighKey='', lastLiveFetch=0;
   const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const icon = name => `<svg class="icon" aria-hidden="true"><use href="#ic-${name}"/></svg>`;
   const list = (d,key) => Array.isArray(d?.[key]) ? d[key] : [];
@@ -47,6 +47,7 @@
   const blank=(name,hint='')=>`<div class="blank"><span class="blank-icon">${icon('info')}</span><strong>${esc(name)}</strong>${hint?`<small>${esc(hint)}</small>`:''}</div>`;
   const card=(title,body,extra='',classes='')=>`<section class="panel ${classes}"><div class="panel-top"><h2>${esc(title)}</h2>${extra}</div>${body}</section>`;
   const stat=(t,v,n,mark)=>`<article class="stat"><span class="stat-top"><span>${esc(t)}</span>${icon(mark)}</span><strong>${esc(String(v??'—'))}</strong><small>${esc(n)}</small></article>`;
+  const homeStat=(t,v,n,mark,to)=>`<button type="button" class="stat stat-action" data-page="${esc(to)}" aria-label="${esc(t+': '+String(v??'—')+'. Open '+PAGES[to])}"><span class="stat-top"><span>${esc(t)}</span>${icon(mark)}</span><strong>${esc(String(v??'—'))}</strong><small>${esc(n)}</small></button>`;
   const navlink=(to,label)=>`<button class="text-action" type="button" data-page="${esc(to)}">${esc(label)} ${icon('arrow')}</button>`;
   const provenance=()=>{const labels={preview:['Preview','No live evidence','neutral'],live:['Live report','HTTP evidence','green'],imported:['Imported report','Local only','amber'],stale:['Stale report','Refresh failed','amber']};const [name,sub,color]=labels[state.source];return `<div class="provenance"><span class="provenance-main"><span class="provenance-dot ${color}"></span><strong>${name}</strong><span>${sub}</span></span><small>${ready()?`Updated ${esc(time(state.data.generatedAt||state.data.briefing?.generatedAt))}`:'Not connected'}</small></div>`;};
   const link = raw => {try{const x=new URL(String(raw));return ['https:','http:'].includes(x.protocol)&&!x.username&&!x.password?x.href:null;}catch{return null;}};
@@ -72,13 +73,15 @@
   function permittedDecision(item,kind){const thread=`${kind}:${item.id}`;const event=latestJournal().get(thread);const previous=event?.state||'proposed';return {thread,event,previous,revision:Number(event?.revision??item.revision??0),actions:TRANSITIONS[previous]||[]};}
   function canDecide(){return state.source==='live'&&state.data.decisionJournal?.available===true;}
   function home(){
-    const d=state.data, q=queue(), pulse=pulseItems();
-    const s=ready()?status(website()?.status):'—';
-    const pulseBlock=pulse.length?pulse.map(x=>{const i=state.pulse.indexOf(x);return `<button type="button" class="pulse-row" data-detail="pulse" data-id="${i}"><span class="pulse-symbol">${icon(x._kind==='finding'?'shield':x._kind==='opportunity'?'compass':'clock')}</span><span class="pulse-text"><strong>${esc(cut(x.title||x.summary||'Update',105))}</strong><small>${esc(x._kind==='finding'?'Alert':x._kind==='opportunity'?'Research':'Update')}</small></span><span class="pulse-date">${date(x._date)}</span></button>`;}).join(''):blank('No updates');
-    return header('Home','Status · decisions · activity',importButton())+provenance()+
-      `<div class="stat-grid four">${stat('YorpHives.com',s,'HTTP check','shield')}${stat('Headquarters',hqLabel(),'API · DB · scheduler','clock')}${stat('To review',num(d.operating?.pending),'Recommendations','check')}${stat('Research',ready()?list(d,'opportunities').length:'—','Unverified leads','compass')}</div>`+
+    const d=state.data, q=queue(), raw=pulseItems(), search=state.pulseQuery.trim().toLowerCase();
+    const pulse=raw.filter(x=>!search||[x.title,x.summary,x.description,x.asset,x._kind].some(v=>String(v||'').toLowerCase().includes(search)));
+    const counts={all:state.pulse.length,alerts:state.pulse.filter(x=>x._kind==='finding').length,research:state.pulse.filter(x=>x._kind==='opportunity').length,changes:state.pulse.filter(x=>['change','activity'].includes(x._kind)).length};
+    const s=state.source==='live'?status(website()?.status):state.source==='stale'?'Stale':state.source==='imported'?'Imported':'—';
+    const pulseBlock=pulse.length?pulse.map(x=>{const i=state.pulse.indexOf(x);return `<button type="button" class="pulse-row" data-detail="pulse" data-id="${i}"><span class="pulse-symbol">${icon(x._kind==='finding'?'shield':x._kind==='opportunity'?'compass':'clock')}</span><span class="pulse-text"><strong>${esc(cut(x.title||x.summary||'Update',105))}</strong><small>${esc(x._kind==='finding'?'Alert':x._kind==='opportunity'?'Research':'Update')}</small></span><span class="pulse-date">${date(x._date)}</span></button>`;}).join(''):blank('No matching updates');
+    return header('Home','Status · decisions · activity','<a class="button button-subtle" href="https://yorphives.com/" target="_blank" rel="noopener noreferrer" aria-label="Open YorpHives website">Website ↗</a>')+provenance()+
+      `<div class="stat-grid four">${homeStat('YorpHives.com',s,'HTTP check','shield','control')}${homeStat('Headquarters',hqLabel(),'API · DB · scheduler','clock','control')}${homeStat('To review',num(d.operating?.pending),'Recommendations','check','decisions')}${homeStat('Research',ready()?list(d,'opportunities').length:'—','Unverified leads','compass','discover')}</div>`+
       `<div class="shortcut-row">${navlink('discover','Discover')}${navlink('team','AI Employees')}${navlink('decisions','Decisions')}${navlink('growth','Growth')}</div>`+
-      `<div class="content-grid home-grid">${card('YH Pulse',`<div class="filter-scroller compact-tabs">${[['all','All'],['alerts','Alerts'],['research','Research'],['changes','Changes']].map(([id,n])=>tab(n,id,state.homeFilter,'pulse-filter')).join('')}</div><div class="pulse-list scroll-region" role="region" tabindex="0" aria-label="YH Pulse updates">${pulseBlock}</div>`,badge('LATEST 20'))}`+
+      `<div class="content-grid home-grid">${card('YH Pulse',`<div class="filter-scroller compact-tabs">${[['all','All'],['alerts','Alerts'],['research','Research'],['changes','Changes']].map(([id,n])=>tab(n+' '+counts[id],id,state.homeFilter,'pulse-filter')).join('')}</div><div class="pulse-tools"><label class="inline-search pulse-search">${icon('search')}<input id="pulse-query" type="search" placeholder="Search updates" aria-label="Search YH Pulse" value="${esc(state.pulseQuery)}"/></label>${search?button('clear-pulse-search','Clear','close'):''}<small class="pulse-count" role="status">${pulse.length} / ${state.pulse.length}</small></div><div class="pulse-list scroll-region" role="region" tabindex="0" aria-label="YH Pulse updates">${pulseBlock}</div>`,badge('LATEST 20'))}`+
       `<div class="vertical-stack">${card('Priorities',q.length?`<div class="record-list">${q.map((x,i)=>row(asRecord(x),'review',i,x.contract?.classification||x.status||'Review')).join('')}</div>`:blank('No recommendations'),badge('TOP 3')+navlink('decisions','Open'))}`+
       `${card('Quick actions',`<div class="quick-grid">${button('import','Open report','upload')}${exportButton()}${button('copy-summary','Copy status','file')}${button('refresh','Refresh','refresh')}</div>`)}</div></div>`;
   }
@@ -231,17 +234,24 @@
   }
   function highAlert(d){const high=list(d,'findings').filter(x=>['high','critical'].includes(x.priority));if(!high.length||!state.alerts||!('Notification' in window)||Notification.permission!=='granted')return;
     const key=high.map(x=>x.id||x.title).join('|');if(!lastHighKey){lastHighKey=key;return;}if(key!==lastHighKey){lastHighKey=key;try{new Notification('HQ: new high-priority findings',{body:'Open Headquarters to review.',tag:'yh-high-priority'});}catch{}}}
-  async function refresh(manual=false){if(state.busy){return;}if(!/^https?:$/.test(location.protocol)){if(manual)notify('Open report locally');return;}
+  async function refresh(manual=false){if(state.busy||(!manual&&state.source==='imported')){return;}if(!/^https?:$/.test(location.protocol)){if(manual)notify('Open report locally');return;}
     state.busy=true;try{const reply=await fetch('/api/report',{credentials:'same-origin',headers:{accept:'application/json'},cache:'no-store'});if(!reply.ok)throw Error('Report unavailable');const d=normalize(await reply.json());
-      const oldSource=state.source;state.data=d;state.source='live';if(oldSource==='live')highAlert(d);else lastHighKey=list(d,'findings').filter(x=>['high','critical'].includes(x.priority)).map(x=>x.id||x.title).join('|');
+      const oldSource=state.source;state.data=d;state.source='live';lastLiveFetch=Date.now();if(oldSource==='live')highAlert(d);else lastHighKey=list(d,'findings').filter(x=>['high','critical'].includes(x.priority)).map(x=>x.id||x.title).join('|');
       if(manual)notify('Report refreshed');
     }catch{if(state.source==='live')state.source='stale';if(manual)notify('Live report unavailable');}
     finally{state.busy=false;render();}
   }
   async function openLocal(file){if(!file)return;if(file.size>5*1024*1024){notify('Report limit: 5 MB');return;}try{const d=normalize(JSON.parse(await file.text()));state.data=d;state.source='imported';lastHighKey='';navigate('home');notify('Report opened locally');}catch{notify('Invalid HQ report');}}
   function downloadJson(data,name){const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200);notify('Private export created');}
-  const summary=()=>`YorpHives HQ\nSource: ${state.source}\nWebsite HTTP: ${ready()?status(website()?.status):'Unknown'}\nTo review: ${num(state.data.operating?.pending)}\nResearch leads: ${ready()?list(state.data,'opportunities').length:'—'}\nRevenue: unavailable`;
-  async function copySummary(){try{await navigator.clipboard.writeText(summary());notify('Status copied');}catch{notify('Clipboard unavailable');}}
+  const summary=()=>`YorpHives HQ
+Source: ${state.source}
+Updated: ${state.data.generatedAt||'Unavailable'}
+Website HTTP: ${state.source==='live'?status(website()?.status):'Not live-verified'}
+Headquarters: ${hqLabel()}
+To review: ${num(state.data.operating?.pending)}
+Research leads: ${ready()?list(state.data,'opportunities').length:'—'}
+Revenue: unavailable`;
+  async function copySummary(){const message=summary();try{if(!navigator.clipboard?.writeText)throw Error('Clipboard unavailable');await navigator.clipboard.writeText(message);notify('Status copied');}catch{const dialog=$('copy-modal'),field=$('copy-text');field.value=message;if(!dialog.open)dialog.showModal();field.focus();field.select();notify('Select and copy status');}}
   function searchItems(){const items=[...Object.entries(PAGES).map(([id,title])=>({kind:'page',id,title,label:'Page'})),...DEPARTMENTS.map((x,id)=>({kind:'department',id,title:x.name,label:'Department'}))];
     for(const [kind,label] of [['finding','Alert'],['opportunity','Research'],['product','Product'],['comparison','Comparison'],['security','Advisory']]){
       list(state.data,files(kind)).forEach((x,i)=>items.push({kind,id:filled(x.id)?x.id:'at-'+i,title:x.title||x.name||x.competitor||'Untitled',label}));}
@@ -253,7 +263,7 @@
   async function toggleAlerts(checked){if(!checked){state.alerts=false;store.set('alerts',false);notify('Browser alerts off');return;}
     if(!('Notification' in window)||!window.isSecureContext){state.alerts=false;notify('Browser alerts require a secure connection');return;}
     let permission=Notification.permission;if(permission==='default')permission=await Notification.requestPermission();state.alerts=permission==='granted';store.set('alerts',state.alerts);notify(state.alerts?'Alerts on · open tab only':'Notification permission unavailable');}
-  function action(cmd){switch(cmd){case 'import':$('report-file').click();break;case 'refresh':refresh(true);break;case 'toggle-saved':state.savedOnly=!state.savedOnly;render();break;case 'export-report':if(ready())downloadJson(state.data,'hq-evidence-private.json');break;case 'export-decisions':downloadJson({exportedAt:today(),events:list(state.data.decisionJournal,'events')},'hq-decisions-private.json');break;case 'copy-summary':copySummary();break;case 'close-detail':closeDetail();break;}}
+  function action(cmd){switch(cmd){case 'import':$('report-file').click();break;case 'refresh':refresh(true);break;case 'clear-pulse-search':state.pulseQuery='';render();break;case 'toggle-saved':state.savedOnly=!state.savedOnly;render();break;case 'export-report':if(ready())downloadJson(state.data,'hq-evidence-private.json');break;case 'export-decisions':downloadJson({exportedAt:today(),events:list(state.data.decisionJournal,'events')},'hq-decisions-private.json');break;case 'copy-summary':copySummary();break;case 'close-detail':closeDetail();break;}}
   function bind(){document.addEventListener('click',e=>{
       const nav=e.target.closest('[data-page]');if(nav){if($('search-modal').open)$('search-modal').close();if(!$('detail-drawer').hidden)closeDetail();navigate(nav.dataset.page);return;}
       const detail=e.target.closest('[data-detail]');if(detail){if($('search-modal').open)$('search-modal').close();openDetail(detail.dataset.detail,detail.dataset.id);return;}
@@ -268,10 +278,10 @@
     for(const id of ['global-search-button','mobile-search-button'])$(id).addEventListener('click',openSearch);
     for(const id of ['refresh-button','mobile-refresh-button'])$(id).addEventListener('click',()=>refresh(true));
     for(const id of ['back-button','mobile-back-button'])$(id).addEventListener('click',goBack);
-    $('search-input').addEventListener('input',renderSearch);$('search-close').addEventListener('click',()=>$('search-modal').close());
+    $('search-input').addEventListener('input',renderSearch);$('search-close').addEventListener('click',()=>$('search-modal').close());$('copy-close').addEventListener('click',()=>$('copy-modal').close());
     $('detail-close').addEventListener('click',closeDetail);$('detail-scrim').addEventListener('click',closeDetail);
     $('report-file').addEventListener('change',e=>{openLocal(e.target.files[0]);e.target.value='';});
-    document.addEventListener('input',e=>{if(['discover-query','product-query'].includes(e.target.id)){state[e.target.id==='discover-query'?'discoverQuery':'productQuery']=e.target.value;render({keepFocus:true});}});
+    document.addEventListener('input',e=>{if(['discover-query','product-query','pulse-query'].includes(e.target.id)){state[e.target.id==='discover-query'?'discoverQuery':e.target.id==='product-query'?'productQuery':'pulseQuery']=e.target.value;render({keepFocus:true});}});
     document.addEventListener('change',async e=>{if(e.target.id==='discover-sort'){state.discoverSort=e.target.value;render();}if(e.target.id==='product-filter'){state.productFilter=e.target.value;render();}if(e.target.id==='decision-state')updateDecisionFields();
       if(e.target.id==='compact-toggle'){state.compact=e.target.checked;store.set('compact',state.compact);render();}if(e.target.id==='alerts-toggle'){await toggleAlerts(e.target.checked);render();}});
     document.addEventListener('submit',e=>{if(e.target.getAttribute('id')==='decision-form'){e.preventDefault();submitDecision(e.target);}});
@@ -285,4 +295,7 @@
     document.addEventListener('pointerdown',e=>{if(!$('more-popover').hidden&&!e.target.closest('#more-popover')&&!e.target.closest('#more-button')){$('more-popover').hidden=true;$('more-button').setAttribute('aria-expanded','false');}});
   }
   bind();history.replaceState({hqPage:state.page},'','#'+state.page);render();refresh();
+  // Read cached evidence only while the tab is visible; never overwrite a locally opened report.
+  setInterval(()=>{if(!document.hidden&&!state.busy&&state.source!=='imported'&&Date.now()-lastLiveFetch>=120000)refresh(false);},120000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!state.busy&&state.source!=='imported'&&Date.now()-lastLiveFetch>=120000)refresh(false);});
 })();
