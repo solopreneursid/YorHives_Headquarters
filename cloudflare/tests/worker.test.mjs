@@ -35,14 +35,17 @@ test("public RSS lead classifier does not invent popularity or revenue",()=>{
 });
 test("one 5-minute Cron handles all schedules without paid always-on services",()=>{
   const at=(x)=>schedulePlan(new Date(x).getTime());
-  assert.deepEqual(at("2026-11-15T00:05:00Z"),{uptime:false,products:true,discovery:false,research:false,security:false,retention:false});
-  assert.deepEqual(at("2026-11-15T06:00:00Z"),{uptime:true,products:false,discovery:true,research:false,security:false,retention:false});
+  assert.deepEqual(at("2026-11-15T00:05:00Z"),{uptime:false,products:true,discovery:false,research:false,security:false,retention:false,competitorIndex:-1});
+  assert.deepEqual(at("2026-11-15T06:00:00Z"),{uptime:true,products:false,discovery:true,research:false,security:false,retention:false,competitorIndex:-1});
   assert.equal(at("2026-11-15T06:15:00Z").products,true);
   assert.equal(at("2026-11-15T06:10:00Z").uptime,false);
   assert.equal(at("2026-11-15T06:15:00Z").uptime,true);
+  assert.equal(at("2026-11-15T07:05:00Z").competitorIndex,0);
+  assert.equal(at("2026-11-15T07:10:00Z").competitorIndex,1);
+  assert.equal(at("2026-11-15T07:05:00Z").products,false,"Research slots must not compete with tool checks");
   assert.equal(at("2026-11-15T06:00:00Z").products,false,"Heavy discovery must have its own CPU budget");
   assert.equal(at("2026-11-15T06:20:00Z").products,true);
-  assert.deepEqual(at("2026-11-15T03:00:00Z"),{uptime:true,products:false,discovery:false,research:true,security:false,retention:true});
+  assert.deepEqual(at("2026-11-15T03:00:00Z"),{uptime:true,products:false,discovery:false,research:true,security:false,retention:true,competitorIndex:-1});
 });
 test("private report fails closed if Access is not configured", async()=>{
   const request=new Request("https://example.workers.dev/api/report");
