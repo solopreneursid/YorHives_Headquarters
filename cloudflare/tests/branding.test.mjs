@@ -1,21 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
+import {createHash} from "node:crypto";
 import {execFileSync} from "node:child_process";
 import {dirname,join,resolve} from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"../..");
 test("Official HQ branding contains the approved original WebP files",()=>{
   const html=readFileSync(join(root,"index.html"),"utf8");
-  assert.match(html,/class="brand-logo" src="\.\/assets\/yorphives-logo\.webp"/);
-  assert.match(html,/class="mobile-brand-icon" src="\.\/assets\/yorphives-mark\.webp"/);
-  assert.match(html,/<link rel="icon" type="image\/webp" href="\.\/assets\/yorphives-mark\.webp">/);
+  assert.match(html,/class="brand-logo" src="\.\/assets\/yorphives-logo\.webp\?v=ba0f325e"/);
+  assert.match(html,/class="brand-label"><strong>YorpHives<\/strong><small>HEADQUARTERS<\/small>/);
+  assert.match(html,/class="mobile-brand-icon" src="\.\/assets\/yorphives-mark\.webp\?v=7f78695a"/);
+  assert.match(html,/<link rel="icon" type="image\/webp" href="\.\/assets\/yorphives-mark\.webp\?v=7f78695a">/);
   assert.doesNotMatch(html,/brand-symbol|FOUNDER SPACE/);
+  const approvedHashes={"yorphives-logo.webp":"ba0f325ea6109cee438aecd2624f656558f23a254aeb5c502e26c302cffa4114","yorphives-mark.webp":"7f78695ae874e7f72c524227e84c639faa0370fe4199802a40b917d7721fcb22"};
   for(const name of ["yorphives-logo.webp","yorphives-mark.webp"]){
     const bytes=readFileSync(join(root,"assets",name));
     assert.equal(bytes.toString("ascii",0,4),"RIFF");
     assert.equal(bytes.toString("ascii",8,12),"WEBP");
     assert(bytes.length>4000 && bytes.length<150000);
+    assert.equal(createHash("sha256").update(bytes).digest("hex"),approvedHashes[name]);
   }
 });
 test("Pilot only serves official logo to authenticated founder",async()=>{

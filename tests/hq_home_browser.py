@@ -11,7 +11,7 @@ HTML=(ROOT/"index.html").read_text().replace('<link rel="stylesheet" href="./sty
 # Offline browser tests load the two real artwork files as data URIs.
 for logoFile in ("yorphives-logo.webp","yorphives-mark.webp"):
     source=ROOT/"assets"/logoFile
-    HTML=HTML.replace("./assets/"+logoFile,"data:image/webp;base64,"+base64.b64encode(source.read_bytes()).decode())
+    HTML=HTML.replace("./assets/"+logoFile+("?v=ba0f325e" if logoFile=="yorphives-logo.webp" else "?v=7f78695a"),"data:image/webp;base64,"+base64.b64encode(source.read_bytes()).decode())
 CSS=(ROOT/"styles.css").read_text()
 JS=(ROOT/"dashboard.js").read_text().replace("if(!/^https?:$/.test(location.protocol))","if(!/^https?:$/.test(location.protocol)&&!window.__hqTestMode)")
 
@@ -60,6 +60,7 @@ with sync_playwright() as pw:
             page.wait_for_function("document.querySelector('.provenance')?.textContent.includes('Live report')")
             assert page.locator(".stat-action").count()==4
             assert page.locator(".brand-symbol").count()==0
+            assert page.locator(".brand-label strong").inner_text()=="YorpHives"
             for logo in (".brand-logo",".mobile-brand-icon"):
                 assert page.locator(logo).count()==1
                 page.wait_for_function("(css)=>document.querySelector(css)?.naturalWidth>0",arg=logo)

@@ -18,10 +18,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,[tabindex]:focus-visibl
 .skip-link:focus{top:10px}
 .app-shell{min-height:100vh}
 .sidebar{position:fixed;z-index:30;inset:0 auto 0 0;width:246px;background:#fff;border-right:1px solid var(--border);padding:27px 16px 18px;display:flex;flex-direction:column}
-.brand-wrap{padding:13px 12px 14px;margin:0 0 18px;border-radius:15px;background:linear-gradient(145deg,#0d1020,#16182d);box-shadow:inset 0 0 0 1px #ffffff12}
-.brand{display:block;width:100%;outline-offset:4px}
-.brand-logo{display:block;width:100%;height:auto;object-fit:contain;max-height:86px}
-.brand-subtitle{margin:2px 0 0;text-align:center;color:#adb5dc;font-size:9px;font-weight:800;letter-spacing:2.5px}
+.brand-wrap{padding:12px 10px;margin:0 0 18px;border-radius:15px;background:linear-gradient(145deg,#060c1b,#0c1530);box-shadow:inset 0 0 0 1px #ffffff12}
+.brand{display:flex;align-items:center;gap:9px;width:100%;min-width:0;outline-offset:4px}
+.brand-logo{display:block;width:62px;height:62px;object-fit:cover;border-radius:12px;flex:none}
+.brand-label{min-width:0;color:#fff}
+.brand-label strong{display:block;line-height:1.15;font-size:17px;letter-spacing:-.55px;font-weight:820;white-space:nowrap}
+.brand-label small{display:block;margin-top:5px;font-size:8px;letter-spacing:1.1px;font-weight:750;color:#aabbe0;white-space:nowrap}
 .desktop-nav{display:flex;flex-direction:column;gap:5px}
 .nav-btn{display:flex;align-items:center;gap:13px;width:100%;padding:14px 15px;border-radius:12px;font-size:13px;color:#66748e;font-weight:680;text-align:left;min-height:48px;transition:background .15s,color .15s}
 .nav-btn:hover{background:#f6f7fc;color:var(--ink)}

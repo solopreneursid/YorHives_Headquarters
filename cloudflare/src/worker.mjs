@@ -1091,7 +1091,7 @@ export default {
         return new Response("Brand asset unavailable",{status:503});
       const bytes=Uint8Array.from(atob(item),ch=>ch.charCodeAt(0));
       return new Response(request.method==="HEAD"?null:bytes,{status:200,
-        headers:{"content-type":"image/webp","cache-control":"private,max-age=3600",
+        headers:{"content-type":"image/webp","cache-control":"private,no-store",
           "x-content-type-options":"nosniff","x-frame-options":"DENY",
           "referrer-policy":"no-referrer"}});
     }
