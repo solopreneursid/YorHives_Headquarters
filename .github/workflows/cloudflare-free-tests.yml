@@ -18,6 +18,19 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+      - name: Confirm anonymous pilot visits reach Cloudflare Access sign-in
+        shell: bash
+        run: |
+          headers="$(mktemp)"
+          trap 'rm -f "$headers"' EXIT
+          status="$(curl --silent --show-error --max-time 18 --retry 2 \
+            --user-agent 'YorpHives-HQ-Access-Test/1.0' \
+            --dump-header "$headers" --output /dev/null --write-out '%{http_code}' \
+            'https://yorphives-hq-free-pilot.solopreneursid-proy.workers.dev/')"
+          echo "Anonymous access returned HTTP $status (expected redirect to Access)."
+          test "$status" = 302 || test "$status" = 303
+          grep -qiE '^location:.*(/cdn-cgi/access/|cloudflareaccess\\.com)' "$headers"
+          echo 'PASS: private pilot requires Access login without exposing the dashboard.'
       - name: Check Cloudflare worker JavaScript
         run: |
           node --check cloudflare/src/worker.mjs
