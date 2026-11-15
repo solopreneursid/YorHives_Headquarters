@@ -168,3 +168,18 @@ For optional browser link discovery and read-only rendering checks, install Play
 **Validation:** [Latest recorded intelligence QA results](docs/INTELLIGENCE_VALIDATION.md). **The services are not installed or running on your server.**
 
 **Architecture and test instructions:** [Product intelligence documentation](intelligence/README.md). This does not edit YorpHives website files or Headquarters project files during monitoring. The UI preview data remains clearly labelled as illustrative; imported report data remains unverified until an authenticated evidence pipeline is added.
+
+## Cloudflare Free Headquarters pilot (isolated)
+
+A separate, provider-neutral, read-only monitoring adaptation now exists under [cloudflare/](cloudflare/README.md).
+It targets **₹0 in additional monthly platform charges** by using one 5-minute Cron Trigger, lightweight public GET observations,
+a dedicated D1 database, a strict 900-request/day external-fetch budget, and founder-only Cloudflare Access.
+The existing live website and its Cloudflare Worker remain unchanged. **No AI inference, browser testing, paid container,
+automatic code editing or deployment tools are enabled in the pilot.**
+
+Private pilot URL (Access sign-in required):
+https://yorphives-hq-free-pilot.solopreneursid-proy.workers.dev/
+
+The pilot is not fully production-verified until a successful scheduled scan is recorded in D1 and the founder confirms private access,
+product discovery coverage and resource usage. Static UI is packaged into a reproducible self-contained pilot bundle;
+the source also supports switching to standard Cloudflare Workers Static Assets later.
