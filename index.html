@@ -243,6 +243,11 @@
         <section id="view-monitoring" class="view" aria-labelledby="monitoring-heading" hidden>
           <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> KEEPING AN EYE ON THINGS</div><h1 id="monitoring-heading">What needs <em>your attention?</em></h1><p>Potential problems Headquarters noticed. Open any alert to see why it matters and what you can do next.</p></div><span class="header-emblem"><svg class="icon"><use href="#i-shield"/></svg></span></div>
           <div class="inner-insight"><svg class="icon"><use href="#i-lock"/></svg><span>Observation only. No agent can edit code, change configuration, or deploy a fix.</span></div>
+          <div class="browser-alert-option">
+            <div><strong>Optional browser alerts</strong>
+              <small>Get a generic alert for new high-priority findings while this signed-in tab is open. Nothing is sent to an external alert service.</small></div>
+            <button type="button" id="browser-alert-toggle" class="button button-secondary" aria-pressed="false">Enable alerts</button>
+          </div>
           <div class="filter-bar"><div class="filter-chips" role="group" aria-label="Filter findings"><button class="filter-chip is-selected" data-finding-filter="all">All findings</button><button class="filter-chip" data-finding-filter="security">Security</button><button class="filter-chip" data-finding-filter="dependencies">App packages</button><button class="filter-chip" data-finding-filter="reliability">Reliability</button><button class="filter-chip" data-finding-filter="quality">Quality</button></div><span class="filter-detail" id="monitoring-count"></span></div>
           <div class="records-panel"><div class="records-head"><span>OBSERVATION</span><span>PRIORITY</span><span>SYSTEM</span><span>REVIEW</span></div><div id="findings-list"></div></div>
           <section class="panel security-watch-panel" aria-labelledby="security-watch-heading">
