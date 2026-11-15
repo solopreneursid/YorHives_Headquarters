@@ -1,0 +1,31 @@
+name: Independent website and HQ availability
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  observe-public-surfaces:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check yorphives.com public HTTPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          code="$(curl --silent --show-error --location --max-time 20 --retry 1             --output /dev/null --write-out '%{http_code}'             --user-agent 'YorpHives-Independent-Health/1.0'             'https://yorphives.com/')"
+          echo "YorpHives.com HTTPS: $code"
+          [[ "$code" =~ ^2[0-9][0-9]$ ]]
+      - name: Check private HQ sign-in gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          trap 'rm -f "$headers"' EXIT
+          code="$(curl --silent --show-error --max-time 20 --retry 1             --dump-header "$headers" --output /dev/null --write-out '%{http_code}'             --user-agent 'YorpHives-Independent-Health/1.0'             'https://yorphives-hq-free-pilot.solopreneursid-proy.workers.dev/')"
+          echo "HQ private sign-in gate: HTTP $code"
+          [[ "$code" == "302" || "$code" == "303" ]]
+          grep -qiE '^location:.*(/cdn-cgi/access/|cloudflareaccess\.com)' "$headers"
+          echo 'PASS: HQ private entrypoint responds and redirects to Access.'
+          echo 'Scope: anonymous HTTPS and login gate only; authenticated API/D1 checks are internal.'
