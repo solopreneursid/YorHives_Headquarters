@@ -39,6 +39,7 @@ jobs:
           python3 tests/test_intelligence.py
           python3 tests/test_viewer.py
           python3 tests/test_assurance.py
+          python3 tests/test_watchdog.py
       - name: Parse frontend JS and run deterministic checks
         run: |
           node --check dashboard.js
