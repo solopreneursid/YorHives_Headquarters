@@ -50,7 +50,8 @@
     view: "overview",
     findingFilter: "all",
     opportunityFilter: "all",
-    selectedDetail: null
+    selectedDetail: null,
+    feedFilter: "all"
   };
 
   const $ = (id) => document.getElementById(id);
@@ -83,7 +84,7 @@
     } catch (_) { return ""; }
   };
   const label = (word) => String(word || "").replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
-  const originLabel = () => state.origin === "preview" ? "Example only" : state.origin === "local" ? "Private local evidence — unverified" : "Imported — unverified";
+  const originLabel = () => state.origin === "preview" ? "Example only" : state.origin === "cloudflare" ? "Cloudflare scheduled evidence — unverified" : state.origin === "local" ? "Private local evidence — unverified" : "Imported — unverified";
   const priorityRank = { high: 0, medium: 1, low: 2 };
   const categoryIcons = { security: "shield", dependencies: "code", reliability: "activity", quality: "check", product: "layers", revenue: "dollar", technology: "radar" };
   const workerIcons = ["activity", "shield", "spark", "radar", "trend", "dollar"];
@@ -109,12 +110,13 @@
       else button.removeAttribute("aria-current");
     });
     $("breadcrumb-current").textContent = ({
-      overview: "Overview", monitoring: "Monitoring", opportunities: "Opportunities", products: "Product intelligence",
-      workforce: "AI workforce", activity: "Activity & evidence", governance: "Governance"
+      overview: "Home", monitoring: "Alerts", opportunities: "Ideas", products: "My tools",
+      workforce: "AI team", activity: "History", governance: "Safety & access"
     })[view];
     document.body.classList.remove("nav-open");
     $("sidebar-scrim").hidden = true;
     $("mobile-menu").setAttribute("aria-expanded", "false");
+    $("mobile-more").setAttribute("aria-expanded", "false");
     if (location.hash !== "#" + view) history.replaceState(null, "", "#" + view);
     window.scrollTo({ top: 0, behavior: "instant" });
     $("main-content").focus({ preventScroll: true });
@@ -122,7 +124,8 @@
 
   function renderMetrics() {
     const d = state.data;
-    const local = state.origin === "local";
+    const local = state.origin === "local" || state.origin === "cloudflare";
+    const cloud = state.origin === "cloudflare";
     const preview = state.origin === "preview";
     $("metric-assets").textContent = d.assets.length;
     $("metric-findings").textContent = d.findings.length;
@@ -140,10 +143,10 @@
     const observedAt = cleanDate(d.verification?.generatedAt || "");
     $("snapshot-date").textContent = preview ? "Illustrative dashboard" :
       local ? "Local evidence" + (observedAt ? " · " + observedAt : "") : "Imported file · not independently verified";
-    $("mode-label").textContent = preview ? "Preview mode" : local ? "Private evidence" : "Imported data";
+    $("mode-label").textContent = preview ? "Preview mode" : cloud ? "Cloudflare evidence" : local ? "Private evidence" : "Imported data";
     $("mode-chip").classList.toggle("imported", !preview);
     $("footer-mode").textContent = preview ? "PREVIEW · NOT A LIVE HEALTH REPORT" :
-      local ? "PRIVATE COLLECTOR · EVIDENCE REQUIRES REVIEW" : "IMPORTED DATA · NOT INDEPENDENTLY VERIFIED";
+      cloud ? "CLOUDFLARE FREE · OBSERVATION ONLY" : local ? "PRIVATE COLLECTOR · EVIDENCE REQUIRES REVIEW" : "IMPORTED DATA · NOT INDEPENDENTLY VERIFIED";
     $("brief-kind").textContent = preview ? "EXAMPLE" : local ? "LOCAL REPORT" : "IMPORTED";
     const notice = $("data-notice");
     notice.hidden = false;
@@ -151,8 +154,131 @@
     noticeText.textContent = preview
       ? "Preview workspace — The records below are examples, not findings from a live scan. Import a report to explore your own observations."
       : local
-        ? "Private collector report — This view refreshes from a self-hosted read-only endpoint. HTTP responses and research leads are observations, not proof that products work or business demand exists."
+        ? "Read-only collector report — These are recorded HTTP observations and research leads, not proof that every product feature works or that market demand exists."
         : "Imported report — These values came from a file in your browser. Headquarters has not independently checked them or connected to production systems.";
+  }
+
+  function renderHomeFeed() {
+    const d=state.data;
+    const preview=state.origin==="preview";
+    const official=state.origin==="cloudflare" || state.origin==="local";
+    const at=cleanDate(d.verification?.generatedAt);
+    $("home-updated").textContent=preview?"You're viewing example updates · Not live":
+      at?"Last update: "+at+" · "+(official?"Automatic report":"Imported report"):
+      "Report timestamp unavailable · Check data source";
+
+    // Hide low-level collector heartbeat keys from the founder's social feed.
+    // They remain available in History for auditability.
+    const meaningfulActivity=d.activity.filter(item=>
+      !/^(last[ _-]?cron|discovery|research|security[ _-]?watch|site[ _-]?bundle[ _-]?fingerprint)$/i.test(item.title));
+    $("home-alert-count").textContent=d.findings.length;
+    $("home-idea-count").textContent=d.opportunities.length;
+    $("home-tool-count").textContent=(state.origin==="cloudflare" && !d.verification?.complete)?"?":d.products.length;
+    $("home-update-count").textContent=meaningfulActivity.length+d.changes.length;
+
+    const site=d.assets.find(asset=>asset.kind==="website" || /yorphives website/i.test(asset.name));
+    const sitePill=$("home-site-pill");
+    const siteCopy=$("home-site-copy");
+    sitePill.className="home-site-pill";
+    if(preview || !site || site.status==="unknown"){
+      sitePill.textContent=preview?"Example · not live":"Status not verified";
+      sitePill.classList.add("unknown");
+      siteCopy.textContent=preview?"This is an example screen, not a live website check.":
+        "No reliable website status in this report yet. Check coverage before assuming the site works.";
+    }else if(site.status==="healthy"){
+      sitePill.textContent="Reported reachable";
+      sitePill.classList.add("good");
+      siteCopy.textContent="The latest recorded check reached the website. Individual tool features are not verified.";
+    }else{
+      sitePill.textContent="Issue reported";
+      sitePill.classList.add("warning");
+      siteCopy.textContent="A recent check reported a problem. Open Alerts and review the evidence.";
+    }
+
+    const lead=[...d.findings].sort((a,b)=>(priorityRank[a.priority]??3)-(priorityRank[b.priority]??3))[0];
+    const opportunity=d.opportunities[0];
+    const next=$("home-next-copy");
+    const nextButton=$("home-next-action");
+    if(lead){
+      next.textContent="Review: "+lead.title+". Headquarters can suggest what to investigate, not make changes.";
+      nextButton.dataset.nav="monitoring";
+      nextButton.replaceChildren(document.createTextNode("Review alert "),icon("chevron"));
+    }else if(state.origin==="cloudflare" && !d.verification?.complete){
+      next.textContent="Your website tool list is incomplete. Review discovery before trusting comparisons.";
+      nextButton.dataset.nav="products";
+      nextButton.replaceChildren(document.createTextNode("See my tools "),icon("chevron"));
+    }else if(opportunity){
+      next.textContent="There is an idea worth looking at: "+opportunity.title+". Demand is not verified.";
+      nextButton.dataset.nav="opportunities";
+      nextButton.replaceChildren(document.createTextNode("Explore ideas "),icon("chevron"));
+    }else{
+      next.textContent="No decisions are listed in this report. Check coverage; an empty list isn't proof that all is well.";
+      nextButton.dataset.nav="monitoring";
+      nextButton.replaceChildren(document.createTextNode("Review coverage "),icon("chevron"));
+    }
+
+    const entries=[];
+    d.findings.forEach(item=>entries.push({
+      id:"alert-"+item.id,kind:"alerts",title:item.title,
+      text:item.description || "A monitoring observation may need your review.",
+      date:item.observedAt,chip:item.priority==="high"?"Needs attention":"For review",
+      source:"Monitoring",icon:"shield",action:"Read recommendation",open:()=>showDetail(item,"finding")
+    }));
+    d.opportunities.forEach(item=>entries.push({
+      id:"idea-"+item.id,kind:"ideas",title:item.title,
+      text:item.description || "A research lead to investigate before investing.",
+      date:item.observedAt,chip:item.kind==="catalog-unverified"?"Catalog incomplete":"Unverified idea",
+      source:"Ideas",icon:"spark",action:"Explore idea",open:()=>showDetail(item,"opportunity")
+    }));
+    d.changes.forEach(item=>entries.push({
+      id:"change-"+item.id,kind:"changes",title:item.kind==="new-product"?"New tool spotted":"Website change noticed",
+      text:item.summary || "A change was observed. Review its source before drawing conclusions.",
+      date:item.occurredAt,chip:"Observation",source:"My tools",icon:"layers",action:"View tools",
+      open:()=>showView("products")
+    }));
+    meaningfulActivity.forEach(item=>entries.push({
+      id:"activity-"+item.id,kind:"changes",title:item.title,
+      text:item.summary || "An update was logged; see History for details.",
+      date:item.occurredAt,chip:"Activity log",source:"HQ history",icon:"clock",action:"View history",
+      open:()=>showView("activity")
+    }));
+    const groupOrder={alerts:0,changes:1,ideas:2};
+    entries.sort((a,b)=>{
+      const ad=Date.parse(a.date||""),bd=Date.parse(b.date||"");
+      const atime=Number.isFinite(ad)?ad:0,btime=Number.isFinite(bd)?bd:0;
+      return btime-atime || (groupOrder[a.kind]||0)-(groupOrder[b.kind]||0);
+    });
+    const filtered=entries.filter(entry=>state.feedFilter==="all" || entry.kind===state.feedFilter).slice(0,8);
+    const parent=$("home-feed-list");
+    parent.replaceChildren();
+    if(!filtered.length){
+      parent.append(emptyState(state.feedFilter==="all"?"No updates in this report":"Nothing in this category yet",
+        "That doesn't mean everything is healthy. Check when your sources last reported, or choose another filter."));
+      return;
+    }
+    for(const item of filtered){
+      const card=node("article","feed-card feed-"+item.kind);
+      const avatar=node("span","feed-avatar");
+      avatar.append(icon(item.icon));
+      const head=node("div","feed-card-top");
+      const author=node("div","feed-author");
+      append(author,node("strong","",item.source),
+        node("small","",cleanDate(item.date)||"No timestamp"));
+      const status=node("span","feed-provenance",preview?"EXAMPLE":state.origin==="cloudflare"?"REPORTED":"UNVERIFIED");
+      append(head,avatar,author,status);
+      const content=node("div","feed-card-content");
+      const badge=node("span","feed-badge",item.chip);
+      append(content,badge,node("h3","",item.title),
+        node("p","",item.text.length>220?item.text.slice(0,217)+"…":item.text));
+      const foot=node("div","feed-card-bottom");
+      const action=node("button","feed-open",item.action);
+      action.type="button";
+      action.append(icon("chevron"));
+      action.addEventListener("click",item.open);
+      append(foot,node("span","feed-safe-note","Read-only · Your decision"),action);
+      append(card,head,content,foot);
+      parent.append(card);
+    }
   }
 
   function renderBrief() {
@@ -261,6 +387,31 @@
     });
   }
 
+  function renderSecurityWatch() {
+    const parent = $("security-watch-list");
+    parent.replaceChildren();
+    const rows=state.data.securityWatch || [];
+    if (!rows.length) {
+      parent.append(emptyState("No verified advisory feed records",
+        "The public advisory watch may not have run yet, or its source was unavailable. This does not prove your dependencies are secure."));
+      return;
+    }
+    rows.forEach(record => {
+      const card=node("article","security-advisory-row");
+      const top=node("div","security-advisory-heading");
+      append(top,node("strong","",record.title),node("span","security-advisory-level",record.severity.toUpperCase()+" · PUBLIC ADVISORY"));
+      const body=node("p","",record.packages.length?"Named packages: "+record.packages.join(", "):"Affected package not established");
+      const caveat=node("small","","Applicability to YorpHives is not verified · "+(cleanDate(record.observedAt)||"Time unavailable"));
+      card.append(top,body,caveat);
+      if(record.source && record.source.startsWith("https://github.com/advisories/")) {
+        const link=node("a","source-link","View official advisory");
+        link.href=record.source;link.target="_blank";link.rel="noopener noreferrer";
+        card.append(link);
+      }
+      parent.append(card);
+    });
+  }
+
   function renderOpportunities() {
     const list = state.data.opportunities.filter(item => state.opportunityFilter === "all" || item.category === state.opportunityFilter);
     const parent = $("opportunities-grid");
@@ -271,12 +422,18 @@
       const card = node("article", "opportunity-card");
       const top = node("div", "opportunity-card-top");
       const category = node("span", "opportunity-category"); append(category, icon(categoryIcons[item.category] || "radar"), node("span", "", label(item.category)));
-      append(top, category, node("span", "outline-pill", state.origin === "preview" ? "EXAMPLE" : state.origin === "local" ? "LOCAL" : "IMPORTED"));
+      append(top, category, node("span", "outline-pill",
+        state.origin === "preview" ? "EXAMPLE" : state.origin === "cloudflare" ? "CLOUDFLARE" :
+        state.origin === "local" ? "LOCAL" : "IMPORTED"));
       const bottom = node("div", "card-bottom");
       const open = node("button", "", "Explore lead"); open.type = "button"; open.append(icon("arrow"));
       open.addEventListener("click", () => showDetail(item, "opportunity"));
       append(bottom, node("small", "", item.confidence), open);
-      append(card, top, node("h3", "", item.title), node("p", "", item.description), bottom);
+      const context = node("div", "lead-context", item.kind === "possible-existing-product" ?
+        "POSSIBLE EXISTING TOOL · CHECK FEATURE PARITY" : item.kind === "potential-missing-product" ?
+        "POSSIBLE NEW TOOL · VALIDATE DEMAND" : item.kind === "catalog-unverified" ?
+        "CATALOG NOT VERIFIED · RESEARCH MENTION ONLY" : "UNVALIDATED RESEARCH LEAD");
+      append(card, top, context, node("h3", "", item.title), node("p", "", item.description), bottom);
       parent.append(card);
     });
   }
@@ -319,7 +476,7 @@
     const changes = state.data.changes || [];
     const comparisons = state.data.comparisons || [];
     const imported = state.origin !== "preview";
-    const local = state.origin === "local";
+    const local = state.origin === "local" || state.origin === "cloudflare";
     const verifiedScan = imported && state.data.verification?.complete;
     $("product-total").textContent = products.length;
     $("product-new").textContent = changes.filter(item => item.kind === "new-product").length;
@@ -329,10 +486,31 @@
     const qaPassed = checked.filter(p => p.qaStatus === "passed").length;
     const qaFailed = checked.filter(p => p.qaStatus === "failed").length;
     const qaPending = checked.filter(p => p.qaStatus === "pending_confirmation").length;
-    $("product-qa-total").textContent = checked.length ? qaPassed + "/" + checked.length : "—";
-    $("product-qa-caption").textContent = checked.length
-      ? qaFailed + " confirmed alerts · " + qaPending + " awaiting confirmation"
+    $("product-qa-total").textContent = state.origin === "cloudflare" ? "HTTP" : checked.length ? qaPassed + "/" + checked.length : "—";
+    $("product-qa-caption").textContent = state.origin === "cloudflare"
+      ? "Passive monitoring · no browser testing"
+      : checked.length ? qaFailed + " confirmed alerts · " + qaPending + " awaiting confirmation"
       : "No browser checks reported";
+
+    const spending = $("zero-cost-summary"); spending.replaceChildren();
+    const guard = state.data.resourceBudget;
+    if (!guard) {
+      spending.append(emptyState("Budget telemetry unavailable",
+        "Connect the isolated Cloudflare Free collector to see daily request counts and explicit disabled capabilities."));
+    } else {
+      const area = node("div", "budget-grid");
+      const stats = [
+        ["Public HTTP requests today", guard.used + " / " + (guard.limit || "not set"), guard.limit > 0 ? "Internal daily limit" : "No limit declared"],
+        ["AI inference", guard.aiDisabled ? "OFF" : "Not verified", "No paid model calls expected"],
+        ["Production browser testing", guard.browserDisabled ? "OFF" : "Not verified", "No browser sessions in this worker"]
+      ];
+      for (const [name, count, hint] of stats) {
+        const tile = node("div", "budget-record");
+        append(tile, node("span", "", name), node("strong", "", count), node("small", "", hint));
+        area.append(tile);
+      }
+      spending.append(area);
+    }
     $("catalog-kind").textContent = local ? "LOCAL REPORT" : imported ? "IMPORTED" : "EXAMPLE";
     $("discovery-status").textContent = !imported ? "Preview — not connected"
       : verifiedScan ? (local ? "Local discovery reported complete" : "Imported successful discovery")
@@ -407,11 +585,13 @@
 
   function renderAll() {
     renderMetrics();
+    renderHomeFeed();
     renderBrief();
     renderCoverage();
     renderPriorityInbox();
     renderOpportunityPreview();
     renderFindings();
+    renderSecurityWatch();
     renderOpportunities();
     renderProducts();
     renderWorkforce();
@@ -451,7 +631,7 @@
 
   function normalizeData(raw) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("The JSON root must be an object.");
-    const arrays = ["assets", "findings", "opportunities", "products", "changes", "comparisons", "agents", "activity"];
+    const arrays = ["assets", "findings", "opportunities", "products", "changes", "comparisons", "agents", "activity", "securityWatch"];
     for (const key of arrays) if (raw[key] !== undefined && !Array.isArray(raw[key])) throw new Error("'" + key + "' must be an array.");
     const items = (key) => (raw[key] || []).filter(x => x && typeof x === "object" && !Array.isArray(x)).slice(0, 200);
     const evidence = (item) => Array.isArray(item.evidence) ? item.evidence.slice(0, 10).map(safeUrl).filter(Boolean) : [];
@@ -472,8 +652,17 @@
         id: cleanText(o.id, 80) || "opportunity" + i, title: cleanText(o.title, 160) || "Untitled lead",
         category: ["product", "revenue", "technology"].includes(o.category) ? o.category : "product",
         confidence: cleanText(o.confidence, 70) || "Unassessed",
+        kind: ["potential-missing-product", "possible-existing-product", "catalog-unverified"].includes(o.kind) ? o.kind : "unvalidated-lead",
         description: cleanText(o.description, 3000), recommendation: cleanText(o.recommendation, 3000),
         observedAt: cleanText(o.observedAt, 45), evidence: evidence(o)
+      })),
+      securityWatch: items("securityWatch").map((a,i) => ({
+        id: cleanText(a.id,60) || "public-advisory"+i,
+        title: cleanText(a.title,180) || "Public security advisory",
+        severity: ["high","critical"].includes(a.severity) ? a.severity : "unverified",
+        packages: Array.isArray(a.packages) ? a.packages.slice(0,5).map(p => cleanText(p?.name,100)).filter(Boolean) : [],
+        source: safeUrl(a.source), observedAt: cleanText(a.observedAt,45),
+        applicability: "Not verified against YorpHives dependencies"
       })),
       products: items("products").map((p, i) => ({
         id: cleanText(p.id, 80) || "product" + i, name: cleanText(p.name, 160) || "Unnamed product",
@@ -507,6 +696,17 @@
         occurredAt: cleanText(a.occurredAt, 45)
       }))
     };
+    const rawBudget = raw.resourceBudget;
+    if (rawBudget && typeof rawBudget === "object" && !Array.isArray(rawBudget)) {
+      const publicFetches = rawBudget.publicFetches || {};
+      const number = value => Number.isSafeInteger(value) && value >= 0 ? Math.min(value, 1_000_000) : 0;
+      normal.resourceBudget = {
+        used: number(publicFetches.used),
+        limit: number(publicFetches.limit),
+        aiDisabled: rawBudget.aiCalls?.disabled === true,
+        browserDisabled: rawBudget.browserMinutes?.disabled === true
+      };
+    }
     normal.verification = {
       complete: raw.pipeline?.products?.complete === true || raw.verification?.complete === true,
       generatedAt: cleanText(raw.pipeline?.generatedAt || raw.generatedAt, 45),
@@ -523,6 +723,12 @@
     state.origin = origin;
     state.findingFilter = "all";
     state.opportunityFilter = "all";
+    state.feedFilter = "all";
+    document.querySelectorAll("[data-feed-filter]").forEach(button=>{
+      const active=button.dataset.feedFilter==="all";
+      button.classList.toggle("is-selected",active);
+      button.setAttribute("aria-pressed",String(active));
+    });
     document.querySelectorAll("[data-finding-filter], [data-opportunity-filter]").forEach(button => {
       button.classList.toggle("is-selected", button.dataset.findingFilter === "all" || button.dataset.opportunityFilter === "all");
     });
@@ -551,7 +757,8 @@
     }
     try {
       const response = await fetch("/api/report", { credentials: "same-origin", cache: "no-store" });
-      if (response.status !== 200 || response.headers.get("X-YorpHives-HQ-Evidence") !== "readonly-local") {
+      const mode = response.headers.get("X-YorpHives-HQ-Evidence");
+      if (response.status !== 200 || !["readonly-local", "readonly-cloudflare"].includes(mode)) {
         if (notify) showToast("No fresh, authenticated private report is available.");
         return false;
       }
@@ -562,8 +769,8 @@
         return false;
       }
       if (state.origin === "imported" && !notify) return true;
-      applyReport(raw, "local");
-      if (notify) showToast("Private evidence refreshed. Check timestamps and sources.");
+      applyReport(raw, mode === "readonly-cloudflare" ? "cloudflare" : "local");
+      if (notify) showToast("Read-only evidence refreshed. Check timestamps and sources.");
       return true;
     } catch (error) {
       if (notify) showToast("Private evidence unavailable: " + cleanText(error.message, 90));
@@ -607,6 +814,21 @@
   function initialize() {
     document.querySelectorAll("[data-nav]").forEach(button => button.addEventListener("click", () => showView(button.dataset.nav)));
     window.addEventListener("hashchange", () => showView(location.hash.replace("#", "")));
+    document.querySelectorAll("[data-feed-filter]").forEach(chip=>chip.addEventListener("click",()=>{
+      state.feedFilter=chip.dataset.feedFilter;
+      document.querySelectorAll("[data-feed-filter]").forEach(button=>{
+        const active=button===chip;
+        button.classList.toggle("is-selected",active);
+        button.setAttribute("aria-pressed",String(active));
+      });
+      renderHomeFeed();
+    }));
+    $("mobile-more").addEventListener("click",()=>{
+      const open=document.body.classList.toggle("nav-open");
+      $("sidebar-scrim").hidden=!open;
+      $("mobile-menu").setAttribute("aria-expanded",String(open));
+      $("mobile-more").setAttribute("aria-expanded",String(open));
+    });
     document.querySelectorAll("[data-finding-filter]").forEach(button => button.addEventListener("click", () => {
       state.findingFilter = button.dataset.findingFilter;
       document.querySelectorAll("[data-finding-filter]").forEach(chip => chip.classList.toggle("is-selected", chip === button));
@@ -637,6 +859,27 @@
     $("notice-dismiss").addEventListener("click", () => { $("data-notice").hidden = true; });
     $("detail-close").addEventListener("click", () => $("detail-dialog").close());
     $("dialog-done").addEventListener("click", () => $("detail-dialog").close());
+    // The keyboard hint is a label only; functionality supports both
+    // Control+K and Command+K on all platforms.
+    const shortcut=$("search-shortcut");
+    if(shortcut){
+      const platform=String(navigator.userAgentData?.platform || navigator.platform || "");
+      shortcut.textContent=/Mac|iPad|iPhone/i.test(platform)?"⌘ K":"Ctrl K";
+    }
+    // Logout is a normal top-level navigation to Cloudflare Access's
+    // documented revocation endpoint. No client-side-only pseudo logout.
+    document.querySelectorAll('a[href="/cdn-cgi/access/logout"]').forEach(link=>{
+      link.addEventListener("click",event=>{
+        if(event.defaultPrevented || event.button!==0 || event.metaKey || event.ctrlKey ||
+           event.shiftKey || event.altKey) return;
+        document.body.classList.add("session-ending");
+      });
+    });
+    // Never expose a cached, previously signed-in private dashboard when the
+    // user hits Back from Cloudflare Access logout (BFCache restoration).
+    window.addEventListener("pageshow",event=>{
+      if(event.persisted) window.location.reload();
+    });
     $("search-trigger").addEventListener("click", openSearch);
     $("global-search").addEventListener("input", (event) => renderSearch(event.target.value));
     $("copy-record").addEventListener("click", async () => {
