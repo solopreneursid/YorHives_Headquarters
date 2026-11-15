@@ -1,4 +1,4 @@
-/* YorpHives Headquarters — dependency-free, read-only presentation layer.
+/* YorpHives Headquarters — dependency-free observation and founder-review UI.
    Nothing here scans, deploys, edits repositories, or contacts an external API.
    Imported JSON is displayed as unverified user-provided evidence, not live status. */
 (() => {
@@ -86,7 +86,7 @@
     } catch (_) { return ""; }
   };
   const label = (word) => String(word || "").replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
-  const originLabel = () => state.origin === "preview" ? "Example only" : state.origin === "cloudflare" ? "Cloudflare scheduled evidence — unverified" : state.origin === "local" ? "Private local evidence — unverified" : "Imported — unverified";
+  const originLabel = () => state.origin === "selfhost" ? "Self-hosted scheduled evidence — unverified" : state.origin === "preview" ? "Example only" : ["cloudflare","selfhost"].includes(state.origin) ? "Cloudflare scheduled evidence — unverified" : state.origin === "local" ? "Private local evidence — unverified" : "Imported — unverified";
   const priorityRank = { high: 0, medium: 1, low: 2 };
   const categoryIcons = { security: "shield", dependencies: "code", reliability: "activity", quality: "check", product: "layers", revenue: "dollar", technology: "radar" };
   const workerIcons = ["activity", "shield", "spark", "radar", "trend", "dollar"];
@@ -126,8 +126,8 @@
 
   function renderMetrics() {
     const d = state.data;
-    const local = state.origin === "local" || state.origin === "cloudflare";
-    const cloud = state.origin === "cloudflare";
+    const local = state.origin === "local" || ["cloudflare","selfhost"].includes(state.origin);
+    const cloud = ["cloudflare","selfhost"].includes(state.origin);
     const preview = state.origin === "preview";
     $("metric-assets").textContent = d.assets.length;
     $("metric-findings").textContent = d.findings.length;
@@ -197,7 +197,7 @@
   function renderHomeFeed() {
     const d=state.data;
     const preview=state.origin==="preview";
-    const official=state.origin==="cloudflare" || state.origin==="local";
+    const official=["cloudflare","selfhost"].includes(state.origin) || state.origin==="local";
     const at=cleanDate(d.verification?.generatedAt);
     $("home-updated").textContent=preview?"You're viewing example updates · Not live":
       at?"Last update: "+at+" · "+(official?"Automatic report":"Imported report"):
@@ -209,7 +209,7 @@
       !/^(last[ _-]?cron|discovery|research|security[ _-]?watch|site[ _-]?bundle[ _-]?fingerprint)$/i.test(item.title));
     $("home-alert-count").textContent=d.findings.length;
     $("home-idea-count").textContent=d.opportunities.length;
-    $("home-tool-count").textContent=(state.origin==="cloudflare" && !d.verification?.complete)?"?":d.products.length;
+    $("home-tool-count").textContent=(["cloudflare","selfhost"].includes(state.origin) && !d.verification?.complete)?"?":d.products.length;
     $("home-update-count").textContent=meaningfulActivity.length+d.changes.length;
 
     const site=d.assets.find(asset=>asset.kind==="website" || /yorphives website/i.test(asset.name));
@@ -232,14 +232,15 @@
     }
 
     const lead=[...d.findings].sort((a,b)=>(priorityRank[a.priority]??3)-(priorityRank[b.priority]??3))[0];
-    const opportunity=d.opportunities[0];
+    const actionableIdeas=d.opportunities.filter(item=>{const previous=currentDecision(item.id,"opportunity");const thread=d.operating?.threads.find(x=>x.thread==="opportunity:"+item.id);return !previous||!["rejected","snoozed","verified"].includes(previous.state)||thread?.changed;});
+    const opportunity=actionableIdeas[0];
     const next=$("home-next-copy");
     const nextButton=$("home-next-action");
     if(lead){
       next.textContent="Review: "+lead.title+". Headquarters can suggest what to investigate, not make changes.";
       nextButton.dataset.nav="monitoring";
       nextButton.replaceChildren(document.createTextNode("Review alert "),icon("chevron"));
-    }else if(state.origin==="cloudflare" && !d.verification?.complete){
+    }else if(["cloudflare","selfhost"].includes(state.origin) && !d.verification?.complete){
       next.textContent="Your website tool list is incomplete. Review discovery before trusting comparisons.";
       nextButton.dataset.nav="products";
       nextButton.replaceChildren(document.createTextNode("See my tools "),icon("chevron"));
@@ -257,10 +258,10 @@
     d.findings.forEach(item=>entries.push({
       id:"alert-"+item.id,kind:"alerts",title:item.title,
       text:item.description || "A monitoring observation may need your review.",
-      date:item.observedAt,chip:item.priority==="high"?"Needs attention":"For review",
+      date:item.observedAt,chip:decisionLabels[currentDecision(item.id,"finding")?.state]||(item.priority==="high"?"Needs attention":"For review"),
       source:"Monitoring",icon:"shield",action:"Read recommendation",open:()=>showDetail(item,"finding")
     }));
-    d.opportunities.forEach(item=>entries.push({
+    actionableIdeas.forEach(item=>entries.push({
       id:"idea-"+item.id,kind:"ideas",title:item.title,
       text:item.description || "A research lead to investigate before investing.",
       date:item.observedAt,chip:item.kind==="catalog-unverified"?"Catalog incomplete":"Unverified idea",
@@ -300,7 +301,7 @@
       const author=node("div","feed-author");
       append(author,node("strong","",item.source),
         node("small","",cleanDate(item.date)||"No timestamp"));
-      const status=node("span","feed-provenance",preview?"EXAMPLE":state.origin==="cloudflare"?"REPORTED":"UNVERIFIED");
+      const status=node("span","feed-provenance",preview?"EXAMPLE":["cloudflare","selfhost"].includes(state.origin)?"REPORTED":"UNVERIFIED");
       append(head,avatar,author,status);
       const content=node("div","feed-card-content");
       const badge=node("span","feed-badge",item.chip);
@@ -459,7 +460,7 @@
       const top = node("div", "opportunity-card-top");
       const category = node("span", "opportunity-category"); append(category, icon(categoryIcons[item.category] || "radar"), node("span", "", label(item.category)));
       append(top, category, node("span", "outline-pill",
-        state.origin === "preview" ? "EXAMPLE" : state.origin === "cloudflare" ? "CLOUDFLARE" :
+        state.origin === "preview" ? "EXAMPLE" : ["cloudflare","selfhost"].includes(state.origin) ? (state.origin==="selfhost"?"SELF-HOSTED":"CLOUDFLARE") :
         state.origin === "local" ? "LOCAL" : "IMPORTED"));
       const bottom = node("div", "card-bottom");
       const open = node("button", "", "Explore lead"); open.type = "button"; open.append(icon("arrow"));
@@ -512,7 +513,7 @@
     const changes = state.data.changes || [];
     const comparisons = state.data.comparisons || [];
     const imported = state.origin !== "preview";
-    const local = state.origin === "local" || state.origin === "cloudflare";
+    const local = state.origin === "local" || ["cloudflare","selfhost"].includes(state.origin);
     const verifiedScan = imported && state.data.verification?.complete;
     $("product-total").textContent = products.length;
     $("product-new").textContent = changes.filter(item => item.kind === "new-product").length;
@@ -522,8 +523,8 @@
     const qaPassed = checked.filter(p => p.qaStatus === "passed").length;
     const qaFailed = checked.filter(p => p.qaStatus === "failed").length;
     const qaPending = checked.filter(p => p.qaStatus === "pending_confirmation").length;
-    $("product-qa-total").textContent = state.origin === "cloudflare" ? "HTTP" : checked.length ? qaPassed + "/" + checked.length : "—";
-    $("product-qa-caption").textContent = state.origin === "cloudflare"
+    $("product-qa-total").textContent = ["cloudflare","selfhost"].includes(state.origin) ? "HTTP" : checked.length ? qaPassed + "/" + checked.length : "—";
+    $("product-qa-caption").textContent = ["cloudflare","selfhost"].includes(state.origin)
       ? "Passive monitoring · no browser testing"
       : checked.length ? qaFailed + " confirmed alerts · " + qaPending + " awaiting confirmation"
       : "No browser checks reported";
@@ -547,10 +548,10 @@
       }
       spending.append(area);
     }
-    $("catalog-kind").textContent = state.origin==="cloudflare" ? "WEBSITE SOURCES" : local ? "LOCAL REPORT" : imported ? "IMPORTED" : "EXAMPLE";
+    $("catalog-kind").textContent = ["cloudflare","selfhost"].includes(state.origin) ? "WEBSITE SOURCES" : local ? "LOCAL REPORT" : imported ? "IMPORTED" : "EXAMPLE";
     $("discovery-status").textContent = !imported ? "Preview — not connected"
-      : verifiedScan ? (state.origin==="cloudflare" ? "Owner manifest reports a complete catalog · functionality unverified" : "Collector reports complete coverage · verify independently")
-        : (state.origin==="cloudflare" ? "Partial website catalog · some tools may be missing" : "Discovery incomplete or not independently verified");
+      : verifiedScan ? (["cloudflare","selfhost"].includes(state.origin) ? "Owner manifest reports a complete catalog · functionality unverified" : "Collector reports complete coverage · verify independently")
+        : (["cloudflare","selfhost"].includes(state.origin) ? "Partial website catalog · some tools may be missing" : "Discovery incomplete or not independently verified");
     $("discovery-explainer").textContent = !imported
       ? "These are illustrative records. Actual monitoring begins after the scanner is installed on your server."
       : (local ? "Private collector report" : "Imported report") +
@@ -577,8 +578,8 @@
         unverified: "Tool features not tested"
       };
       const qa = node("span", "product-qa-badge qa-" + p.qaStatus,
-        state.origin==="cloudflare" ? "Read-only HTTP" : p.qaCheckedAt ? qaLabels[p.qaStatus] : "Tool features not tested");
-      qa.title = state.origin==="cloudflare" ? (p.qaReason || "Only public HTTP observations are available; features are not functionally verified.") :
+        ["cloudflare","selfhost"].includes(state.origin) ? "Read-only HTTP" : p.qaCheckedAt ? qaLabels[p.qaStatus] : "Tool features not tested");
+      qa.title = ["cloudflare","selfhost"].includes(state.origin) ? (p.qaReason || "Only public HTTP observations are available; features are not functionally verified.") :
         p.qaCheckedAt ? "Browser observation: " + (cleanDate(p.qaCheckedAt) || "undated") +
         " · " + (p.qaReason || "No reason provided") : "No functional testing evidence recorded";
       info.append(qa);
@@ -627,6 +628,7 @@
   function renderAll() {
     renderMetrics();
     renderFounderBriefing();
+    renderDecisionQueue();
     renderHomeFeed();
     renderBrief();
     renderCoverage();
@@ -638,6 +640,101 @@
     renderProducts();
     renderWorkforce();
     renderActivity();
+  }
+
+  const decisionLabels={proposed:'Needs review',accepted:'Awaiting founder action',implemented:'Implemented · awaiting verification',verified:'Outcome recorded by founder',rejected:'Not pursuing',snoozed:'Paused'};
+  const decisionOptions={proposed:['accepted','rejected','snoozed'],accepted:['implemented','rejected','snoozed'],implemented:['verified','accepted'],verified:['proposed'],rejected:['proposed'],snoozed:['proposed']};
+  function currentDecision(id,type) {
+    return (state.data.decisionJournal?.events||[]).find(x=>x.thread===type+':'+id);
+  }
+  function renderDecisionQueue() {
+    const area=$("decision-queue");area.replaceChildren();
+    const operating=state.data.operating;
+    $("decision-summary").textContent=state.origin==='preview'?'Connect your private report to track decisions.':
+      !operating?'Decision tracking is not available in this report.':
+      operating.pending?operating.pending+' recommendations need review · showing up to three.':
+      'Nothing new requires a decision. Check monitoring freshness above.';
+    $("decision-limit").textContent=operating?operating.activeOpportunities+' / 3 active opportunities':'No active opportunity count available';
+    for(const record of operating?.queue||[]) {
+      const card=node('article','decision-card');
+      append(card,node('span','source-note',record.type==='finding'?'Monitoring':'Opportunity'),node('h3','',record.title),
+        node('p','',record.changed?'Evidence changed since your decision. Review the update.':record.contract.impact),
+        node('small','source-note',record.contract.freshness+' evidence · '+record.contract.owner));
+      const action=node('button','button button-secondary','Review recommendation');action.type='button';
+      action.addEventListener('click',()=>{const item=(record.type==='finding'?state.data.findings:state.data.opportunities).find(x=>x.id===record.id);if(item)showDetail(item,record.type);});
+      append(card,action);area.append(card);
+    }
+    const history=$("decision-history");history.replaceChildren();
+    const seen=new Set();
+    for(const event of state.data.decisionJournal?.events||[]) {
+      if(seen.has(event.thread)||seen.size>=12)continue;seen.add(event.thread);
+      const button=node('button','decision-history-item',event.title+' — '+(decisionLabels[event.state]||event.state));
+      button.type='button';button.addEventListener('click',()=>{
+        const items=event.kind==='finding'?state.data.findings:state.data.opportunities;
+        const item=items.find(x=>x.id===event.record_id)||{id:event.record_id,title:event.title,category:'quality',priority:'low',asset:'Archived recommendation',description:'The original source record is no longer in this report. Decision history is retained.',recommendation:'Review the retained decision and outcome evidence.',evidence:event.evidence_url?[event.evidence_url]:[],observedAt:event.created_at};
+        showDetail(item,event.kind);
+      });history.append(button);
+    }
+    if(!seen.size)history.append(node('p','source-note','No founder decisions recorded.'));
+    $("decision-export").disabled=!(state.data.decisionJournal?.events?.length);
+  }
+  function renderDecisionDetail(item,type) {
+    const current=currentDecision(item.id,type),status=current?.state||'proposed';
+    const record=state.data.operating?.threads.find(x=>x.thread===type+':'+item.id);
+    const facts=$("decision-facts");facts.replaceChildren();
+    const contract=record?.contract;
+    if(contract)for(const [name,value] of [['Evidence',contract.classification+' · '+contract.freshness],['Confidence',contract.confidence],['Business impact',contract.impact],['Owner',contract.owner],['Independent review',contract.reviewer],['Success condition',contract.successCondition],['Effort',contract.effort],['Risk',contract.risk]]){
+      append(facts,node('dt','',name),node('dd','',value));
+    }
+    $("decision-state").textContent=decisionLabels[status];
+    $("decision-notice").textContent=['cloudflare','selfhost'].includes(state.origin)&&state.data.decisionJournal?.available?
+      'Your decision is saved privately. It never triggers code, deployment, spending or a website change.':
+      'Viewing only. Saving needs the authenticated founder journal; examples and imported reports cannot write decisions.';
+    const select=$("decision-next");select.replaceChildren();
+    for(const value of decisionOptions[status]||[]) {const option=node('option','',decisionLabels[value]);option.value=value;select.append(option);}
+    $("decision-note").value='';$("decision-outcome").value=current?.outcome||'';
+    $("decision-success").value=current?.success_condition||contract?.successCondition||'';
+    $("decision-evidence").value=current?.evidence_url||'';$("decision-feedback").value='';
+    $("decision-save").disabled=!['cloudflare','selfhost'].includes(state.origin)||!state.data.decisionJournal?.available;
+    $("decision-error").textContent='';
+    $("experiment-brief").hidden=type!=='opportunity';
+    let experiment={};try{experiment=JSON.parse(current?.experiment_json||'{}');}catch{}
+    for(const key of ['audience','problem','hypothesis','metric','target','effortHours','stopCondition','reviewBy']){
+      const input=document.getElementById('experiment-'+key);
+      input.value=key==='reviewBy'?(experiment[key]||'').slice(0,10):(experiment[key]??'');
+    }
+    const history=$("decision-detail-history");history.replaceChildren();
+    for(const event of (state.data.decisionJournal?.events||[]).filter(x=>x.thread===type+':'+item.id).slice(0,20)) {
+      const row=node('li','');append(row,node('strong','',decisionLabels[event.state]),
+        node('p','',event.note),node('small','source-note',cleanDate(event.created_at)));
+      if(event.feedback)row.append(node('p','','Feedback: '+label(event.feedback)));
+      if(event.outcome)row.append(node('p','','Outcome: '+event.outcome));
+      if(event.evidence_url){const link=node('a','','Outcome evidence');link.href=event.evidence_url;link.target='_blank';link.rel='noopener noreferrer';row.append(link);}
+      history.append(row);
+    }
+  }
+  async function submitDecision() {
+    const selected=state.selectedDetail;
+    if(!selected||!['cloudflare','selfhost'].includes(state.origin)||!state.data.decisionJournal?.available)return;
+    const {item,type}=selected,current=currentDecision(item.id,type);
+    const input={kind:type,id:item.id,revision:current?.revision||0,state:$("decision-next").value,
+      note:$("decision-note").value,feedback:$("decision-feedback").value,outcome:$("decision-outcome").value,
+      successCondition:$("decision-success").value,evidenceUrl:$("decision-evidence").value};
+    if(type==='opportunity')input.experiment=Object.fromEntries(['audience','problem','hypothesis','metric','target','effortHours','stopCondition','reviewBy'].map(key=>{
+      const value=document.getElementById('experiment-'+key).value;
+      return [key,['target','effortHours'].includes(key)?Number(value):value];
+    }));
+    if(!input.note.trim()){ $("decision-error").textContent='Add a short reason before saving.';return; }
+    $("decision-save").disabled=true;
+    try {
+      const response=await fetch('/api/decisions',{method:'POST',credentials:'same-origin',redirect:'error',
+        headers:{'Content-Type':'application/json','X-HQ-Founder-Action':'decision-v1'},body:JSON.stringify(input)});
+      const result=await response.json();
+      if(!response.ok||!result.saved)throw Error(result.error||'Decision was not saved.');
+      if(!await loadLocalReport(false))throw Error("Decision saved, but the updated report could not be loaded. Refresh before another decision.");
+      renderDecisionDetail(item,type);showToast('Decision saved. No changes were executed.');
+    }catch(error){$("decision-error").textContent=cleanText(error.message,350)||'Could not confirm the save. Refresh before retrying.';}
+    finally{$("decision-save").disabled=!['cloudflare','selfhost'].includes(state.origin)||!state.data.decisionJournal?.available;}
   }
 
   function showDetail(item, type) {
@@ -660,7 +757,8 @@
         const link = node("a", "", url); link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer"; evidence.append(link, document.createElement("br"));
       });
     } else evidence.append(node("p", "source-note", "No evidence links included. Treat this as a hypothesis until verified."));
-    $("detail-dialog").showModal();
+    renderDecisionDetail(item,type);
+    if(!$("detail-dialog").open)$("detail-dialog").showModal();
   }
 
   function showToast(message) {
@@ -740,6 +838,22 @@
         occurredAt: cleanText(a.occurredAt, 45)
       }))
     };
+    const eventFields=['thread','kind','record_id','title','state','note','feedback','outcome','success_condition','evidence_url','created_at','experiment_json','snapshot'];
+    normal.decisionJournal={available:raw.decisionJournal?.available===true,events:
+      (Array.isArray(raw.decisionJournal?.events)?raw.decisionJournal.events:[]).slice(0,2000)
+      .filter(e=>e&&['finding','opportunity'].includes(e.kind)&&Object.hasOwn(decisionLabels,e.state))
+      .map(e=>{const row=Object.fromEntries(eventFields.map(k=>[k,cleanText(e[k],k==='title'?160:k==='experiment_json'?3000:k==='snapshot'?10000:1000)]));
+        row.evidence_url=safeUrl(e.evidence_url);row.revision=Number.isSafeInteger(e.revision)&&e.revision>0?e.revision:0;return row;})};
+    if(raw.operating&&typeof raw.operating==='object'){
+      const count=x=>Number.isSafeInteger(x)&&x>=0?Math.min(x,9999):0;
+      const cleanRecord=x=>({id:cleanText(x.id,80),thread:cleanText(x.thread,100),title:cleanText(x.title,160),
+        type:x.type==='finding'?'finding':'opportunity',changed:x.changed===true,
+        contract:Object.fromEntries(['impact','freshness','owner','classification','confidence','reviewer','successCondition','effort','risk']
+          .map(k=>[k,cleanText(x.contract?.[k],500)||'Not supplied']))});
+      normal.operating={pending:count(raw.operating.pending),activeOpportunities:count(raw.operating.activeOpportunities),
+        queue:(Array.isArray(raw.operating.queue)?raw.operating.queue:[]).filter(x=>x&&typeof x==='object').slice(0,3).map(cleanRecord),
+        threads:(Array.isArray(raw.operating.threads)?raw.operating.threads:[]).filter(x=>x&&typeof x==='object').slice(0,200).map(cleanRecord)};
+    }
     const rawBudget = raw.resourceBudget;
     if (rawBudget && typeof rawBudget === "object" && !Array.isArray(rawBudget)) {
       const publicFetches = rawBudget.publicFetches || {};
@@ -785,7 +899,7 @@
   }
 
   function notifyNewHighPriority(previous, normal, origin) {
-    if(!state.browserAlertsOn || origin!=="cloudflare" || previous!=="cloudflare") return;
+    if(!state.browserAlertsOn || !["cloudflare","selfhost"].includes(origin) || previous!==origin) return;
     for(const finding of normal.findings){
       if(!["high"].includes(finding.priority) || state.seenFindingIds.has(finding.id)) continue;
       state.seenFindingIds.add(finding.id);
@@ -840,6 +954,15 @@
     }
   }
 
+  function markReportUnavailable() {
+    if(!['cloudflare','local','selfhost'].includes(state.origin))return;
+    state.data.assets.forEach(asset=>{asset.status='unknown';});
+    if(state.data.briefing){state.data.briefing.collector.current=false;state.data.briefing.site.status='not-verified';}
+    if(state.data.decisionJournal)state.data.decisionJournal.available=false;
+    renderAll();
+    $("decision-summary").textContent='Current report unavailable. Retained evidence may be stale; refresh before deciding.';
+    $("decision-save").disabled=true;
+  }
   async function loadLocalReport(notify = false) {
     if (!["http:", "https:"].includes(location.protocol)) {
       if (notify) showToast("Private evidence viewer is not connected in this preview.");
@@ -848,21 +971,24 @@
     try {
       const response = await fetch("/api/report", { credentials: "same-origin", cache: "no-store" });
       const mode = response.headers.get("X-YorpHives-HQ-Evidence");
-      if (response.status !== 200 || !["readonly-local", "readonly-cloudflare"].includes(mode)) {
+      if (response.status !== 200 || !["readonly-local", "readonly-cloudflare", "readonly-selfhost"].includes(mode)) {
+        markReportUnavailable();
         if (notify) showToast("No fresh, authenticated private report is available.");
         return false;
       }
       const raw = await response.json();
       if (raw.schemaVersion !== "yorphives.hq-intelligence.v1" ||
           raw.pipeline?.readOnly !== true || !raw.pipeline?.generatedAt) {
+        markReportUnavailable();
         if (notify) showToast("Local evidence contract is invalid; no report applied.");
         return false;
       }
       if (state.origin === "imported" && !notify) return true;
-      applyReport(raw, mode === "readonly-cloudflare" ? "cloudflare" : "local");
+      applyReport(raw, mode === "readonly-cloudflare" ? "cloudflare" : mode === "readonly-selfhost" ? "selfhost" : "local");
       if (notify) showToast("Read-only evidence refreshed. Check timestamps and sources.");
       return true;
     } catch (error) {
+      markReportUnavailable();
       if (notify) showToast("Private evidence unavailable: " + cleanText(error.message, 90));
       return false;
     }
@@ -902,6 +1028,12 @@
   }
 
   function initialize() {
+    $("decision-save").addEventListener('click',submitDecision);
+    $("decision-export").addEventListener('click',()=>{
+      const data={schemaVersion:'yorphives.founder-decisions.v1',exportedAt:new Date().toISOString(),origin:originLabel(),events:state.data.decisionJournal?.events||[]};
+      const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+      const link=document.createElement('a');link.href=url;link.download='yorphives-founder-decisions.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    });
     $("browser-alert-toggle").addEventListener("click",async()=>{
       if(state.browserAlertsOn){
         state.browserAlertsOn=false;

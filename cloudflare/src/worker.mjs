@@ -813,7 +813,8 @@ function makeFounderBriefing(assets,findings,opportunities,hypotheses,metadata,u
   const site=siteCurrent&&website?.status==="reachable"?"reported-reachable":
     siteCurrent&&website?.status==="degraded"?"issue-reported":"not-verified";
   const discovery=metadata.find(x=>x.key==="discovery");
-  const discoveryCurrent=discovery&&Date.parse(at)-Date.parse(discovery.checked_at)<12*3600000;
+  const discoveryAge=Date.parse(at)-Date.parse(discovery?.checked_at||" ");
+  const discoveryCurrent=Number.isFinite(discoveryAge)&&discoveryAge>=0&&discoveryAge<12*3600000;
   const inventoryComplete=Boolean(discoveryCurrent&&discovery.value.startsWith("observed:manifest-complete:"));
   const urgent=[...findings].filter(x=>x.priority==="high"||x.priority==="critical");
   const alternatives=hypotheses.length;
@@ -840,13 +841,122 @@ function makeFounderBriefing(assets,findings,opportunities,hypotheses,metadata,u
       httpReachable:reachable,httpIssue:degraded,httpUnverified:uncertain,
       inventoryComplete,method:"Read-only HTTP; no interactive feature testing"},
     alerts:{open:findings.length,highPriority:urgent.length},
-    research:{leads:opportunities.length,alternatives,verifiedRevenue:0,
+    research:{leads:opportunities.length,alternatives,verifiedRevenue:null,
       limitation:"Research mentions and public feature claims are not proof of traffic, demand or feature gaps"},
     usage:{used:Math.max(0,Number(used)||0),limit:FETCH_BUDGET_DAY,
       note:"Internal public-GET safeguard, not an invoice or a price guarantee"},
     nextAction:suggested,
     safety:{readOnly:true,changeRequiresFounder:true,liveBrowserTests:false,paidAi:false}
   };
+}
+
+// Founder decisions are internal records only. Collectors cannot invoke this
+// route and no decision is interpreted as an instruction to execute code.
+const DECISION_TRANSITIONS = Object.freeze({
+  proposed:['accepted','rejected','snoozed'], accepted:['implemented','rejected','snoozed'],
+  implemented:['verified','accepted'], verified:['proposed'], rejected:['proposed'], snoozed:['proposed']
+});
+function decisionTransition(previous, next) {
+  return (DECISION_TRANSITIONS[previous]||[]).includes(next);
+}
+function evidenceContract(item,type,at=nowIso()) {
+  const age=Date.parse(at)-Date.parse(item.observed_at||item.observedAt||'');
+  const maxAge=type==='finding'?3600000:7*86400000;
+  const source=item.evidence||item.source_url||'';
+  const hasSource=Array.isArray(source)?source.some(x=>/^https?:\/\//.test(x)):/^https?:\/\//.test(source);
+  const freshness=!Number.isFinite(age)||age<0?'unknown':age>maxAge?'stale':'recent';
+  return {classification:type==='finding'?'observation':'hypothesis',freshness,
+    confidence:hasSource&&freshness==='recent'?'Source available; independent validation needed':'Insufficient current evidence',
+    impact:type==='finding'?'Visitors may be unable to use the affected service; impact is not quantified.':'Potential user value; demand and revenue are not established.',
+    owner:type==='finding'?(item.category==='security'?'Security & Independent QA':'Engineering & Operations'):
+      item.category==='revenue'?'Revenue & Business':'Product & Growth',
+    reviewer:type==='finding'?'Security & Independent QA':'Global Market Intelligence',
+    successCondition:type==='finding'?'An independent check confirms the reported problem is resolved.':'A defined customer experiment meets its success threshold.',
+    effort:'Not estimated',risk:'Assess before founder execution'};
+}
+async function decisionJournal(env) {
+  if(env.HQ_DECISIONS_ENABLED!=='true')return {available:false,events:[]};
+  try {
+    const rows=await env.DB.prepare('SELECT * FROM founder_decisions ORDER BY sequence DESC LIMIT 2000').all();
+    return {available:true,events:rows.results||[]};
+  } catch {return {available:false,events:[]};}
+}
+function operatingBrief(findings,opportunities,journal,at=nowIso()) {
+  const latest=new Map();
+  for(const event of journal.events)if(!latest.has(event.thread))latest.set(event.thread,event);
+  const records=[...findings.map(item=>({item,type:'finding'})),...opportunities.map(item=>({item,type:'opportunity'}))];
+  const queue=records.map(({item,type})=>{
+    const thread=type+':'+item.id,decision=latest.get(thread);
+    const contract=evidenceContract(item,type,at);
+    // A repeated polling timestamp alone must not resurface a rejected idea.
+    const changed=Boolean(decision&&decision.snapshot!==JSON.stringify([item.title,item.description,item.recommendation,item.evidence||item.source_url]));
+    return {id:item.id,thread,type,title:item.title,priority:item.priority||'low',
+      status:decision?.state||'proposed',revision:decision?.revision||0,changed,contract,
+      needsDecision:!decision||(changed&&['rejected','snoozed','verified'].includes(decision.state))||decision.state==='proposed'};
+  });
+  const ranked=queue.filter(x=>x.needsDecision).sort((a,b)=>
+    (a.type==='finding'?0:1)-(b.type==='finding'?0:1)||
+    ({high:0,medium:1,low:2}[a.priority]??2)-({high:0,medium:1,low:2}[b.priority]??2)||a.thread.localeCompare(b.thread));
+  return {version:1,queue:ranked.slice(0,3),pending:ranked.length,threads:queue,
+    activeOpportunities:[...latest.values()].filter(x=>x.kind==='opportunity'&&['accepted','implemented'].includes(x.state)).length,
+    opportunityLimit:3,aiStatus:'Not connected',
+    learning:'Founder feedback retained; no automatic changes to rules, permissions or budgets',
+    stages:['Observe','Investigate','Challenge','Recommend','Follow through']};
+}
+function validateExperiment(value,at=Date.now()) {
+  if(!value||typeof value!=='object'||Array.isArray(value))return null;
+  const keys=['audience','problem','hypothesis','metric','stopCondition'];
+  if(keys.some(key=>typeof value[key]!=='string'||!value[key].trim()||value[key].length>400))return null;
+  const deadline=Date.parse(value.reviewBy);
+  if(!Number.isFinite(value.target)||value.target<=0||value.target>1e9||
+     !Number.isFinite(value.effortHours)||value.effortHours<=0||value.effortHours>40||
+     !Number.isFinite(deadline)||deadline<=at||deadline>at+90*86400000)return null;
+  return {...Object.fromEntries(keys.map(k=>[k,value[k].trim()])),target:value.target,
+    effortHours:value.effortHours,reviewBy:new Date(deadline).toISOString()};
+}
+async function saveDecision(request,env) {
+  if(env.HQ_DECISIONS_ENABLED!=='true'||!env.DB)return json({error:'Decision journal is not enabled'},503);
+  const url=new URL(request.url);
+  if(request.headers.get('origin')!==url.origin||request.headers.get('x-hq-founder-action')!=='decision-v1'||
+     request.headers.get('content-type')?.split(';')[0]!=='application/json')return json({error:'Same-origin founder action required'},403);
+  let input;
+  try {const body=await boundedText(request,8192);if(body===null)return json({error:'Decision too large'},413);input=JSON.parse(body);}
+  catch{return json({error:'Invalid JSON'},400);}
+  if(!input||!['finding','opportunity'].includes(input.kind)||!/^[-a-zA-Z0-9_]{1,80}$/.test(input.id)||
+     !Number.isSafeInteger(input.revision)||input.revision<0)return json({error:'Invalid record or revision'},400);
+  const note=clampText(input.note,800),outcome=clampText(input.outcome,800),success=clampText(input.successCondition,500);
+  const feedback=['useful','incorrect','too-noisy','not-priority',''].includes(input.feedback||'')?input.feedback||'':null;
+  let evidence='';try{const parsed=new URL(input.evidenceUrl);if(parsed.protocol==='https:'&&!parsed.username&&!parsed.password)evidence=parsed.href.slice(0,1000);}catch{}
+  if(!note||feedback===null)return json({error:'Add a reason and valid feedback'},400);
+  if(input.state==='verified'&&(!outcome||!success||!evidence))return json({error:'Verification needs a measured outcome, success condition and HTTPS evidence link'},400);
+  const thread=input.kind+':'+input.id;
+  const current=await env.DB.prepare('SELECT * FROM founder_decisions WHERE thread=? ORDER BY revision DESC LIMIT 1').bind(thread).first();
+  if((current?.revision||0)!==input.revision||!decisionTransition(current?.state||'proposed',input.state))return json({error:'Decision changed or transition is invalid; refresh and review'},409);
+  const table=input.kind==='finding'?'findings':'opportunities'; // fixed allowlist, never user SQL
+  const item=await env.DB.prepare('SELECT * FROM '+table+' WHERE id=?').bind(input.id).first();
+  if(!item&&!current)return json({error:'Record not found'},404);
+  const snapshot=item?JSON.stringify([item.title,item.description,item.recommendation,item.evidence||item.source_url]):current.snapshot;
+  let experiment=current?.experiment_json||'{}';
+  if(input.kind==='opportunity'&&input.state==='accepted'){
+    const validated=validateExperiment(input.experiment);
+    if(!validated)return json({error:'Acceptance requires an audience, problem, hypothesis, metric, positive target, effort limit (up to 40 hours), stop condition and review date within 90 days'},400);
+    experiment=JSON.stringify(validated);
+  }
+  const timestamp=nowIso();
+  // Single atomic INSERT enforces optimistic concurrency, the three-opportunity
+  // limit and the finite journal budget even for simultaneous browser tabs.
+  const sql=`INSERT INTO founder_decisions(thread,revision,kind,record_id,title,state,note,feedback,outcome,success_condition,evidence_url,snapshot,created_at,experiment_json)
+    SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?
+    WHERE COALESCE((SELECT MAX(revision) FROM founder_decisions WHERE thread=?),0)=?
+    AND (SELECT COUNT(*) FROM founder_decisions)<2000
+    AND (?!='opportunity' OR ? NOT IN ('accepted','implemented') OR
+      (SELECT COUNT(*) FROM founder_decisions d WHERE d.kind='opportunity' AND d.state IN ('accepted','implemented')
+       AND d.thread!=? AND d.revision=(SELECT MAX(revision) FROM founder_decisions e WHERE e.thread=d.thread))<3)`;
+  const result=await env.DB.prepare(sql).bind(thread,input.revision+1,input.kind,input.id,
+    item?.title||current.title,input.state,note,feedback,outcome,success,evidence,snapshot,timestamp,experiment,
+    thread,input.revision,input.kind,input.state,thread).run();
+  if(result.meta?.changes!==1)return json({error:'Refresh before retrying. The journal permits three active opportunities and 2,000 history entries; export for archival if full.'},409);
+  return json({saved:true,revision:input.revision+1,state:input.state,executionTriggered:false},201);
 }
 
 async function report(env) {
@@ -862,21 +972,24 @@ async function report(env) {
   const a=assets.results||[],f=findings.results||[],o=leads.results||[],metadata=status.results||[];
   const last=metadata.find(x=>x.key==="last_cron");
   const discovery=metadata.find(x=>x.key==="discovery");
-  const fresh=Boolean(last && Date.now()-Date.parse(last.checked_at)<2*3600000);
+  const heartbeatAge=Date.now()-Date.parse(last?.checked_at||" ");
+  const fresh=Number.isFinite(heartbeatAge)&&heartbeatAge>=0&&heartbeatAge<30*60000;
   const discoveryFresh=Boolean(discovery && Number.isFinite(Date.parse(discovery.checked_at)) &&
     Date.now()-Date.parse(discovery.checked_at)>=0 &&
     Date.now()-Date.parse(discovery.checked_at)<12*3600000);
-  const discoveryComplete=Boolean(discoveryFresh && discovery?.value.startsWith("observed:"));
+  const discoveryComplete=Boolean(discoveryFresh && discovery?.value.startsWith("observed:manifest-complete:"));
   const tools=a.filter(x=>x.kind==="tool");
   const quotaUsed=Object.fromEntries((quota.results||[]).map(row=>[row.kind,row.used]));
   const now=nowIso();
+  const journal=await decisionJournal(env);
   return {
+    decisionJournal:journal, operating:operatingBrief(f,o,journal,now),
     schemaVersion:"yorphives.hq-intelligence.v1", generatedAt:now,
     briefing:makeFounderBriefing(a,f,o,hypotheses.results||[],metadata,quotaUsed.public_fetches||0,now),
     verification:{method:"cloudflare-worker-readonly-http",complete:discoveryComplete,
       limitations:"Public GET evidence only. A complete catalog requires an explicit owner manifest; page changes and functionality need independent verification.",
       generatedAt:last?.checked_at||"",notes:fresh?[]:["Collector heartbeat stale or absent"]},
-    assets:a.map(x=>({id:fnv(x.url),name:x.name,kind:x.kind,status:x.status==="reachable"?"healthy":"unknown",summary:x.url})),
+    assets:a.map(x=>({id:fnv(x.url),name:x.name,kind:x.kind,status:fresh&&Number.isFinite(Date.parse(x.last_checked))&&Date.now()-Date.parse(x.last_checked)>=0&&Date.now()-Date.parse(x.last_checked)<3600000?(x.status==="reachable"?"healthy":x.status==="degraded"?"degraded":"unknown"):"unknown",summary:x.url})),
     products:tools.map(x=>({id:fnv(x.url),name:x.name,url:x.url,
       source:x.discovery_source||"unverified",discoveryConfidence:x.inventory_confidence||"unverified",
       evidenceUrl:x.evidence_url||"",status:x.inventory_confidence==="candidate"?"unknown":
@@ -933,8 +1046,13 @@ function json(value,status=200) {return new Response(JSON.stringify(value),{stat
 export default {
   async fetch(request,env,ctx) {
     const route=new URL(request.url).pathname;
-    if(!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
+    const decisionWrite=route==="/api/decisions"&&request.method==="POST";
+    if(!decisionWrite&&!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
     if(!(await verifyAccess(request,env,ctx))) return new Response("Private Headquarters access not configured or unauthorized",{status:403,headers:{"cache-control":"no-store","x-content-type-options":"nosniff"}});
+    if(decisionWrite) {
+      try{return await saveDecision(request,env);}catch{return json({error:"Decision could not be saved; refresh before retrying"},503);}
+    }
+    if(route==="/api/decisions"&&request.method==="GET")return json(await decisionJournal(env));
     if(route==="/api/report") {
       if(!env.DB) return json({error:"Evidence database is not configured"},503);
       const result=await report(env);
@@ -967,4 +1085,4 @@ export default {
     }));
   }
 };
-export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report};
+export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report,decisionTransition,evidenceContract,operatingBrief,saveDecision,validateExperiment};
