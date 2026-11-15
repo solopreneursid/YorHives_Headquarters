@@ -112,3 +112,60 @@ test("new manifest entry joins passive HTTP monitoring on the next scheduled hou
     assert(!state.calls.some(x=>/DELETE FROM assets|DROP TABLE|ALTER TABLE|UPDATE.*repository/i.test(x.sql)));
   }finally{globalThis.fetch=before;}
 });
+
+test("the real Pages-style tool sitemap and directory hub enroll File Studio without a manifest",async()=>{
+  const state=evidenceDatabase(),oldFetch=globalThis.fetch,requests=[];
+  globalThis.fetch=async(url,options)=>{
+    requests.push(url);
+    assert.equal(options.method,"GET");
+    if(url==="https://yorphives.com/")return new Response(
+      "<title>YorpHives</title><h1>Tools</h1>",{status:200,headers:{"content-type":"text/html"}});
+    if(url==="https://yorphives.com/free-tools-tool-sitemap.xml")return new Response(
+      '<urlset><url><loc>https://yorphives.com/free-tools/file-studio/</loc></url></urlset>',
+      {status:200,headers:{"content-type":"application/xml"}});
+    if(url==="https://yorphives.com/free-tools/index.html" || url==="https://yorphives.com/free-tools/"){
+      return new Response('<a href="/free-tools/file-studio/">File Studio</a>',
+        {status:200,headers:{"content-type":"text/html"}});
+    }
+    return new Response("not found",{status:404});
+  };
+  try{
+    let pending;
+    await worker.scheduled({scheduledTime:Date.parse("2026-11-15T06:00:00Z")},
+      {DB:state.db},{waitUntil(p){pending=p}});
+    await pending;
+    const route=[...state.products.keys()].find(x=>x.includes("/free-tools/file-studio"));
+    assert(route,"Public product route missing from registered inventory");
+    const record=state.products.get(route);
+    assert.equal(record.inventory_confidence,"published");
+    assert.equal(record.discovery_source,"link");
+    assert.match(state.status.get("discovery").value,/^partial:/);
+    assert(requests.includes("https://yorphives.com/free-tools-tool-sitemap.xml"));
+    assert(!requests.some(x=>x.includes("api.github.com")));
+  }finally{globalThis.fetch=oldFetch;}
+});
+
+test("HTTP 308 directory redirects are not interpreted as broken tool functionality",async()=>{
+  const state=evidenceDatabase(),originalFetch=globalThis.fetch;
+  const route="https://yorphives.com/free-tools/file-studio";
+  state.products.set(route,{url:route,name:"File Studio",kind:"tool",failures:1,
+    page_fingerprint:"",inventory_confidence:"published",last_checked:null,
+    features_json:"[]",status:"pending"});
+  state.status.set("discovery_engine_version",{value:"v3",checked_at:new Date().toISOString()});
+  globalThis.fetch=async(url,options)=>{
+    assert.equal(options.method,"GET");
+    assert.equal(options.redirect,"manual");
+    return url===route?new Response(null,{status:308,headers:{"location":"/free-tools/file-studio/"}}):
+      new Response("OK",{status:200,headers:{"content-type":"text/html"}});
+  };
+  try{
+    let pending;
+    await worker.scheduled({scheduledTime:Date.parse("2026-11-15T01:00:00Z")},
+      {DB:state.db},{waitUntil(p){pending=p}});
+    await pending;
+    assert.equal(state.products.get(route).failures,0);
+    assert.equal(state.products.get(route).status,"unverified");
+    assert(!state.calls.some(x=>x.sql.startsWith("INSERT INTO findings")),
+      "Canonical redirect must not create an outage alert");
+  }finally{globalThis.fetch=originalFetch;}
+});
