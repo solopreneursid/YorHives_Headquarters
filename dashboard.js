@@ -325,6 +325,14 @@
     $("product-new").textContent = changes.filter(item => item.kind === "new-product").length;
     $("product-changes-total").textContent = changes.length;
     $("product-comparisons-total").textContent = comparisons.length;
+    const checked = products.filter(p => p.qaCheckedAt);
+    const qaPassed = checked.filter(p => p.qaStatus === "passed").length;
+    const qaFailed = checked.filter(p => p.qaStatus === "failed").length;
+    const qaPending = checked.filter(p => p.qaStatus === "pending_confirmation").length;
+    $("product-qa-total").textContent = checked.length ? qaPassed + "/" + checked.length : "—";
+    $("product-qa-caption").textContent = checked.length
+      ? qaFailed + " confirmed alerts · " + qaPending + " awaiting confirmation"
+      : "No browser checks reported";
     $("catalog-kind").textContent = local ? "LOCAL REPORT" : imported ? "IMPORTED" : "EXAMPLE";
     $("discovery-status").textContent = !imported ? "Preview — not connected"
       : verifiedScan ? (local ? "Local discovery reported complete" : "Imported successful discovery")
@@ -346,6 +354,17 @@
       info.append(node("span", "product-state " + (p.status === "healthy" && p.active ? "product-state-reachable" : ""), p.active ? (
         p.status === "healthy" ? "Reported reachable" : p.status === "degraded" ? "Reported degraded" : "Status unknown"
       ) : "No longer discoverable"));
+      const qaLabels = {
+        passed: "Browser rendered",
+        failed: "QA alert",
+        pending_confirmation: "Needs recheck",
+        unverified: "Browser QA not verified"
+      };
+      const qa = node("span", "product-qa-badge qa-" + p.qaStatus,
+        p.qaCheckedAt ? qaLabels[p.qaStatus] : "Browser QA not run");
+      qa.title = p.qaCheckedAt ? "Browser observation: " + (cleanDate(p.qaCheckedAt) || "undated") +
+        " · " + (p.qaReason || "No reason provided") : "No browser assurance check is recorded";
+      info.append(qa);
       if (p.url) {
         const link = node("a", "product-url-link", "Open"); link.href = p.url; link.target = "_blank"; link.rel = "noopener noreferrer";
         link.append(icon("external")); info.append(link);
@@ -461,6 +480,8 @@
         url: safeUrl(p.url) || "", source: cleanText(p.source, 80),
         status: ["healthy", "degraded", "unknown", "not_discoverable"].includes(p.status) ? p.status : "unknown",
         active: p.active !== false, firstSeen: cleanText(p.firstSeen, 45), lastChecked: cleanText(p.lastChecked, 45),
+        qaStatus: ["passed", "failed", "pending_confirmation", "unverified"].includes(p.qaStatus) ? p.qaStatus : "unverified",
+        qaCheckedAt: cleanText(p.qaCheckedAt, 45), qaReason: cleanText(p.qaReason, 100),
         features: Array.isArray(p.features) ? p.features.slice(0, 60).map(x => cleanText(x, 120)).filter(Boolean) : []
       })),
       changes: items("changes").map((c, i) => ({
