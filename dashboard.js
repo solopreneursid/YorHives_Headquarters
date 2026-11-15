@@ -513,7 +513,7 @@
     }
     $("catalog-kind").textContent = state.origin==="cloudflare" ? "WEBSITE SOURCES" : local ? "LOCAL REPORT" : imported ? "IMPORTED" : "EXAMPLE";
     $("discovery-status").textContent = !imported ? "Preview — not connected"
-      : verifiedScan ? "Owner manifest reports a complete catalog · functionality unverified"
+      : verifiedScan ? (state.origin==="cloudflare" ? "Owner manifest reports a complete catalog · functionality unverified" : "Collector reports complete coverage · verify independently")
         : (state.origin==="cloudflare" ? "Partial website catalog · some tools may be missing" : "Discovery incomplete or not independently verified");
     $("discovery-explainer").textContent = !imported
       ? "These are illustrative records. Actual monitoring begins after the scanner is installed on your server."
