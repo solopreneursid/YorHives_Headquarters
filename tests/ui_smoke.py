@@ -90,7 +90,8 @@ def main():
                     "opportunities": [], "agents": [], "activity": [],
                     "products": [{"name": '<script>window.ATTACKED=true</script>',
                                   "url": "javascript:alert(1)", "source": "sitemap",
-                                  "status": "unknown", "features": ["Resize image"]}],
+                                  "status": "unknown", "discoveryConfidence": "candidate",
+                                  "features": ["Resize image"]}],
                     "changes": [{"kind": "new-product", "summary": '<img src=x onerror="window.ATTACKED=true">'}],
                     "comparisons": [{"product": "Image converter", "competitor": "Example",
                                      "missingFeatures": ['<iframe src=javascript:alert(1)>'],
@@ -123,6 +124,8 @@ def main():
                 assert page.locator("#product-catalog .product-record").count() == 1
                 assert page.locator("#product-change-feed .product-change-record").count() == 1
                 assert page.locator("#product-feature-gaps .feature-gap-card").count() == 1
+                assert "Unverified route candidate" in page.locator("#product-catalog").inner_text()
+                assert "Potential missing features:" not in page.locator("#product-feature-gaps").inner_text()
                 assert page.locator("script").count() == 1, "Untrusted product names created new script elements"
                 assert page.locator("#product-catalog a[href^='javascript:']").count() == 0, "Unsafe tool URL"
                 assert page.locator("#product-feature-gaps a[href^='javascript:']").count() == 0, "Unsafe evidence URL"
