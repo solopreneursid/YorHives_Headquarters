@@ -795,6 +795,60 @@ async function verifyAccess(request,env,ctx) {
       new TextEncoder().encode(parts[0]+"."+parts[1]));
   }catch{return false;}
 }
+// Structured, evidence-bound daily briefing. No model calls, cloud billing
+// assumptions or automated remediation. Always distinguish HTTP from features.
+function makeFounderBriefing(assets,findings,opportunities,hypotheses,metadata,used,at=nowIso()){
+  const tools=assets.filter(x=>x.kind==="tool");
+  const checked=tools.filter(x=>Boolean(x.last_checked));
+  const pending=tools.length-checked.length;
+  const reachable=checked.filter(x=>x.status==="reachable").length;
+  const degraded=checked.filter(x=>x.status==="degraded").length;
+  const uncertain=checked.length-reachable-degraded;
+  const website=assets.find(x=>x.kind==="website");
+  const lastCron=metadata.find(x=>x.key==="last_cron")?.checked_at||"";
+  const cronAge=Date.parse(at)-Date.parse(lastCron);
+  const collectorCurrent=Number.isFinite(cronAge)&&cronAge>=0&&cronAge<30*60000;
+  const siteAge=Date.parse(at)-Date.parse(website?.last_checked||"");
+  const siteCurrent=Number.isFinite(siteAge)&&siteAge>=0&&siteAge<60*60000;
+  const site=siteCurrent&&website?.status==="reachable"?"reported-reachable":
+    siteCurrent&&website?.status==="degraded"?"issue-reported":"not-verified";
+  const discovery=metadata.find(x=>x.key==="discovery");
+  const discoveryCurrent=discovery&&Date.parse(at)-Date.parse(discovery.checked_at)<12*3600000;
+  const inventoryComplete=Boolean(discoveryCurrent&&discovery.value.startsWith("observed:manifest-complete:"));
+  const urgent=[...findings].filter(x=>x.priority==="high"||x.priority==="critical");
+  const alternatives=hypotheses.length;
+  const suggested=urgent.length?
+    {label:"Review a reported problem",description:urgent[0].title,section:"monitoring",kind:"alert"}:
+    !collectorCurrent?{label:"Check monitoring freshness",description:"The scheduled collector's latest heartbeat is missing or stale.",
+      section:"monitoring",kind:"coverage"}:
+    pending?{label:"Finish the first tool checks",description:pending+" tool routes await their first HTTP observation.",
+      section:"products",kind:"coverage"}:
+    !inventoryComplete?{label:"Review catalog completeness",
+      description:"The public site does not yet certify a complete inventory; unlinked tools may be missing.",
+      section:"products",kind:"coverage"}:
+    alternatives?{label:"Review a possible alternative",
+      description:"External public pages suggest features to investigate; no YorpHives feature gap is established.",
+      section:"products",kind:"research"}:
+    {label:"Review new ideas",description:"No urgent findings are recorded. Public ideas remain unvalidated.",
+      section:"opportunities",kind:"research"};
+  return {
+    generatedAt:at,
+    collector:{current:collectorCurrent,lastSeen:lastCron},
+    site:{status:site,lastCheck:website?.last_checked||"",httpStatus:website?.http_status||null},
+    coverage:{discovered:tools.length,checked:checked.length,awaitingFirstCheck:pending,
+      checkedPercent:tools.length?Math.round(checked.length/tools.length*100):0,
+      httpReachable:reachable,httpIssue:degraded,httpUnverified:uncertain,
+      inventoryComplete,method:"Read-only HTTP; no interactive feature testing"},
+    alerts:{open:findings.length,highPriority:urgent.length},
+    research:{leads:opportunities.length,alternatives,verifiedRevenue:0,
+      limitation:"Research mentions and public feature claims are not proof of traffic, demand or feature gaps"},
+    usage:{used:Math.max(0,Number(used)||0),limit:FETCH_BUDGET_DAY,
+      note:"Internal public-GET safeguard, not an invoice or a price guarantee"},
+    nextAction:suggested,
+    safety:{readOnly:true,changeRequiresFounder:true,liveBrowserTests:false,paidAi:false}
+  };
+}
+
 async function report(env) {
   const [assets,findings,leads,quota,status,security,hypotheses]=await Promise.all([
     env.DB.prepare("SELECT * FROM assets ORDER BY kind ASC,name ASC LIMIT 150").all(),
@@ -818,6 +872,7 @@ async function report(env) {
   const now=nowIso();
   return {
     schemaVersion:"yorphives.hq-intelligence.v1", generatedAt:now,
+    briefing:makeFounderBriefing(a,f,o,hypotheses.results||[],metadata,quotaUsed.public_fetches||0,now),
     verification:{method:"cloudflare-worker-readonly-http",complete:discoveryComplete,
       limitations:"Public GET evidence only. A complete catalog requires an explicit owner manifest; page changes and functionality need independent verification.",
       generatedAt:last?.checked_at||"",notes:fresh?[]:["Collector heartbeat stale or absent"]},
@@ -909,4 +964,4 @@ export default {
     }));
   }
 };
-export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,schedulePlan,verifyAccess,report};
+export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report};
