@@ -1,0 +1,84 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {fileURLToPath} from "node:url";
+import {dirname,resolve} from "node:path";
+import handler,{safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,schedulePlan,verifyAccess,report}
+  from "../src/worker.mjs";
+
+test("same-origin discovery rejects arbitrary external URLs and strips tracking parameters",()=>{
+  assert.equal(safeToolUrl("/tools/pdf?utm_source=x"),"https://yorphives.com/tools/pdf");
+  assert.equal(safeToolUrl("https://www.yorphives.com/explore/app#x"),"https://www.yorphives.com/explore/app");
+  assert.equal(safeToolUrl("https://evil.example/tools/pdf"),null);
+  assert.equal(safeToolUrl("javascript:alert(1)"),null);
+  assert.equal(safeToolUrl("https://yorphives.com.evil.example/tools/pdf"),null);
+});
+test("discovers real product routes from sitemap but ignores section index",()=>{
+  const xml='<urlset><url><loc>https://yorphives.com/tools/crop-image</loc></url><url><loc>https://yorphives.com/free-tools</loc></url></urlset>';
+  assert.deepEqual(sitemapTools(xml),["https://yorphives.com/tools/crop-image"]);
+});
+test("discovers tool links from server-rendered home and hub HTML",()=>{
+  const html='<a href="/tools/free-resizer">Resizer</a><a href="https://malicious.example/tools/steal">Bad</a>';
+  assert.deepEqual(hubTools(html),["https://yorphives.com/tools/free-resizer"]);
+});
+test("manifest discovers products on custom vanity routes",()=>{
+  const json=JSON.stringify({products:[{url:"/make-resume",name:"Resume"},{url:"https://bad.example/fake"}]});
+  assert.deepEqual(manifestTools(json),["https://yorphives.com/make-resume"]);
+});
+test("malformed manifest never invents products",()=>{
+  assert.deepEqual(manifestTools('{"products":'),[]);
+});
+test("public RSS lead classifier does not invent popularity or revenue",()=>{
+  const xml='<rss><channel><item><title>New open source image tool</title><link>https://example.org/post/123</link></item>'+
+     '<item><title>Unrelated story</title><link>https://example.org/post/456</link></item></channel></rss>';
+  assert.deepEqual(feedLeads(xml),[{title:"New open source image tool",link:"https://example.org/post/123"}]);
+});
+test("one 5-minute Cron handles all schedules without paid always-on services",()=>{
+  const at=(x)=>schedulePlan(new Date(x).getTime());
+  assert.deepEqual(at("2026-11-15T00:05:00Z"),{uptime:true,products:false,discovery:false,research:false,retention:false});
+  assert.deepEqual(at("2026-11-15T06:00:00Z"),{uptime:true,products:true,discovery:true,research:false,retention:false});
+  assert.deepEqual(at("2026-11-15T03:00:00Z"),{uptime:true,products:true,discovery:false,research:true,retention:true});
+});
+test("private report fails closed if Access is not configured", async()=>{
+  const request=new Request("https://example.workers.dev/api/report");
+  assert.equal(await verifyAccess(request,{}),false);
+  const res=await handler.fetch(request,{DB:{}},{});
+  assert.equal(res.status,403);
+});
+test("HTTP write methods are rejected even without Access setup",async()=>{
+  const res=await handler.fetch(new Request("https://example.workers.dev/api/report",{method:"POST"}),{},{});
+  assert.equal(res.status,405);
+});
+test("no D1 binding means scheduled worker does not start scans",async()=>{
+  let called=false;
+  await handler.scheduled({scheduledTime:Date.now()},{},{waitUntil:()=>{called=true;}});
+  assert.equal(called,false);
+});
+test("report returns well-labelled unverified evidence with no paid AI inference",async()=>{
+  const fixtures=[
+    {results:[{url:"https://yorphives.com/",name:"YorpHives website",kind:"website",status:"reachable",first_seen:"2026-11-15T00:00:00Z",last_checked:"2026-11-15T00:05:00Z"}]},
+    {results:[]},{results:[]},{results:[{kind:"public_fetches",used:2}]},
+    {results:[{key:"last_cron",value:"cycle",checked_at:new Date().toISOString()},{key:"discovery",value:"unverified:no-readable-sources",checked_at:new Date().toISOString()}]}
+  ];
+  let i=0;
+  const db={prepare(){return{bind(){return this},all:async()=>fixtures[i++]}}};
+  const data=await report({DB:db});
+  assert.equal(data.schemaVersion,"yorphives.hq-intelligence.v1");
+  assert.equal(data.pipeline.readOnly,true);
+  assert.equal(data.verification.complete,false);
+  assert.equal(data.resourceBudget.aiCalls.disabled,true);
+  assert.equal(data.resourceBudget.browserMinutes.disabled,true);
+  assert.equal(data.assets.length,1);
+});
+test("configuration uses isolated HQ worker, single Cron and no paid service bindings",()=>{
+  const here=dirname(fileURLToPath(import.meta.url));
+  const conf=JSON.parse(readFileSync(resolve(here,"../wrangler.jsonc"),"utf8"));
+  assert.equal(conf.name,"yorphives-hq-free-pilot");
+  assert.deepEqual(conf.triggers.crons,["*/5 * * * *"]);
+  assert.equal(conf.d1_databases.length,1);
+  assert.equal(conf.d1_databases[0].binding,"DB");
+  assert.equal(conf.assets.run_worker_first,true);
+  assert(!conf.ai);
+  assert(!conf.containers);
+  assert(!conf.queues);
+});
