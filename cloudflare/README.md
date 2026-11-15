@@ -81,8 +81,8 @@ Founder login through Cloudflare Access has not been independently tested from t
 ## What this deployed Worker does
 
 - Every 5 minutes: public GET availability check of `https://yorphives.com/`.
-- Every hour: GET availability checks on up to four least-recently-checked automatically enrolled tools.
-- Every six hours: inspect the public sitemap, tool/free-tool/explore catalog links, and optional product JSON manifest. Insert newly found tool URLs into a dedicated D1 inventory.
+- Every 15 minutes: GET monitoring of up to three least-recently-checked enrolled tools (about two hours per 22-tool rotation).
+- Every six hours: inspect public manifest, robots/sitemap indexes, the deployed site's `/free-tools-tool-sitemap.xml`, tool hubs and at most one bounded same-origin JS route-hint bundle. Confirmed links and tentative candidates are tracked separately.
 - Daily (and once after first activation): inspect a limited **Show HN and Ask HN** RSS feed for potential products and unmet user needs. Compare title keywords against known YorpHives tools, labeling each lead **possible existing** or **potentially missing**, never proven inferior or profitable.
 - Daily (and once after first activation): inspect a small sample of GitHub-reviewed npm security advisories. Record package names, severity and source, **without claiming an advisory affects YorpHives** until the package and deployed version are independently verified.
 - Store compact findings, status, source links and internal daily request usage for private dashboard review.

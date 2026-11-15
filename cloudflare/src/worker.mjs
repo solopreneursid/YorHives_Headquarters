@@ -8,13 +8,13 @@
 const SITE = "https://yorphives.com";
 const ORIGIN_SET = new Set(["https://yorphives.com", "https://www.yorphives.com"]);
 const PATH_ROOTS = ["/tools/", "/tool/", "/free-tools/", "/apps/", "/app/", "/explore/", "/products/"];
-const HUBS = ["/", "/free-tools", "/tools", "/explore"];
+const HUBS = ["/", "/free-tools/", "/free-tools/index.html", "/tools/", "/explore/"];
 const RESEARCH = "https://hnrss.org/show";
 const RESEARCH_SOURCES = [RESEARCH, "https://hnrss.org/ask"];
 // Strictly allowlisted, public, anonymous, GET-only; not an applicability assessment.
 const ADVISORY_SOURCE = "https://api.github.com/advisories?type=reviewed&ecosystem=npm&per_page=3";
 const MAX_ROUTES_PER_DISCOVERY = 45;
-const MAX_CHECKS_PER_HOUR = 4;
+const MAX_CHECKS_PER_TICK = 3; // three least-recently-checked tool routes every 15 minutes
 const FETCH_BUDGET_DAY = 900; // intentionally far below platform ceilings
 const MAX_TEXT_BYTES = 100000;
 // Build-time replacement for the isolated API pilot; Wrangler Static Assets take priority.
@@ -76,7 +76,7 @@ async function limitedFetch(url, {allowResearch = false, allowSecurity = false, 
   if (!body) { await response.body?.cancel(); return {status, text:null}; }
   if (status !== 200) { await response.body?.cancel(); return {status, text:null}; }
   const contentType = response.headers.get("content-type") || "";
-  if (!/(xml|html|json|rss|atom|text)/i.test(contentType)) {
+  if (!/(xml|html|json|rss|atom|text|javascript)/i.test(contentType)) {
     await response.body?.cancel(); return {status, text:null};
   }
   return {status, text: await boundedText(response)};
@@ -160,7 +160,7 @@ function feedLeads(xml) {
   return found;
 }
 // Only compares words in titles to the observed catalog; does NOT establish feature parity.
-function classifyLead(title, catalog) {
+function classifyLead(title, catalog, complete=false) {
   if(!Array.isArray(catalog) || !catalog.length) {
     return {kind:"catalog-unverified",related:null,
       recommendation:"First verify the YorpHives product catalog. The current site inventory is incomplete, so this is only an external research mention."};
@@ -178,10 +178,13 @@ function classifyLead(title, catalog) {
     const similarity=matched/known.size;
     if(matched>=2 && similarity>score){best=product;score=similarity;}
   }
-  if(best && score >= .6) return {kind:"possible-existing-product",related:best.name,
-    recommendation:"Review the public evidence for "+best.name+" before assessing feature differences; no feature gap is verified."};
+  if(best && score >= .6) return {kind:"possible-existing-product",related:best.name,relatedUrl:best.url,
+    recommendation:"Potential alternative for "+best.name+
+      ". Compare published source claims and verified tool capabilities; no inferior feature is established."};
+  if(!complete)return {kind:"catalog-unverified",related:null,
+    recommendation:"The published YorpHives catalog is incomplete. Review this lead; do not assume the product is missing."};
   return {kind:"potential-missing-product",related:null,
-    recommendation:"Validate user need, competing products, search demand and differentiation before proposing a new tool."};
+    recommendation:"Catalog suggests a possible missing product. Verify demand, competition, feasibility and differentiation before proposing it."};
 }
 function parseAdvisories(text) {
   let parsed; try { parsed=JSON.parse(text); }catch{return [];}
@@ -202,6 +205,88 @@ function parseAdvisories(text) {
   }
   return output;
 }
+
+const DISALLOWED_PRODUCT_PATH = /^\/(?:api|admin|internal|cdn-cgi|_next|assets|auth|account|login|logout|settings|billing|dashboard|private)(?:\/|$)/i;
+function safeProductUrl(raw, base=SITE, allowVanity=false) {
+  const url=safeToolUrl(raw,base);
+  if(!url || url.length>400) return null;
+  const path=new URL(url).pathname;
+  if(path==="/" || /\/(?:free-tools|tools|explore|apps)\/index\.html$/i.test(path) || DISALLOWED_PRODUCT_PATH.test(path) || /[{}:*]/.test(path) ||
+     /%(?:2f|5c|00)/i.test(path)) return null;
+  if(!allowVanity && !isTool(url)) return null;
+  return url;
+}
+function productManifest(text) {
+  try {
+    const data=JSON.parse(String(text||""));
+    const list=Array.isArray(data)?data:data?.products;
+    if(!Array.isArray(list)) return {items:[],complete:false};
+    const seen=new Set(),items=[];
+    for(const entry of list.slice(0,MAX_ROUTES_PER_DISCOVERY)) {
+      if(!entry || typeof entry!=="object") continue;
+      const url=safeProductUrl(entry.url,SITE,true);
+      if(!url || seen.has(url)) continue;
+      seen.add(url);
+      items.push({url,name:clampText(entry.name,90),features:Array.isArray(entry.features)?
+        entry.features.slice(0,12).map(x=>clampText(x,80)).filter(Boolean):[]});
+    }
+    // An explicitly completed, nonempty owner manifest is the only basis for
+    // treating the inventory as comprehensive. All other sources are partial.
+    return {items,complete:!Array.isArray(data)&&data.complete===true&&items.length>0&&list.length===items.length};
+  }catch{return {items:[],complete:false};}
+}
+function sitemapEntries(xml) {
+  const routes=[],children=[];
+  for(const m of String(xml||"").slice(0,MAX_TEXT_BYTES).matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)){
+    const raw=m[1].replaceAll("&amp;","&");
+    const next=safeToolUrl(raw);
+    if(!next) continue;
+    if(/\.xml$/i.test(new URL(next).pathname)){
+      if(children.length<3&&!children.includes(next))children.push(next);
+    }else{
+      const route=safeProductUrl(next);
+      if(route && !routes.includes(route) && routes.length<MAX_ROUTES_PER_DISCOVERY)routes.push(route);
+    }
+  }
+  return {routes,children};
+}
+function publicStructuredProducts(html) {
+  const items=[],seen=new Set();
+  const collect=(node,depth=0)=>{
+    if(!node||depth>4||items.length>=MAX_ROUTES_PER_DISCOVERY)return;
+    if(Array.isArray(node)){for(const child of node.slice(0,MAX_ROUTES_PER_DISCOVERY))collect(child,depth+1);return;}
+    if(typeof node!=="object")return;
+    const kinds=Array.isArray(node["@type"])?node["@type"]:[node["@type"]];
+    const application=kinds.some(x=>["SoftwareApplication","WebApplication","MobileApplication"].includes(x));
+    if(application){
+      const url=safeProductUrl(node.url||node["@id"],SITE,true);
+      if(url&&!seen.has(url)){seen.add(url);items.push({url,name:clampText(node.name,90)});}
+    }
+    if(node.item)collect(node.item,depth+1);
+    if(node.itemListElement)collect(node.itemListElement,depth+1);
+    if(node["@graph"])collect(node["@graph"],depth+1);
+  };
+  const scripts=String(html||"").slice(0,MAX_TEXT_BYTES).matchAll(
+    /<script\b[^>]*\btype=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  for(const m of scripts) {
+    try{collect(JSON.parse(m[1]));}catch{}
+    if(items.length>=MAX_ROUTES_PER_DISCOVERY)break;
+  }
+  return items;
+}
+function publicBundleToolHints(javascript) {
+  const found=[];
+  const code=String(javascript||"").slice(0,MAX_TEXT_BYTES).replaceAll("\\/","/");
+  // A literal product URL in public source is only a *route candidate*:
+  // bundles can contain obsolete routes, examples and dead code.
+  for(const match of code.matchAll(/["'\x60](\/(?:tools|tool|free-tools|apps|app|explore|products)\/[a-z0-9][a-z0-9/_-]{1,110})["'\x60]/gi)) {
+    const url=safeProductUrl(match[1]);
+    if(url&&!found.includes(url))found.push(url);
+    if(found.length>=12)break;
+  }
+  return found;
+}
+
 async function saveStatus(env,key,value) {
   await env.DB.prepare("INSERT INTO status(key,value,checked_at) VALUES(?,?,?) "+
   "ON CONFLICT(key) DO UPDATE SET value=excluded.value,checked_at=excluded.checked_at")
@@ -218,7 +303,14 @@ async function addFinding(env,{key,category,priority,asset,title,description,evi
 async function checkSite(env) {
   let result, reason=""; try {
     result=await getPublic(env,SITE+"/",{body:false});
-  } catch(error) { reason=clampText(error.message,80); result={status:0}; }
+  } catch(error) {
+    reason=clampText(error.message,80);
+    if(reason==="daily-free-budget-exhausted"){
+      await saveStatus(env,"monitoring_paused","Daily request budget exhausted; no failed health check inferred.");
+      return {status:null,skipped:true};
+    }
+    result={status:0};
+  }
   const rows=await env.DB.prepare("SELECT failures FROM assets WHERE url=?").bind(SITE+"/").first();
   const ok=result.status>=200 && result.status<300;
   const fails=ok?0:Number(rows?.failures||0)+1;
@@ -238,100 +330,240 @@ async function checkSite(env) {
   }
   return {status:result.status,failures:fails};
 }
+function publicPageFingerprint(html){
+  const page=String(html||"").slice(0,MAX_TEXT_BYTES);
+  const title=(page.match(/<title[^>]*>([^<]{1,220})<\/title>/i)||[])[1]||"";
+  const heading=(page.match(/<h1[^>]*>([^<]{1,220})<\/h1>/i)||[])[1]||"";
+  const description=(page.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']{1,350})/i)||[])[1]||"";
+  const stable=[title,heading,description].map(x=>clampText(x,250)).filter(Boolean).join("|");
+  return stable?fnv(stable):"";
+}
 async function discoverTools(env) {
-  const candidates=new Set(); let sources=0; const limits=[
-    [SITE+"/sitemap.xml","sitemap"],
-    [SITE+"/.well-known/yorphives-products.json","manifest"],
-    ...HUBS.map(path=>[SITE+path,"hub"])
-  ];
-  for(const [url,kind] of limits){
+  const choices=new Map(),manifestDeclared=new Set(),sourceHealth=[]; let validSources=0,manifestComplete=false,scriptCandidateCount=0;
+  const rank={manifest:5,structured:4,link:3,sitemap:2,script:1};
+  const insert=(url,source,evidence,name="",features=[])=>{
+    const safe=safeProductUrl(url,SITE,source==="manifest"||source==="structured");
+    if(!safe || choices.size>=MAX_ROUTES_PER_DISCOVERY&&!choices.has(safe))return;
+    const current=choices.get(safe);
+    if(current && rank[current.source]>=rank[source])return;
+    choices.set(safe,{url:safe,source,evidence,name:clampText(name,90),
+      features:features.slice(0,12),confidence:source==="script"?"candidate":"published"});
+  };
+  // Catalog sources are public GET resources on the website's own domain.
+  // The website's GitHub source may not correspond to the current Pages deploy.
+  try{
+    const result=await getPublic(env,SITE+"/.well-known/yorphives-products.json",{body:true});
+    sourceHealth.push("manifest:"+result.status);
+    if(result.status===200 && result.text){
+      const parsed=productManifest(result.text);
+      if(parsed.items.length){validSources++;manifestComplete=parsed.complete;}
+      for(const item of parsed.items){
+        manifestDeclared.add(item.url);
+        insert(item.url,"manifest",SITE+"/.well-known/yorphives-products.json",item.name,item.features);
+      }
+    }
+  }catch{}
+  const sitemaps=[SITE+"/sitemap.xml",SITE+"/free-tools-tool-sitemap.xml",SITE+"/sitemap_index.xml"];
+  try{
+    const robots=await getPublic(env,SITE+"/robots.txt",{body:true});
+    sourceHealth.push("robots:"+robots.status);
+    if(robots.status===200 && robots.text){
+      for(const m of robots.text.matchAll(/^\s*Sitemap:\s*(\S+)\s*$/gim)){
+        const url=safeToolUrl(m[1]);
+        if(url && /\.xml$/i.test(new URL(url).pathname) && sitemaps.length<5 && !sitemaps.includes(url))sitemaps.push(url);
+      }
+    }
+  }catch{}
+  for(let k=0;k<sitemaps.length && k<5;k++){
+    const source=sitemaps[k];
     try{
-      const result=await getPublic(env,url,{body:true});
-      if(result.status!==200 || result.text===null) continue;
-      sources++;
-      if(kind==="hub" && url===SITE+"/"){
-        const assetRefs=siteBundleRefs(result.text);
-        if(assetRefs.length){
-          const fingerprint=fnv(assetRefs.join("|"));
+      const response=await getPublic(env,source,{body:true});
+      sourceHealth.push("sitemap:"+new URL(source).pathname+":"+response.status);
+      if(response.status!==200||!response.text)continue;
+      const parsed=sitemapEntries(response.text);
+      if(parsed.routes.length||parsed.children.length)validSources++;
+      for(const item of parsed.routes)insert(item,"sitemap",source);
+      for(const nested of parsed.children){
+        if(sitemaps.length<4&&!sitemaps.includes(nested))sitemaps.push(nested);
+      }
+    }catch{}
+  }
+  const hubs=[SITE+"/",...HUBS.filter(x=>x!=="/").map(x=>SITE+x)];
+  for(const url of hubs){
+    try{
+      const page=await getPublic(env,url,{body:true});
+      sourceHealth.push("hub:"+new URL(url).pathname+":"+page.status);
+      if(page.status!==200||page.text===null)continue;
+      const links=hubTools(page.text,url);
+      const structured=publicStructuredProducts(page.text);
+      if(links.length||structured.length)validSources++;
+      for(const item of links)insert(item,"link",url);
+      for(const item of structured)insert(item.url,"structured",url,item.name);
+      if(url===SITE+"/"){
+        const meaningful=publicPageFingerprint(page.text);
+        if(meaningful)await saveStatus(env,"home_content_fingerprint",meaningful);
+        const refs=siteBundleRefs(page.text);
+        if(refs.length){
+          const version=fnv(refs.join("|"));
           const previous=await env.DB.prepare("SELECT value FROM status WHERE key='site_bundle_fingerprint'").first();
-          if(previous?.value && previous.value!==fingerprint)
-            await saveStatus(env,"site_bundle_change",
-              "Public site build assets changed. Review catalog for added or updated tools; product identity is not confirmed.");
-          await saveStatus(env,"site_bundle_fingerprint",fingerprint);
+          if(previous?.value && previous.value!==version)await saveStatus(env,"site_bundle_change",
+            "Public site JS/CSS assets changed. Review for newly published or modified tools; identity unverified.");
+          await saveStatus(env,"site_bundle_fingerprint",version);
+          // Fetch at most ONE small, same-origin public JS file for SPA routes.
+          const main=refs.filter(x=>new URL(x).pathname.endsWith(".js"))
+            .sort((a,b)=>Number(/(?:index|main|app)[.-]/i.test(b))-Number(/(?:index|main|app)[.-]/i.test(a)))[0];
+          if(main){
+            try{
+              const bundle=await getPublic(env,main,{body:true});
+              sourceHealth.push("script:"+bundle.status+(bundle.text===null?":oversize":""));
+              if(bundle.status===200&&bundle.text){
+                const hinted=publicBundleToolHints(bundle.text);
+                scriptCandidateCount+=hinted.length;
+                for(const item of hinted)insert(item,"script",main);
+              }
+            }catch{}
+          }
         }
       }
-      const urls=kind==="sitemap"?sitemapTools(result.text):kind==="manifest"?
-        manifestTools(result.text):hubTools(result.text);
-      for(const item of urls) candidates.add(item);
-    }catch { /* one unavailable source never implies a removed product */ }
-    if(candidates.size>=MAX_ROUTES_PER_DISCOVERY) break;
+    }catch{}
   }
-  const hasPrevious=await env.DB.prepare("SELECT COUNT(*) AS total FROM assets WHERE kind='tool'").first();
-  let inserted=0;
-  for(const url of [...candidates].slice(0,MAX_ROUTES_PER_DISCOVERY)){
-    const name=decodeURIComponent(new URL(url).pathname.split("/").pop()||"Tool").replace(/[-_]/g," ").slice(0,100);
-    const answer=await env.DB.prepare("INSERT OR IGNORE INTO assets(url,name,kind,first_seen,last_seen,status) VALUES(?,?,'tool',?,?,'unverified')")
-      .bind(url,name,nowIso(),nowIso()).run();
-    if(Number(answer.meta?.changes||0)>0) {
-      inserted++;
-      if(Number(hasPrevious?.total||0)>0) await saveStatus(env,"new_tool_"+fnv(url),"New tool discovered: "+url);
+  const wasInitialized=await env.DB.prepare("SELECT value FROM status WHERE key='discovery'").first();
+  let enrolled=0;
+  for(const item of [...choices.values()].slice(0,MAX_ROUTES_PER_DISCOVERY)){
+    const pieces=new URL(item.url).pathname.split("/").filter(Boolean);
+    const path=pieces.at(-1)==="index.html"?pieces.at(-2)||"Product":pieces.at(-1)||"Product";
+    let readable=path;
+    try{readable=decodeURIComponent(path);}catch{}
+    const name=item.name||clampText(readable.replace(/[-_]/g," "),90);
+    const data=await env.DB.prepare(
+      "INSERT OR IGNORE INTO assets(url,name,kind,first_seen,last_seen,status,discovery_source,evidence_url,inventory_confidence,features_json)"+
+      " VALUES(?,?,'tool',?,?,'unverified',?,?,?,?)"
+    ).bind(item.url,name,nowIso(),nowIso(),item.source,item.evidence,item.confidence,
+      JSON.stringify(item.features)).run();
+    if(Number(data.meta?.changes||0)>0){
+      enrolled++;
+      if(wasInitialized)await saveStatus(env,"new_tool_"+fnv(item.url),
+        (item.confidence==="candidate"?"Possible tool route (unverified): ":"New tool discovered: ")+item.url);
     }
-    await env.DB.prepare("UPDATE assets SET last_seen=? WHERE url=?").bind(nowIso(),url).run();
+    await env.DB.prepare(
+      "UPDATE assets SET last_seen=?, "+
+      "name=CASE WHEN ?<>'' THEN ? ELSE name END, "+
+      "discovery_source=CASE WHEN inventory_confidence='published' AND ?='candidate' THEN discovery_source ELSE ? END, "+
+      "evidence_url=CASE WHEN inventory_confidence='published' AND ?='candidate' THEN evidence_url ELSE ? END, "+
+      "inventory_confidence=CASE WHEN inventory_confidence='published' THEN inventory_confidence ELSE ? END, "+
+      "features_json=CASE WHEN ?<>'[]' THEN ? ELSE features_json END WHERE url=?"
+    ).bind(nowIso(),item.name,item.name,item.confidence,item.source,item.confidence,item.evidence,
+      item.confidence,JSON.stringify(item.features),JSON.stringify(item.features),item.url).run();
   }
-  await saveStatus(env,"discovery",sources===0?"unverified:no-readable-sources":
-    candidates.size===0?"partial:no-discoverable-tool-routes":
-    candidates.size>=MAX_ROUTES_PER_DISCOVERY?"partial:inventory-cap-reached:" + candidates.size:
-    "observed:"+candidates.size+":sources:"+sources);
-  // No automatic deletions. Missing sitemap entries are NOT proof a tool was removed.
-  return {discovered:candidates.size,newlyEnrolled:inserted,validSources:sources};
+  const confirmed=[...choices.values()].filter(x=>x.confidence==="published").length;
+  // A manifest cannot certify a comprehensive inventory if the website
+  // also publicly links tools omitted from it. Preserve those discoveries,
+  // but warn the founder that the catalog is inconsistent.
+  const mismatch=manifestComplete&&[...choices.values()].some(x=>
+    x.confidence==="published"&&!manifestDeclared.has(x.url));
+  if(mismatch)manifestComplete=false;
+  const label=manifestComplete?"observed:manifest-complete:":"partial:";
+  await saveStatus(env,"discovery",label+"published:"+confirmed+":candidates:"+scriptCandidateCount+
+    ":sources:"+validSources+(mismatch?":manifest-mismatch":""));
+  await saveStatus(env,"discovery_sources",sourceHealth.slice(0,14).join(","));
+
+  // Discoveries are never removed on missing scans; a missing source is NOT
+  // evidence of deletion, and literal JS routes never prove functionality.
+  return {discovered:choices.size,newlyEnrolled:enrolled,confirmed,manifestComplete,scriptCandidateCount};
 }
 async function checkProducts(env) {
   const list=await env.DB.prepare(
-    "SELECT url,name,failures FROM assets WHERE kind='tool' ORDER BY (last_checked IS NOT NULL) ASC,last_checked ASC LIMIT ?"
-  ).bind(MAX_CHECKS_PER_HOUR).all();
+    "SELECT url,name,failures,page_fingerprint,inventory_confidence FROM assets WHERE kind='tool' "+
+    "ORDER BY (last_checked IS NOT NULL) ASC,last_checked ASC LIMIT ?"
+  ).bind(MAX_CHECKS_PER_TICK).all();
+  const homepage=await env.DB.prepare("SELECT value FROM status WHERE key='home_content_fingerprint'").first();
+  let checked=0;
   for(const item of list.results||[]){
-    let status=0;
-    try{ status=(await getPublic(env,item.url,{body:false})).status; }catch{}
-    const ok=status>=200 && status<300;
+    let result={status:0,text:null};
+    try{ result=await getPublic(env,item.url,{body:true}); }
+    catch(error){
+      if(error?.message==="daily-free-budget-exhausted"){
+        await saveStatus(env,"monitoring_paused",
+          "Daily request allowance exhausted. Remaining tool checks skipped, not failed.");
+        break;
+      }
+    }
+    checked++;
+    const redirect=result.status>=300&&result.status<400;
+    // Same-site directory routes can canonically redirect to a trailing
+    // slash. A redirect is NOT a failed tool nor proof the destination works.
+    const ok=result.status>=200&&result.status<400;
+    const hash=ok&&result.text?publicPageFingerprint(result.text):"";
+    const shell=Boolean(hash&&homepage?.value&&hash===homepage.value);
+    const previous=item.page_fingerprint||"";
     const fails=ok?0:Number(item.failures||0)+1;
-    await env.DB.prepare("UPDATE assets SET last_checked=?,http_status=?,failures=?,status=? WHERE url=?")
-      .bind(nowIso(),status,fails,ok?"reachable":fails>=2?"degraded":"pending",item.url).run();
-    if(ok && Number(item.failures||0)>=2) {
+    await env.DB.prepare(
+      "UPDATE assets SET last_checked=?,http_status=?,failures=?,status=?,page_fingerprint=? WHERE url=?"
+    ).bind(nowIso(),result.status,fails,ok?(shell||redirect?"unverified":"reachable"):
+      fails>=2?"degraded":"pending",hash||previous,item.url).run();
+    if(ok && Number(item.failures||0)>=2){
       await env.DB.prepare("UPDATE findings SET status='resolved' WHERE id=?")
         .bind(fnv("tool-down:"+item.url)).run();
     }
-    if(fails===2) await addFinding(env,{key:"tool-down:"+item.url,category:"reliability",priority:"high",
-      asset:item.name,title:"Tool appears repeatedly unavailable: "+item.name,
-      description:"Two consecutive read-only requests failed. Last observed HTTP "+status,
+    if(fails===2)await addFinding(env,{key:"tool-down:"+item.url,category:"reliability",priority:"high",
+      asset:item.name,title:"Tool route repeatedly unavailable: "+item.name,
+      description:"Two HTTP GET checks failed (last status "+result.status+
+        "). This is a route observation, not functional browser testing.",
       evidence:item.url});
+    if(ok && hash && previous && hash!==previous && !shell){
+      await saveStatus(env,"tool_change_"+fnv(item.url),
+        "Public title, heading or description changed for "+item.url+
+        ". Review new features; page metadata is not proof of functionality.");
+      await env.DB.prepare("UPDATE assets SET changed_at=? WHERE url=?")
+        .bind(nowIso(),item.url).run();
+    }
+    // A generic SPA shell is not a verified product response, even at HTTP 200.
+    if(shell)await saveStatus(env,"spa_shell_"+fnv(item.url),
+      "Generic site shell returned for "+item.url+"; tool functionality remains unverified.");
   }
-  return (list.results||[]).length;
+  return checked;
 }
 async function research(env) {
-  const catalog=await env.DB.prepare("SELECT url,name FROM assets WHERE kind='tool' LIMIT 150").all();
+  const catalog=await env.DB.prepare(
+    "SELECT url,name,features_json FROM assets WHERE kind='tool' AND inventory_confidence='published' LIMIT 150"
+  ).all();
   const products=catalog.results||[];
-  let created=0, successful=0;
-  for(const feed of RESEARCH_SOURCES) {
-    try {
+  const completeness=await env.DB.prepare("SELECT value FROM status WHERE key='discovery'").first();
+  const complete=Boolean(completeness?.value?.startsWith("observed:manifest-complete:"));
+  let created=0,successful=0,linked=0;
+  for(const feed of RESEARCH_SOURCES){
+    try{
       const response=await getPublic(env,feed,{body:true,allowResearch:true});
-      if(response.status!==200 || response.text===null) continue;
+      if(response.status!==200||response.text===null)continue;
       successful++;
-      const leads=feedLeads(response.text);
-      for(const item of leads){
-        const classification=classifyLead(item.title,products);
-        const result=await env.DB.prepare(
+      for(const item of feedLeads(response.text)){
+        const result=classifyLead(item.title,products,complete);
+        const stored=await env.DB.prepare(
           "INSERT OR IGNORE INTO opportunities(id,title,description,recommendation,source_url,observed_at,score,kind) "+
           "VALUES(?,?,?,?,?,?,?,?)"
         ).bind(fnv(item.link),item.title,
           "Public "+(feed.endsWith("/ask")?"problem discussion":"product mention")+
-          "; audience demand, traffic, features and revenue remain unverified.",
-          classification.recommendation,item.link,nowIso(),15,classification.kind).run();
-        created+=Number(result.meta?.changes||0);
+          "; demand, traffic, feature equivalence and revenue are unverified.",
+          result.recommendation,item.link,nowIso(),15,result.kind).run();
+        created+=Number(stored.meta?.changes||0);
+        // Public mentions can suggest alternatives, but never prove that any
+        // current YorpHives feature is missing, inferior, or profitable.
+        if(result.kind==="possible-existing-product" && result.relatedUrl){
+          const hypothesisId=fnv(result.relatedUrl+"|"+item.link);
+          await env.DB.prepare(
+            "INSERT INTO product_hypotheses(id,product_url,product_name,competing_title,competing_url,evidence_summary,recommendation,status,observed_at)"+
+            " VALUES(?,?,?,?,?,?,?,'unverified',?)"+
+            " ON CONFLICT(id) DO UPDATE SET observed_at=excluded.observed_at"
+          ).bind(hypothesisId,result.relatedUrl,result.related,item.title,item.link,
+            "A public RSS title resembles an enrolled tool; no competitor feature audit performed.",
+            result.recommendation,nowIso()).run();
+          linked++;
+        }
       }
-    } catch { /* Each source is optional; always expose partial research status. */ }
+    }catch{}
   }
   await saveStatus(env,"research",successful?"sources:"+successful+"/"+RESEARCH_SOURCES.length+
-    ":new:"+created:"unavailable:no-public-feeds");
+    ":new:"+created+":alternatives:"+linked:"unavailable:no-public-feeds");
   return created;
 }
 async function securityWatch(env) {
@@ -359,7 +591,7 @@ async function securityWatch(env) {
 function schedulePlan(scheduledTime){
   const time=new Date(scheduledTime);
   const minute=time.getUTCMinutes(),hour=time.getUTCHours();
-  return {uptime:true,products:minute===0,discovery:minute===0 && hour%6===0,
+  return {uptime:true,products:minute%15===0,discovery:minute===0 && hour%6===0,
     research:minute===0 && hour===3, security:minute===0 && hour===4, retention:minute===0 && hour===3};
 }
 async function scheduledCycle(env, scheduledTime) {
@@ -377,8 +609,16 @@ async function scheduledCycle(env, scheduledTime) {
   const observed=new Set((first.results||[]).map(x=>x.key));
   // Stagger expensive first-run discovery/research/watch across separate Cron
   // invocations. Never try to run all public collectors in one Free-tier event.
-  if(plan.discovery || !observed.has("discovery")) await discoverTools(env);
-  else if(plan.research || !observed.has("research")) await research(env);
+  // A newly deployed discovery engine gets one immediate scheduled scan,
+  // preserving earlier records instead of waiting six hours or rewriting
+  // website files. Versioned scan state is D1 observation metadata only.
+  const version=await env.DB.prepare(
+    "SELECT value FROM status WHERE key='discovery_engine_version'"
+  ).first();
+  if(plan.discovery || !observed.has("discovery") || version?.value!=="v4") {
+    await discoverTools(env);
+    await saveStatus(env,"discovery_engine_version","v4");
+  }else if(plan.research || !observed.has("research")) await research(env);
   else if(plan.security || !observed.has("security_watch")) await securityWatch(env);
   if(plan.retention) {
     await env.DB.prepare("DELETE FROM quota WHERE day < ?").bind(nowIso().slice(0,10)).run();
@@ -445,13 +685,14 @@ async function verifyAccess(request,env,ctx) {
   }catch{return false;}
 }
 async function report(env) {
-  const [assets,findings,leads,quota,status,security]=await Promise.all([
+  const [assets,findings,leads,quota,status,security,hypotheses]=await Promise.all([
     env.DB.prepare("SELECT * FROM assets ORDER BY kind ASC,name ASC LIMIT 150").all(),
     env.DB.prepare("SELECT * FROM findings WHERE status='open' ORDER BY observed_at DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM opportunities ORDER BY observed_at DESC LIMIT 50").all(),
     env.DB.prepare("SELECT kind,used FROM quota WHERE day=?").bind(nowIso().slice(0,10)).all(),
     env.DB.prepare("SELECT key,value,checked_at FROM status ORDER BY checked_at DESC LIMIT 30").all(),
-    env.DB.prepare("SELECT * FROM security_watch ORDER BY observed_at DESC LIMIT 15").all()
+    env.DB.prepare("SELECT * FROM security_watch ORDER BY observed_at DESC LIMIT 15").all(),
+    env.DB.prepare("SELECT * FROM product_hypotheses ORDER BY observed_at DESC LIMIT 30").all()
   ]);
   const a=assets.results||[],f=findings.results||[],o=leads.results||[],metadata=status.results||[];
   const last=metadata.find(x=>x.key==="last_cron");
@@ -467,15 +708,25 @@ async function report(env) {
   return {
     schemaVersion:"yorphives.hq-intelligence.v1", generatedAt:now,
     verification:{method:"cloudflare-worker-readonly-http",complete:discoveryComplete,
-      limitations:"HTTP evidence only; catalog completeness and feature functionality are not verified.",
+      limitations:"Public GET evidence only. A complete catalog requires an explicit owner manifest; page changes and functionality need independent verification.",
       generatedAt:last?.checked_at||"",notes:fresh?[]:["Collector heartbeat stale or absent"]},
     assets:a.map(x=>({id:fnv(x.url),name:x.name,kind:x.kind,status:x.status==="reachable"?"healthy":"unknown",summary:x.url})),
-    products:tools.map(x=>({id:fnv(x.url),name:x.name,url:x.url,source:"public-sitemap-or-hub",
-      status:x.status==="reachable"?"healthy":x.status==="degraded"?"degraded":"unknown",
-      active:true,firstSeen:x.first_seen,lastChecked:x.last_checked||"",features:[]})),
-    changes:metadata.filter(x=>x.key.startsWith("new_tool_")).map(x=>({
-      id:x.key,url:x.value.replace("New tool discovered: ",""),kind:"new-product",severity:"info",
-      summary:x.value,occurredAt:x.checked_at
+    products:tools.map(x=>({id:fnv(x.url),name:x.name,url:x.url,
+      source:x.discovery_source||"unverified",discoveryConfidence:x.inventory_confidence||"unverified",
+      evidenceUrl:x.evidence_url||"",status:x.inventory_confidence==="candidate"?"unknown":
+        x.status==="reachable"?"healthy":x.status==="degraded"?"degraded":"unknown",
+      active:true,firstSeen:x.first_seen,lastChecked:x.last_checked||"",
+      features:(()=>{try{const arr=JSON.parse(x.features_json||"[]");return Array.isArray(arr)?arr.slice(0,12):[];}catch{return [];}})(),
+      qaStatus:"unverified",qaReason:x.status==="unverified"?"Generic SPA response; route not verified":
+        "HTTP route observation only; not a functional test"})),
+    changes:metadata.filter(x=>x.key.startsWith("new_tool_")||x.key.startsWith("tool_change_")||
+      x.key==="site_bundle_change").map(x=>({
+      id:x.key,
+      url:x.key.startsWith("new_tool_")?x.value.replace(/^(?:New tool discovered: |Possible tool route \(unverified\): )/,""):"",
+      kind:x.key.startsWith("tool_change_")?"content-change":
+        x.key==="site_bundle_change"?"site-release":
+        x.value.startsWith("Possible tool route")?"candidate-route":"new-product",
+      severity:"info",summary:x.value,occurredAt:x.checked_at
     })),
     findings:f.map(x=>({id:x.id,title:x.title,category:x.category,priority:x.priority,asset:x.asset,
       description:x.description,recommendation:x.recommendation,observedAt:x.observed_at,evidence:[x.evidence]})),
@@ -487,14 +738,22 @@ async function report(env) {
     securityWatch:(security.results||[]).map(x=>({id:x.id,title:x.title,severity:x.severity,
       packages:JSON.parse(x.packages||"[]"),source:x.source_url,observedAt:x.observed_at,
       applicability:"Not evaluated against YorpHives dependencies"})),
-    comparisons:[],agents:[],
-    activity:metadata.filter(x=>x.key!=="site_bundle_fingerprint").slice(0,25).map(x=>({id:x.key,title:x.key.replaceAll("_"," "),
+    comparisons:(hypotheses.results||[]).map(x=>({
+      id:x.id,product:x.product_name,competitor:x.competing_title,
+      missingFeatures:[],confidence:"Public title similarity only · no feature gap verified",
+      recommendation:x.recommendation,evidence:[x.product_url,x.competing_url],
+      observedAt:x.observed_at
+    })),agents:[],
+    activity:metadata.filter(x=>x.key!=="site_bundle_fingerprint" && x.key!=="discovery_engine_version" && x.key!=="discovery_sources").slice(0,25).map(x=>({id:x.key,title:x.key.replaceAll("_"," "),
       summary:x.value,kind:"observation",occurredAt:x.checked_at})),
     resourceBudget:{publicFetches:{used:quotaUsed.public_fetches||0,limit:FETCH_BUDGET_DAY},
       aiCalls:{used:0,limit:0,disabled:true},browserMinutes:{used:0,limit:0,disabled:true}},
     pipeline:{generatedAt:last?.checked_at||"",readOnly:true,approvalRequired:true,
-      products:{complete:discoveryComplete,method:"cloudflare-scheduled-http",
-        discovered:tools.length,notes:[]},
+      products:{complete:discoveryComplete,method:"bounded-public-http-discovery",
+        discovered:tools.length,confirmed:tools.filter(x=>x.inventory_confidence==="published").length,
+        candidates:tools.filter(x=>x.inventory_confidence==="candidate").length,
+        notes:discoveryComplete?["Owner manifest declares complete inventory, but tool functionality is not verified."]:
+          ["Public inventory incomplete; JS bundle paths are only candidates. No product absence or inferiority is established."]},
       research:{status:metadata.find(x=>x.key==="research")?.value||"not-yet-observed"},
       security:{status:metadata.find(x=>x.key==="security_watch")?.value||"not-yet-observed",
         limitation:"Public npm advisories; applicability to YorpHives is not established"},
@@ -539,4 +798,4 @@ export default {
     }));
   }
 };
-export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,schedulePlan,verifyAccess,report};
+export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,schedulePlan,verifyAccess,report};

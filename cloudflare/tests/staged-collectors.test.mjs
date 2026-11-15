@@ -23,7 +23,7 @@ function fakeDb() {
           if(sql.includes("SELECT url,name FROM assets")) return {results:[]};
           return {results:[]};
         },
-        async first(){return null;}
+        async first(){return sql.includes("discovery_engine_version") && status.has("discovery_engine_version") ? {value:status.get("discovery_engine_version")} : null;}
       };
     }
   };

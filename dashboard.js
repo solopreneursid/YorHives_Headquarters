@@ -511,10 +511,10 @@
       }
       spending.append(area);
     }
-    $("catalog-kind").textContent = local ? "LOCAL REPORT" : imported ? "IMPORTED" : "EXAMPLE";
+    $("catalog-kind").textContent = state.origin==="cloudflare" ? "WEBSITE SOURCES" : local ? "LOCAL REPORT" : imported ? "IMPORTED" : "EXAMPLE";
     $("discovery-status").textContent = !imported ? "Preview — not connected"
-      : verifiedScan ? (local ? "Local discovery reported complete" : "Imported successful discovery")
-        : (local ? "Local discovery incomplete — check scanner" : "Imported scan — incomplete or not independently confirmed");
+      : verifiedScan ? (state.origin==="cloudflare" ? "Owner manifest reports a complete catalog · functionality unverified" : "Collector reports complete coverage · verify independently")
+        : (state.origin==="cloudflare" ? "Partial website catalog · some tools may be missing" : "Discovery incomplete or not independently verified");
     $("discovery-explainer").textContent = !imported
       ? "These are illustrative records. Actual monitoring begins after the scanner is installed on your server."
       : (local ? "Private collector report" : "Imported report") +
@@ -522,26 +522,29 @@
         (local ? " · Periodic refresh enabled; evidence remains reviewable." : " · No live connection is established in this browser.");
 
     const inventory = $("product-catalog"); inventory.replaceChildren();
-    if (!products.length) inventory.append(emptyState("No products in this report", "The discovery worker will enroll new tools from your sitemap, catalog links and optional manifest."));
+    if (!products.length) inventory.append(emptyState("No tools found in public sources yet", "This does not mean your website has no tools. Published links or an owner-maintained manifest are needed for reliable automatic enrollment."));
     products.forEach(p => {
       const row = node("div", "product-record");
       const symbol = node("span", "product-record-icon"); symbol.append(icon("layers"));
       const main = node("div", "product-record-main");
-      append(main, node("strong", "", p.name), node("small", "", (p.source || "Source unspecified") + " · " + (p.features.length ? p.features.length + " observed control(s)" : "No controls recorded")));
+      append(main, node("strong", "", p.name), node("small", "",
+        (p.discoveryConfidence==="candidate" ? "Unverified route candidate" : "Published source") + " · " +
+        (p.source || "Source unspecified") + " · " + (p.features.length ? p.features.length + " declared feature(s)" : "Features not listed")));
       const info = node("span", "product-record-info");
       info.append(node("span", "product-state " + (p.status === "healthy" && p.active ? "product-state-reachable" : ""), p.active ? (
-        p.status === "healthy" ? "Reported reachable" : p.status === "degraded" ? "Reported degraded" : "Status unknown"
+        p.discoveryConfidence==="candidate" ? "Needs verification" : p.status === "healthy" ? "HTTP reachable" : p.status === "degraded" ? "HTTP issue reported" : "Status unverified"
       ) : "No longer discoverable"));
       const qaLabels = {
         passed: "Browser rendered",
         failed: "QA alert",
         pending_confirmation: "Needs recheck",
-        unverified: "Browser QA not verified"
+        unverified: "Tool features not tested"
       };
       const qa = node("span", "product-qa-badge qa-" + p.qaStatus,
-        p.qaCheckedAt ? qaLabels[p.qaStatus] : "Browser QA not run");
-      qa.title = p.qaCheckedAt ? "Browser observation: " + (cleanDate(p.qaCheckedAt) || "undated") +
-        " · " + (p.qaReason || "No reason provided") : "No browser assurance check is recorded";
+        state.origin==="cloudflare" ? "Read-only HTTP" : p.qaCheckedAt ? qaLabels[p.qaStatus] : "Tool features not tested");
+      qa.title = state.origin==="cloudflare" ? (p.qaReason || "Only public HTTP observations are available; features are not functionally verified.") :
+        p.qaCheckedAt ? "Browser observation: " + (cleanDate(p.qaCheckedAt) || "undated") +
+        " · " + (p.qaReason || "No reason provided") : "No functional testing evidence recorded";
       info.append(qa);
       if (p.url) {
         const link = node("a", "product-url-link", "Open"); link.href = p.url; link.target = "_blank"; link.rel = "noopener noreferrer";
@@ -564,13 +567,13 @@
     });
 
     const gaps = $("product-feature-gaps"); gaps.replaceChildren();
-    if (!comparisons.length) gaps.append(emptyState("No verified competitor comparisons", "Growth research can collect leads now. Source-backed, feature-by-feature evaluation requires a documented competitor and matching product."));
+    if (!comparisons.length) gaps.append(emptyState("No potential alternatives recorded", "Research sources may suggest similar tools. Headquarters only recommends comparing features after evidence is available."));
     comparisons.forEach(c => {
       const card = node("article", "feature-gap-card");
       const top = node("div", "feature-gap-top");
       append(top, node("strong", "", (c.product || "YorpHives product") + " → " + (c.competitor || "Competitor")),
         node("span", "outline-pill", c.confidence || "Unverified"));
-      const text = node("p", "", c.missingFeatures.length ? "Potential missing features: " + c.missingFeatures.join(" · ") : "No feature details supplied.");
+      const text = node("p", "", c.missingFeatures.length ? "Feature claims to verify: " + c.missingFeatures.join(" · ") : "Possible alternative based on a public mention. No feature shortfall has been verified.");
       const next = node("p", "gap-next", c.recommendation || "Verify with direct evidence before considering changes.");
       append(card, top, text, next);
       const links = node("div", "gap-evidence");
@@ -667,6 +670,7 @@
       products: items("products").map((p, i) => ({
         id: cleanText(p.id, 80) || "product" + i, name: cleanText(p.name, 160) || "Unnamed product",
         url: safeUrl(p.url) || "", source: cleanText(p.source, 80),
+        discoveryConfidence: cleanText(p.discoveryConfidence, 30), evidenceUrl: safeUrl(p.evidenceUrl) || "",
         status: ["healthy", "degraded", "unknown", "not_discoverable"].includes(p.status) ? p.status : "unknown",
         active: p.active !== false, firstSeen: cleanText(p.firstSeen, 45), lastChecked: cleanText(p.lastChecked, 45),
         qaStatus: ["passed", "failed", "pending_confirmation", "unverified"].includes(p.qaStatus) ? p.qaStatus : "unverified",
