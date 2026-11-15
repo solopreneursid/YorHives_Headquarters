@@ -22,6 +22,21 @@ The Cloudflare Access policy permits the Cloudflare-account founder only. Worker
 
 No API keys, model credentials, website-write tokens or deployment privileges are bound to the monitoring Worker. The D1 database is separate from website data.
 
+## First verified live monitoring evidence
+
+A real scheduled invocation completed and wrote these records to the dedicated D1 database on **2026-11-15**:
+
+- Asset: `https://yorphives.com/`
+- Observed HTTP status: **200 OK**
+- Observation timestamp: `2026-11-15T01:05:44.889Z`
+- Collector heartbeat: `2026-11-15T01:05:45.118Z`
+- Consecutive availability failures: **0**
+- Budget usage at that point: **1 public fetch**
+
+This verifies live scheduling, public website HTTP reachability and private evidence persistence **for one cycle**. It is NOT a functional test of a website tool, security verification, proven revenue opportunity or comprehensive product inventory. Product discovery is scheduled every 6 hours and may require a product manifest if the website catalog is JavaScript-only.
+
+Founder login through Cloudflare Access has not been independently tested from this conversation environment. Do not remove the Access guard to troubleshoot a login problem.
+
 ## What this deployed Worker does
 
 - Every 5 minutes: public GET availability check of `https://yorphives.com/`.
