@@ -8,7 +8,7 @@
 const SITE = "https://yorphives.com";
 const ORIGIN_SET = new Set(["https://yorphives.com", "https://www.yorphives.com"]);
 const PATH_ROOTS = ["/tools/", "/tool/", "/free-tools/", "/apps/", "/app/", "/explore/", "/products/"];
-const HUBS = ["/", "/free-tools", "/tools", "/explore"];
+const HUBS = ["/", "/free-tools/", "/free-tools/index.html", "/tools/", "/explore/"];
 const RESEARCH = "https://hnrss.org/show";
 const RESEARCH_SOURCES = [RESEARCH, "https://hnrss.org/ask"];
 // Strictly allowlisted, public, anonymous, GET-only; not an applicability assessment.
@@ -211,7 +211,7 @@ function safeProductUrl(raw, base=SITE, allowVanity=false) {
   const url=safeToolUrl(raw,base);
   if(!url || url.length>400) return null;
   const path=new URL(url).pathname;
-  if(path==="/" || DISALLOWED_PRODUCT_PATH.test(path) || /[{}:*]/.test(path) ||
+  if(path==="/" || /\/(?:free-tools|tools|explore|apps)\/index\.html$/i.test(path) || DISALLOWED_PRODUCT_PATH.test(path) || /[{}:*]/.test(path) ||
      /%(?:2f|5c|00)/i.test(path)) return null;
   if(!allowVanity && !isTool(url)) return null;
   return url;
@@ -359,17 +359,17 @@ async function discoverTools(env) {
       for(const item of parsed.items)insert(item.url,"manifest",SITE+"/.well-known/yorphives-products.json",item.name,item.features);
     }
   }catch{}
-  const sitemaps=[SITE+"/sitemap.xml",SITE+"/sitemap_index.xml"];
+  const sitemaps=[SITE+"/sitemap.xml",SITE+"/free-tools-tool-sitemap.xml",SITE+"/sitemap_index.xml"];
   try{
     const robots=await getPublic(env,SITE+"/robots.txt",{body:true});
     if(robots.status===200 && robots.text){
       for(const m of robots.text.matchAll(/^\s*Sitemap:\s*(\S+)\s*$/gim)){
         const url=safeToolUrl(m[1]);
-        if(url && /\.xml$/i.test(new URL(url).pathname) && sitemaps.length<4 && !sitemaps.includes(url))sitemaps.push(url);
+        if(url && /\.xml$/i.test(new URL(url).pathname) && sitemaps.length<5 && !sitemaps.includes(url))sitemaps.push(url);
       }
     }
   }catch{}
-  for(let k=0;k<sitemaps.length && k<4;k++){
+  for(let k=0;k<sitemaps.length && k<5;k++){
     const source=sitemaps[k];
     try{
       const response=await getPublic(env,source,{body:true});
@@ -422,7 +422,8 @@ async function discoverTools(env) {
   const wasInitialized=await env.DB.prepare("SELECT value FROM status WHERE key='discovery'").first();
   let enrolled=0;
   for(const item of [...choices.values()].slice(0,MAX_ROUTES_PER_DISCOVERY)){
-    const path=new URL(item.url).pathname.split("/").pop()||"Product";
+    const pieces=new URL(item.url).pathname.split("/").filter(Boolean);
+    const path=pieces.at(-1)==="index.html"?pieces.at(-2)||"Product":pieces.at(-1)||"Product";
     let readable=path;
     try{readable=decodeURIComponent(path);}catch{}
     const name=item.name||clampText(readable.replace(/[-_]/g," "),90);
@@ -472,14 +473,17 @@ async function checkProducts(env) {
       }
     }
     checked++;
-    const ok=result.status>=200&&result.status<300;
+    const redirect=result.status>=300&&result.status<400;
+    // Same-site directory routes can canonically redirect to a trailing
+    // slash. A redirect is NOT a failed tool nor proof the destination works.
+    const ok=result.status>=200&&result.status<400;
     const hash=ok&&result.text?publicPageFingerprint(result.text):"";
     const shell=Boolean(hash&&homepage?.value&&hash===homepage.value);
     const previous=item.page_fingerprint||"";
     const fails=ok?0:Number(item.failures||0)+1;
     await env.DB.prepare(
       "UPDATE assets SET last_checked=?,http_status=?,failures=?,status=?,page_fingerprint=? WHERE url=?"
-    ).bind(nowIso(),result.status,fails,ok?(shell?"unverified":"reachable"):
+    ).bind(nowIso(),result.status,fails,ok?(shell||redirect?"unverified":"reachable"):
       fails>=2?"degraded":"pending",hash||previous,item.url).run();
     if(ok && Number(item.failures||0)>=2){
       await env.DB.prepare("UPDATE findings SET status='resolved' WHERE id=?")
