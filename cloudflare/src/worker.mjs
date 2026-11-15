@@ -1057,6 +1057,59 @@ async function report(env) {
       errors:fresh?[]:["Collector heartbeat stale or absent"]}
   };
 }
+
+// Strictly bounded read-only public repository lookup. The founder must initiate every search.
+const publicGithubCache=new Map();
+let lastPublicGithubRequest=0;
+function githubRepoMetadata(repo){
+  const fullName=String(repo?.full_name||"");
+  if(!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(fullName)||repo?.private===true||repo?.archived===true)return null;
+  const topics=Array.isArray(repo.topics)?repo.topics.filter(x=>typeof x==="string").slice(0,12):[];
+  const technology=/(^|[-_ ])(ai|llm|ml|agents?|machine-learning|models?|framework|sdk|mcp|inference|transformers)($|[-_ ])/i;
+  const license=String(repo.license?.spdx_id||"");
+  return {id:fullName,title:fullName,description:String(repo.description||"").slice(0,280),
+    url:"https://github.com/"+fullName,
+    license:/^[A-Za-z0-9.-]{1,40}$/.test(license)&&license!=="NOASSERTION"?license:null,
+    stars:Number.isSafeInteger(repo.stargazers_count)&&repo.stargazers_count>=0?repo.stargazers_count:0,
+    language:typeof repo.language==="string"?repo.language.slice(0,40):"",
+    topics,category:topics.some(t=>technology.test(t))||technology.test(fullName)?"technology":"apps",
+    updatedAt:typeof repo.updated_at==="string"?repo.updated_at:"",
+    source:"github-public",verified:false};
+}
+async function discoverPublicGithub(request){
+  const u=new URL(request.url),q=String(u.searchParams.get("q")||"").normalize("NFKC").trim().replace(/\s+/g," ");
+  if(!/^[\p{L}\p{N} ._-]{2,64}$/u.test(q)||q.split(/\s+/).length>8)return json({error:"Enter 2–64 letters or numbers, up to 8 words."},400);
+  const key=q.toLowerCase(),now=Date.now();
+  for(const [k,v] of publicGithubCache)if(now-v.at>300000)publicGithubCache.delete(k);
+  const hit=publicGithubCache.get(key);
+  if(hit)return json({...hit.data,cached:true});
+  // Isolate-local cooldown; upstream rate limits still apply across edge instances.
+  if(now-lastPublicGithubRequest<15000)return json({error:"Search cooldown. Retry shortly."},429);
+  lastPublicGithubRequest=now;
+  const api=new URL("https://api.github.com/search/repositories");
+  api.searchParams.set("q",q+" in:name,description fork:false archived:false");
+  api.searchParams.set("per_page","12");
+  try{
+    const response=await fetch(api.href,{method:"GET",redirect:"error",cache:"no-store",
+      headers:{accept:"application/vnd.github+json","user-agent":"YorpHives-HQ-ReadOnly-Discovery"},
+      signal:AbortSignal.timeout(7000)});
+    if(response.status===403||response.status===429)return json({error:"GitHub search is rate-limited. Retry later."},429);
+    if(!response.ok)return json({error:"Public GitHub search is temporarily unavailable."},503);
+    if(Number(response.headers.get("content-length")||0)>1000000)return json({error:"Search response too large."},502);
+    const raw=await response.text();
+    if(raw.length>1000000)return json({error:"Search response too large."},502);
+    const data=JSON.parse(raw);
+    if(!Array.isArray(data.items))return json({error:"Unexpected GitHub response."},502);
+    const items=data.items.slice(0,12).map(githubRepoMetadata).filter(Boolean);
+    const payload={query:q,source:"github-public",searchedAt:new Date(now).toISOString(),
+      total:Math.max(0,Number(data.total_count)||0),incomplete:data.incomplete_results===true,items,
+      licenseNotice:"Verify each repository license and obligations before copying or adapting code."};
+    if(publicGithubCache.size>=40)publicGithubCache.delete(publicGithubCache.keys().next().value);
+    publicGithubCache.set(key,{at:now,data:payload});
+    return json(payload);
+  }catch{return json({error:"Public GitHub search did not respond."},503);}
+}
+
 function json(value,status=200) {return new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});}
 export default {
   async fetch(request,env,ctx) {
@@ -1068,6 +1121,8 @@ export default {
       try{return await saveDecision(request,env);}catch{return json({error:"Decision could not be saved; refresh before retrying"},503);}
     }
     if(route==="/api/decisions"&&request.method==="GET")return json(await decisionJournal(env));
+    if(route==="/api/discover"&&request.method==="GET")return discoverPublicGithub(request);
+    if(route==="/api/discover"&&request.method==="HEAD")return new Response(null,{status:200,headers:JSON_HEADERS});
     if(route==="/api/report") {
       if(!env.DB) return json({error:"Evidence database is not configured"},503);
       const result=await report(env);
@@ -1110,4 +1165,4 @@ export default {
     }));
   }
 };
-export {headquartersHealth,safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report,decisionTransition,evidenceContract,operatingBrief,saveDecision,validateExperiment};
+export {githubRepoMetadata,discoverPublicGithub,headquartersHealth,safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report,decisionTransition,evidenceContract,operatingBrief,saveDecision,validateExperiment};
