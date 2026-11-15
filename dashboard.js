@@ -158,6 +158,40 @@
         : "Imported report — These values came from a file in your browser. Headquarters has not independently checked them or connected to production systems.";
   }
 
+  function renderFounderBriefing() {
+    const brief=state.data.briefing;
+    const preview=state.origin==="preview";
+    const has=brief && !preview;
+    const fresh=has && brief.collector.current;
+    $("brief-origin").textContent=preview?"EXAMPLE DATA":!has?"NO BRIEFING":fresh?"RECENT COLLECTOR":"CHECK DATA FRESHNESS";
+    $("brief-site").textContent=!has?"Not verified":
+      brief.site.status==="reported-reachable"?"HTTP reachable":
+      brief.site.status==="issue-reported"?"Issue reported":"Not verified";
+    $("brief-site-caption").textContent=has && brief.site.lastCheck?
+      "Last GET: "+(cleanDate(brief.site.lastCheck)||"time unavailable"):"No recent verified HTTP check";
+    $("brief-coverage").textContent=has?brief.coverage.checked+" / "+brief.coverage.discovered:"—";
+    $("brief-progress").value=has?brief.coverage.checkedPercent:0;
+    $("brief-coverage-caption").textContent=has?
+      brief.coverage.awaitingFirstCheck+" awaiting first check · "+brief.coverage.httpUnverified+
+      " checked but unverified":"Tool coverage not available";
+    $("brief-alerts").textContent=has?brief.alerts.open:"—";
+    $("brief-alerts-caption").textContent=has?
+      brief.alerts.highPriority+" high-priority · findings require review":"No monitoring findings loaded";
+    $("brief-research").textContent=has?brief.research.leads:"—";
+    $("brief-research-caption").textContent=has?
+      brief.research.alternatives+" possible alternatives · demand unverified":"No research feed loaded";
+    $("brief-next-title").textContent=has?brief.nextAction.label:"Connect your private report";
+    $("brief-next-detail").textContent=has?brief.nextAction.description:
+      "The briefing appears after a collector report is connected.";
+    const target=$("brief-next-button");
+    target.dataset.nav=has?brief.nextAction.section:"products";
+    target.firstChild.textContent=has?"Review evidence ":"See my tools ";
+    $("brief-caveat").textContent=has?
+      "Daily public GETs: "+brief.usage.used+" / "+brief.usage.limit+
+      " (internal guard, not billing) · No browser or AI agents change your site.":
+      "No code changes, browser testing or paid AI can be initiated from this briefing.";
+  }
+
   function renderHomeFeed() {
     const d=state.data;
     const preview=state.origin==="preview";
@@ -588,6 +622,7 @@
 
   function renderAll() {
     renderMetrics();
+    renderFounderBriefing();
     renderHomeFeed();
     renderBrief();
     renderCoverage();
@@ -709,6 +744,29 @@
         limit: number(publicFetches.limit),
         aiDisabled: rawBudget.aiCalls?.disabled === true,
         browserDisabled: rawBudget.browserMinutes?.disabled === true
+      };
+    }
+    const rBrief=raw.briefing;
+    if(rBrief && typeof rBrief==="object" && !Array.isArray(rBrief)) {
+      const number=value=>Number.isSafeInteger(value)&&value>=0?Math.min(value,999999):0;
+      const section=value=>["overview","monitoring","products","opportunities","activity"].includes(value)?value:"products";
+      const siteStatus=["reported-reachable","issue-reported"].includes(rBrief.site?.status)?
+        rBrief.site.status:"not-verified";
+      const coverage=rBrief.coverage||{},alerts=rBrief.alerts||{},research=rBrief.research||{};
+      normal.briefing={
+        collector:{current:rBrief.collector?.current===true,lastSeen:cleanText(rBrief.collector?.lastSeen,45)},
+        site:{status:siteStatus,lastCheck:cleanText(rBrief.site?.lastCheck,45)},
+        coverage:{checked:number(coverage.checked),discovered:number(coverage.discovered),
+          awaitingFirstCheck:number(coverage.awaitingFirstCheck),
+          checkedPercent:Math.min(number(coverage.checkedPercent),100),
+          httpUnverified:number(coverage.httpUnverified)},
+        alerts:{open:number(alerts.open),highPriority:number(alerts.highPriority)},
+        research:{leads:number(research.leads),alternatives:number(research.alternatives)},
+        usage:{used:number(rBrief.usage?.used),limit:number(rBrief.usage?.limit)},
+        nextAction:{label:cleanText(rBrief.nextAction?.label,120)||"Review current evidence",
+          description:cleanText(rBrief.nextAction?.description,360)||
+            "Check source evidence before making changes.",
+          section:section(rBrief.nextAction?.section)}
       };
     }
     normal.verification = {
