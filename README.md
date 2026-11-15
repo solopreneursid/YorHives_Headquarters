@@ -133,7 +133,7 @@ The entries above are integration **candidates**, not installed or approved comp
 
 ## Free, self-hosted code-review bots (experimental)
 
-An optional local-only QA pipeline has been added on this review branch. It includes a verified-release installer for reviewdog, Betterleaks and Trivy; deterministic code checks; Playwright browser smoke tests; and an opt-in PR-Agent reviewer using local Ollama. No external bots have been installed on your server and no browser or security scan has been executed yet.
+An optional local-only QA pipeline has been added on this review branch. It includes a verified-release installer for reviewdog, Betterleaks and Trivy; deterministic code checks; Playwright browser smoke tests; and an opt-in PR-Agent reviewer using local Ollama. No external scanner bots have been installed on your server. Isolated Playwright/Chromium tests have passed in GitHub CI, but no live-site security scan has been executed.
 
 Full guide: [Code review bot setup](docs/REVIEW_BOTS.md) · [Current verified/blocked checks](docs/REVIEW_VALIDATION.md)
 
@@ -161,6 +161,10 @@ python3 tests/test_intelligence.py
 python3 intelligence/run_pipeline.py --base-url https://yorphives.com
 ```
 
-For optional browser link discovery, install Playwright and the Chromium runtime on your **own server**, then use `--browser-discovery`. To run recurring checks under a founder-managed process supervisor, add `--loop --interval-minutes 60`. Reports are written only in the external private evidence directory (`~/.local/state/yorphives-hq` by default). Import `headquarters-report.json` through the dashboard. None of these collectors is installed or running just because its source exists in GitHub.
+For optional browser link discovery and read-only rendering checks, install Playwright and Chromium on your **own server**, then use `--browser-discovery --assurance-browser`. To run recurring checks under a founder-managed process supervisor, add `--loop --interval-minutes 60`. Reports are written only in the external private evidence directory (`~/.local/state/yorphives-hq` by default). Import `headquarters-report.json` through the dashboard. None of these collectors is installed or running just because its source exists in GitHub.
+
+**New monitoring safeguards:** `intelligence/assurance.py` automatically schedules read-only browser-render checks across discovered tools (with two-failure confirmation and fair rotation). `intelligence/watchdog.py` independently observes the private viewer and the collector's report heartbeat. Neither process modifies website/HQ project code, fixes vulnerabilities, restarts services, or deploys changes. Reports remain private and require founder review.
+
+**Validation:** [Latest recorded intelligence QA results](docs/INTELLIGENCE_VALIDATION.md). **The services are not installed or running on your server.**
 
 **Architecture and test instructions:** [Product intelligence documentation](intelligence/README.md). This does not edit YorpHives website files or Headquarters project files during monitoring. The UI preview data remains clearly labelled as illustrative; imported report data remains unverified until an authenticated evidence pipeline is added.
