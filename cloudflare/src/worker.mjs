@@ -14,7 +14,7 @@ const RESEARCH_SOURCES = [RESEARCH, "https://hnrss.org/ask"];
 // Strictly allowlisted, public, anonymous, GET-only; not an applicability assessment.
 const ADVISORY_SOURCE = "https://api.github.com/advisories?type=reviewed&ecosystem=npm&per_page=3";
 const MAX_ROUTES_PER_DISCOVERY = 45;
-const MAX_CHECKS_PER_HOUR = 4;
+const MAX_CHECKS_PER_TICK = 3; // three least-recently-checked tool routes every 15 minutes
 const FETCH_BUDGET_DAY = 900; // intentionally far below platform ceilings
 const MAX_TEXT_BYTES = 100000;
 // Build-time replacement for the isolated API pilot; Wrangler Static Assets take priority.
@@ -475,7 +475,7 @@ async function checkProducts(env) {
   const list=await env.DB.prepare(
     "SELECT url,name,failures,page_fingerprint,inventory_confidence FROM assets WHERE kind='tool' "+
     "ORDER BY (last_checked IS NOT NULL) ASC,last_checked ASC LIMIT ?"
-  ).bind(MAX_CHECKS_PER_HOUR).all();
+  ).bind(MAX_CHECKS_PER_TICK).all();
   const homepage=await env.DB.prepare("SELECT value FROM status WHERE key='home_content_fingerprint'").first();
   let checked=0;
   for(const item of list.results||[]){
@@ -591,7 +591,7 @@ async function securityWatch(env) {
 function schedulePlan(scheduledTime){
   const time=new Date(scheduledTime);
   const minute=time.getUTCMinutes(),hour=time.getUTCHours();
-  return {uptime:true,products:minute===0,discovery:minute===0 && hour%6===0,
+  return {uptime:true,products:minute%15===0,discovery:minute===0 && hour%6===0,
     research:minute===0 && hour===3, security:minute===0 && hour===4, retention:minute===0 && hour===3};
 }
 async function scheduledCycle(env, scheduledTime) {
