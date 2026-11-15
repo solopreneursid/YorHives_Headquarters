@@ -696,12 +696,13 @@ function schedulePlan(scheduledTime){
   const discovery=minute===0 && hour%6===0;
   const research=minute===0 && hour===3;
   const security=minute===0 && hour===4;
+  const competitorIndex=hour===7&&minute===5?0:hour===7&&minute===10?1:-1;
   // Keep heavy scanners separate from tool HTTP checks on 10ms CPU Free Cron.
   // 2 tools per ordinary five-minute event and site check every 15 min:
   // 564 tool checks/day + 96 website checks/day, leaving ~240 public fetches
   // for discovery, research, advisory and bounded competitor source reviews.
-  return {uptime:minute%15===0,products:!(discovery||research||security),
-    discovery,research,security,retention:research};
+  return {uptime:minute%15===0,products:!(discovery||research||security||competitorIndex>=0),
+    discovery,research,security,retention:research,competitorIndex};
 }
 async function scheduledCycle(env, scheduledTime) {
   if(!env.DB) throw Error("Missing D1 binding");
@@ -729,6 +730,7 @@ async function scheduledCycle(env, scheduledTime) {
     await saveStatus(env,"discovery_engine_version","v4");
   }else if(plan.research || !observed.has("research")) await research(env);
   else if(plan.security || !observed.has("security_watch")) await securityWatch(env);
+  else if(plan.competitorIndex>=0) await competitorScout(env,plan.competitorIndex);
   if(plan.retention) {
     await env.DB.prepare("DELETE FROM quota WHERE day < ?").bind(nowIso().slice(0,10)).run();
     await env.DB.prepare("DELETE FROM opportunities WHERE observed_at < ?")
