@@ -74,6 +74,20 @@ with sync_playwright() as pw:
       page.wait_for_timeout(25)
       assert page.locator(".stat").filter(has_text="Headquarters").filter(has_text="Responding").count()==1
       assert page.locator(".pulse-row").count()==20
+      pulse=page.locator(".pulse-list")
+      assert pulse.get_attribute("role")=="region"
+      assert pulse.get_attribute("tabindex")=="0"
+      dimensions=pulse.evaluate("(e)=>({top:e.scrollTop,height:e.clientHeight,content:e.scrollHeight,overflow:getComputedStyle(e).overflowY})")
+      assert dimensions["content"]>dimensions["height"],(engine.name,width,"YH Pulse must scroll",dimensions)
+      assert dimensions["overflow"]=="auto"
+      pulse.evaluate("(e)=>{e.scrollTop=e.scrollHeight;}")
+      assert pulse.evaluate("(e)=>e.scrollTop")>0
+      if width==1440:
+        panels=page.locator(".home-grid > .panel, .home-grid > .vertical-stack").evaluate_all(
+          "(els)=>els.map(e=>({top:Math.round(e.getBoundingClientRect().top),bottom:Math.round(e.getBoundingClientRect().bottom),width:Math.round(e.getBoundingClientRect().width)}))")
+        assert len(panels)==2 and panels[0]["top"]==panels[1]["top"],panels
+        assert abs(panels[0]["width"]-panels[1]["width"])<=2,panels
+        assert abs(panels[0]["bottom"]-panels[1]["bottom"])<=4,panels
       page.evaluate("location.hash='discover'")
       page.wait_for_timeout(25)
       page.locator('[data-discover-filter="technology"]').first.click()
@@ -103,6 +117,7 @@ with sync_playwright() as pw:
       page.wait_for_timeout(25)
       page.locator("#product-filter").select_option("candidate")
       assert page.locator('.record-row[data-detail="product"]').count()==1
+      assert page.locator(".record-list[aria-label='Product inventory']").get_attribute("tabindex")=="0"
       page.evaluate("location.hash='control'")
       page.wait_for_timeout(25)
       assert page.locator(".system-card").filter(has_text="HQ API").filter(has_text="Responding").count()==1
