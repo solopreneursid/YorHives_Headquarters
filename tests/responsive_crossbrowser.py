@@ -66,7 +66,8 @@ def run_engine(browser_type,base):
                 page.locator("#mobile-more").click()
                 assert page.locator("#sidebar").is_visible()
                 assert page.locator(".sidebar-signout").is_visible()
-                page.locator("#sidebar-scrim").click()
+                # Tap outside the drawer. The scrim center sits underneath the drawer on tiny phones.
+                page.mouse.click(width-5, 160)
                 assert not page.evaluate("document.body.classList.contains('nav-open')")
                 assert page.locator("#sidebar-scrim").is_hidden()
 
