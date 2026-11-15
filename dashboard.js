@@ -51,7 +51,9 @@
     findingFilter: "all",
     opportunityFilter: "all",
     selectedDetail: null,
-    feedFilter: "all"
+    feedFilter: "all",
+    browserAlertsOn: false,
+    seenFindingIds: new Set()
   };
 
   const $ = (id) => document.getElementById(id);
@@ -156,6 +158,40 @@
       : local
         ? "Read-only collector report — These are recorded HTTP observations and research leads, not proof that every product feature works or that market demand exists."
         : "Imported report — These values came from a file in your browser. Headquarters has not independently checked them or connected to production systems.";
+  }
+
+  function renderFounderBriefing() {
+    const brief=state.data.briefing;
+    const preview=state.origin==="preview";
+    const has=brief && !preview;
+    const fresh=has && brief.collector.current;
+    $("brief-origin").textContent=preview?"EXAMPLE DATA":!has?"NO BRIEFING":fresh?"RECENT COLLECTOR":"CHECK DATA FRESHNESS";
+    $("brief-site").textContent=!has?"Not verified":
+      brief.site.status==="reported-reachable"?"HTTP reachable":
+      brief.site.status==="issue-reported"?"Issue reported":"Not verified";
+    $("brief-site-caption").textContent=has && brief.site.lastCheck?
+      "Last GET: "+(cleanDate(brief.site.lastCheck)||"time unavailable"):"No recent verified HTTP check";
+    $("brief-coverage").textContent=has?brief.coverage.checked+" / "+brief.coverage.discovered:"—";
+    $("brief-progress").value=has?brief.coverage.checkedPercent:0;
+    $("brief-coverage-caption").textContent=has?
+      brief.coverage.awaitingFirstCheck+" awaiting first check · "+brief.coverage.httpUnverified+
+      " checked but unverified":"Tool coverage not available";
+    $("brief-alerts").textContent=has?brief.alerts.open:"—";
+    $("brief-alerts-caption").textContent=has?
+      brief.alerts.highPriority+" high-priority · findings require review":"No monitoring findings loaded";
+    $("brief-research").textContent=has?brief.research.leads:"—";
+    $("brief-research-caption").textContent=has?
+      brief.research.alternatives+" possible alternatives · demand unverified":"No research feed loaded";
+    $("brief-next-title").textContent=has?brief.nextAction.label:"Connect your private report";
+    $("brief-next-detail").textContent=has?brief.nextAction.description:
+      "The briefing appears after a collector report is connected.";
+    const target=$("brief-next-button");
+    target.dataset.nav=has?brief.nextAction.section:"products";
+    target.firstChild.textContent=has?"Review evidence ":"See my tools ";
+    $("brief-caveat").textContent=has?
+      "Daily public GETs: "+brief.usage.used+" / "+brief.usage.limit+
+      " (internal guard, not billing) · No browser or AI agents change your site.":
+      "No code changes, browser testing or paid AI can be initiated from this briefing.";
   }
 
   function renderHomeFeed() {
@@ -573,7 +609,9 @@
       const top = node("div", "feature-gap-top");
       append(top, node("strong", "", (c.product || "YorpHives product") + " → " + (c.competitor || "Competitor")),
         node("span", "outline-pill", c.confidence || "Unverified"));
-      const text = node("p", "", c.missingFeatures.length ? "Feature claims to verify: " + c.missingFeatures.join(" · ") : "Possible alternative based on a public mention. No feature shortfall has been verified.");
+      const text = node("p", "", c.evidenceSummary ||
+        (c.missingFeatures.length ? "Feature claims to verify: " + c.missingFeatures.join(" · ") :
+        "Possible alternative based on a public mention. No feature shortfall has been verified."));
       const next = node("p", "gap-next", c.recommendation || "Verify with direct evidence before considering changes.");
       append(card, top, text, next);
       const links = node("div", "gap-evidence");
@@ -588,6 +626,7 @@
 
   function renderAll() {
     renderMetrics();
+    renderFounderBriefing();
     renderHomeFeed();
     renderBrief();
     renderCoverage();
@@ -686,7 +725,8 @@
         id: cleanText(c.id, 80) || "gap" + i, product: cleanText(c.product, 160),
         competitor: cleanText(c.competitor, 160),
         missingFeatures: Array.isArray(c.missingFeatures) ? c.missingFeatures.slice(0, 40).map(x => cleanText(x, 130)).filter(Boolean) : [],
-        confidence: cleanText(c.confidence, 100), recommendation: cleanText(c.recommendation, 800),
+        confidence: cleanText(c.confidence, 100), evidenceSummary: cleanText(c.evidenceSummary, 400),
+        recommendation: cleanText(c.recommendation, 800),
         evidence: evidence(c)
       })),
       agents: items("agents").map((a, i) => ({
@@ -711,6 +751,29 @@
         browserDisabled: rawBudget.browserMinutes?.disabled === true
       };
     }
+    const rBrief=raw.briefing;
+    if(rBrief && typeof rBrief==="object" && !Array.isArray(rBrief)) {
+      const number=value=>Number.isSafeInteger(value)&&value>=0?Math.min(value,999999):0;
+      const section=value=>["overview","monitoring","products","opportunities","activity"].includes(value)?value:"products";
+      const siteStatus=["reported-reachable","issue-reported"].includes(rBrief.site?.status)?
+        rBrief.site.status:"not-verified";
+      const coverage=rBrief.coverage||{},alerts=rBrief.alerts||{},research=rBrief.research||{};
+      normal.briefing={
+        collector:{current:rBrief.collector?.current===true,lastSeen:cleanText(rBrief.collector?.lastSeen,45)},
+        site:{status:siteStatus,lastCheck:cleanText(rBrief.site?.lastCheck,45)},
+        coverage:{checked:number(coverage.checked),discovered:number(coverage.discovered),
+          awaitingFirstCheck:number(coverage.awaitingFirstCheck),
+          checkedPercent:Math.min(number(coverage.checkedPercent),100),
+          httpUnverified:number(coverage.httpUnverified)},
+        alerts:{open:number(alerts.open),highPriority:number(alerts.highPriority)},
+        research:{leads:number(research.leads),alternatives:number(research.alternatives)},
+        usage:{used:number(rBrief.usage?.used),limit:number(rBrief.usage?.limit)},
+        nextAction:{label:cleanText(rBrief.nextAction?.label,120)||"Review current evidence",
+          description:cleanText(rBrief.nextAction?.description,360)||
+            "Check source evidence before making changes.",
+          section:section(rBrief.nextAction?.section)}
+      };
+    }
     normal.verification = {
       complete: raw.pipeline?.products?.complete === true || raw.verification?.complete === true,
       generatedAt: cleanText(raw.pipeline?.generatedAt || raw.generatedAt, 45),
@@ -721,8 +784,31 @@
     return normal;
   }
 
+  function notifyNewHighPriority(previous, normal, origin) {
+    if(!state.browserAlertsOn || origin!=="cloudflare" || previous!=="cloudflare") return;
+    for(const finding of normal.findings){
+      if(!["high"].includes(finding.priority) || state.seenFindingIds.has(finding.id)) continue;
+      state.seenFindingIds.add(finding.id);
+      if(document.visibilityState!=="hidden" ||
+         typeof Notification==="undefined" || Notification.permission!=="granted")continue;
+      try {
+        new Notification("YorpHives Headquarters: new alert",{
+          body:"Open your private Headquarters to review new evidence.",
+          tag:"yorphives-hq-new-alert",silent:true
+        });
+      }catch{ /* Unsupported mobile browsers simply use the in-app Alerts feed. */ }
+    }
+  }
+  function refreshBrowserAlertButton(){
+    const button=$("browser-alert-toggle");
+    button.textContent=state.browserAlertsOn?"Disable alerts":"Enable alerts";
+    button.setAttribute("aria-pressed",String(state.browserAlertsOn));
+  }
+
   function applyReport(raw, origin) {
     const normal = normalizeData(raw);
+    const previousOrigin=state.origin;
+    notifyNewHighPriority(previousOrigin,normal,origin);
     state.data = normal;
     state.origin = origin;
     state.findingFilter = "all";
@@ -816,6 +902,30 @@
   }
 
   function initialize() {
+    $("browser-alert-toggle").addEventListener("click",async()=>{
+      if(state.browserAlertsOn){
+        state.browserAlertsOn=false;
+        refreshBrowserAlertButton();
+        showToast("Browser alerts are off. The private Alerts feed still works.");
+        return;
+      }
+      if(typeof Notification==="undefined" || !window.isSecureContext){
+        showToast("This browser does not support private tab alerts here.");
+        return;
+      }
+      try{
+        const permission=await Notification.requestPermission();
+        if(permission!=="granted"){
+          showToast("Notification permission not enabled. All alerts remain inside Headquarters.");
+          return;
+        }
+        state.browserAlertsOn=true;
+        // Existing findings are NOT a new incident and must not notify.
+        state.seenFindingIds=new Set(state.data.findings.map(x=>x.id));
+        refreshBrowserAlertButton();
+        showToast("Alerts enabled for new high-priority findings while this tab stays open.");
+      }catch{showToast("Browser alerts are unavailable on this device.");}
+    });
     document.querySelectorAll("[data-nav]").forEach(button => button.addEventListener("click", () => showView(button.dataset.nav)));
     window.addEventListener("hashchange", () => showView(location.hash.replace("#", "")));
     document.querySelectorAll("[data-feed-filter]").forEach(chip=>chip.addEventListener("click",()=>{

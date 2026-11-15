@@ -13,8 +13,20 @@ const RESEARCH = "https://hnrss.org/show";
 const RESEARCH_SOURCES = [RESEARCH, "https://hnrss.org/ask"];
 // Strictly allowlisted, public, anonymous, GET-only; not an applicability assessment.
 const ADVISORY_SOURCE = "https://api.github.com/advisories?type=reviewed&ecosystem=npm&per_page=3";
+// Tiny, replaceable Research Scout registry. Explicit public URLs only.
+// No credentials, arbitrary search input, user browsing history or remote LLM.
+const COMPETITOR_SOURCES = Object.freeze([
+  {id:"ezgif-image-resize",name:"Ezgif image resizer",url:"https://ezgif.com/resize",
+    robots:"https://ezgif.com/robots.txt",paths:["/free-tools/image-resizer"],
+    claims:["animated images","crop","aspect ratio","local processing"]},
+  {id:"ilovepdf-pdf-organize",name:"iLovePDF PDF documentation",
+    url:"https://www.ilovepdf.com/help/documentation",
+    robots:"https://www.ilovepdf.com/robots.txt",
+    paths:["/free-tools/merge-pdf","/free-tools/split-pdf"],
+    claims:["password-protected","cloud storage","page ranges","reorder"]}
+]);
 const MAX_ROUTES_PER_DISCOVERY = 45;
-const MAX_CHECKS_PER_TICK = 3; // three least-recently-checked tool routes every 15 minutes
+const MAX_CHECKS_PER_TICK = 2; // bounded two-product rounds every five minutes; Free-tier safe
 const FETCH_BUDGET_DAY = 900; // intentionally far below platform ceilings
 const MAX_TEXT_BYTES = 100000;
 // Build-time replacement for the isolated API pilot; Wrangler Static Assets take priority.
@@ -64,9 +76,10 @@ async function boundedText(response, max = MAX_TEXT_BYTES) {
   for (const part of chunks) { bytes.set(part,index); index+=part.byteLength; }
   return new TextDecoder().decode(bytes);
 }
-async function limitedFetch(url, {allowResearch = false, allowSecurity = false, body = false} = {}) {
+async function limitedFetch(url, {allowResearch = false, allowSecurity = false, allowCompetitor = false, body = false} = {}) {
   const parsed = new URL(url);
-  const allowed = allowSecurity ? url === ADVISORY_SOURCE :
+  const allowed = allowCompetitor ? COMPETITOR_SOURCES.some(x=>x.url===url||x.robots===url) :
+    allowSecurity ? url === ADVISORY_SOURCE :
     allowResearch ? RESEARCH_SOURCES.includes(url) : ORIGIN_SET.has(parsed.origin);
   if (!allowed) throw Error("target-not-allowlisted");
   const response = await fetch(url, {method:"GET", redirect:"manual", cache:"no-store",
@@ -523,6 +536,95 @@ async function checkProducts(env) {
   }
   return checked;
 }
+// Conservative, standard robots.txt rules for the exact public page path.
+// If unknown or unparseable, the competitor scout skips inspection.
+function robotsAllowsPath(robotsText,pagePath){
+  if(typeof robotsText!=="string"||robotsText.length>100000||!pagePath.startsWith("/"))return false;
+  const groups=[];let agents=[],rules=[],sawRules=false;
+  function flush(){if(agents.length)groups.push({agents,rules});agents=[];rules=[];sawRules=false;}
+  for(const raw of robotsText.split(/\r?\n/).slice(0,1200)){
+    const line=raw.split("#")[0].trim();
+    if(!line)continue;
+    const m=line.match(/^([a-z-]+)\s*:\s*(.*?)\s*$/i);
+    if(!m)continue;
+    const directive=m[1].toLowerCase(),value=m[2];
+    if(directive==="user-agent"){
+      if(sawRules)flush();
+      agents.push(value.toLowerCase());
+    }else if((directive==="allow"||directive==="disallow") && agents.length){
+      sawRules=true;
+      if(value)rules.push({kind:directive,prefix:value.split("*")[0].split("$")[0]});
+    }
+  }
+  flush();
+  const target=["yorphiveshq-readonly","*"];
+  for(const agent of target){
+    const matching=groups.filter(g=>g.agents.some(a=>a===agent));
+    if(!matching.length)continue;
+    let verdict=true,max=-1;
+    for(const rule of matching.flatMap(g=>g.rules)){
+      if(!pagePath.startsWith(rule.prefix))continue;
+      if(rule.prefix.length>max || rule.prefix.length===max && rule.kind==="allow"){
+        max=rule.prefix.length;verdict=rule.kind==="allow";
+      }
+    }
+    return verdict;
+  }
+  return true; // a valid robots file with no applicable group
+}
+function cleanPublicPage(html){
+  return String(html||"").slice(0,MAX_TEXT_BYTES)
+    .replace(/<script\b[\s\S]*?<\/script>/gi," ")
+    .replace(/<style\b[\s\S]*?<\/style>/gi," ")
+    .replace(/<[^>]+>/g," ")
+    .replace(/&(?:amp|quot|nbsp|#39|lt|gt);/gi," ")
+    .replace(/\s+/g," ").trim().toLowerCase();
+}
+function competitorClaimEvidence(html,phrases){
+  const visible=cleanPublicPage(html);
+  return phrases.filter(phrase=>visible.includes(phrase.toLowerCase())).slice(0,4);
+}
+async function competitorScout(env,index){
+  const source=COMPETITOR_SOURCES[index];
+  if(!source)return 0;
+  const key="competitor_watch_"+source.id;
+  let reason="not-verified",created=0;
+  try{
+    const robots=await getPublic(env,source.robots,{body:true,allowCompetitor:true});
+    const allowed=robots.status===404 ||
+      robots.status===200 && robots.text!==null &&
+      robotsAllowsPath(robots.text,new URL(source.url).pathname);
+    if(!allowed){reason="robots-unavailable-or-disallowed";return 0;}
+    const page=await getPublic(env,source.url,{body:true,allowCompetitor:true});
+    if(page.status!==200||!page.text){reason="public-page-not-readable:"+page.status;return 0;}
+    const claims=competitorClaimEvidence(page.text,source.claims);
+    if(!claims.length){reason="no-verifiable-advertised-claims";return 0;}
+    // Only map to exact product URLs already confirmed by public catalog.
+    for(const path of source.paths){
+      const own=await env.DB.prepare(
+        "SELECT url,name,features_json FROM assets WHERE url=? AND kind='tool' AND inventory_confidence='published'"
+      ).bind(SITE+path).first();
+      if(!own)continue;
+      const id=fnv("official-public-page:"+own.url+"|"+source.url);
+      const summary="Official page mentions: "+claims.join(", ")+
+        ". No feature-parity or YorpHives implementation test was performed.";
+      const recommendation="Review "+own.name+" alongside the public "+
+        source.name+" documentation. Check these advertised features manually: "+
+        claims.join(", ")+". Do not assume missing functionality.";
+      await env.DB.prepare(
+        "INSERT INTO product_hypotheses(id,product_url,product_name,competing_title,competing_url,evidence_summary,recommendation,status,observed_at)"+
+        " VALUES(?,?,?,?,?,?,?,'unverified',?)"+
+        " ON CONFLICT(id) DO UPDATE SET evidence_summary=excluded.evidence_summary,recommendation=excluded.recommendation,observed_at=excluded.observed_at"
+      ).bind(id,own.url,own.name,source.name,source.url,summary,recommendation,nowIso()).run();
+      created++;
+    }
+    reason="source-observed:reviews:"+created;
+  }catch(error){
+    reason=error?.message==="daily-free-budget-exhausted"?"budget-paused":"source-unavailable";
+  }finally{await saveStatus(env,key,reason);}
+  return created;
+}
+
 async function research(env) {
   const catalog=await env.DB.prepare(
     "SELECT url,name,features_json FROM assets WHERE kind='tool' AND inventory_confidence='published' LIMIT 150"
@@ -591,15 +693,23 @@ async function securityWatch(env) {
 function schedulePlan(scheduledTime){
   const time=new Date(scheduledTime);
   const minute=time.getUTCMinutes(),hour=time.getUTCHours();
-  return {uptime:true,products:minute%15===0,discovery:minute===0 && hour%6===0,
-    research:minute===0 && hour===3, security:minute===0 && hour===4, retention:minute===0 && hour===3};
+  const discovery=minute===0 && hour%6===0;
+  const research=minute===0 && hour===3;
+  const security=minute===0 && hour===4;
+  const competitorIndex=hour===7&&minute===5?0:hour===7&&minute===10?1:-1;
+  // Keep heavy scanners separate from tool HTTP checks on 10ms CPU Free Cron.
+  // 2 tools per ordinary five-minute event and site check every 15 min:
+  // 564 tool checks/day + 96 website checks/day, leaving ~240 public fetches
+  // for discovery, research, advisory and bounded competitor source reviews.
+  return {uptime:minute%15===0,products:!(discovery||research||security||competitorIndex>=0),
+    discovery,research,security,retention:research,competitorIndex};
 }
 async function scheduledCycle(env, scheduledTime) {
   if(!env.DB) throw Error("Missing D1 binding");
   const plan=schedulePlan(scheduledTime);
   // Cloudflare is free only while account remains on Free; this worker has
   // no paid API, AI binding, browser use, writable GitHub credential or deployment tool.
-  await checkSite(env);
+  if(plan.uptime) await checkSite(env);
   if(plan.products) await checkProducts(env);
   // On a newly initialized HQ database, discover/research immediately rather
   // than waiting up to six hours or one day for the first scheduled window.
@@ -620,6 +730,7 @@ async function scheduledCycle(env, scheduledTime) {
     await saveStatus(env,"discovery_engine_version","v4");
   }else if(plan.research || !observed.has("research")) await research(env);
   else if(plan.security || !observed.has("security_watch")) await securityWatch(env);
+  else if(plan.competitorIndex>=0) await competitorScout(env,plan.competitorIndex);
   if(plan.retention) {
     await env.DB.prepare("DELETE FROM quota WHERE day < ?").bind(nowIso().slice(0,10)).run();
     await env.DB.prepare("DELETE FROM opportunities WHERE observed_at < ?")
@@ -684,6 +795,60 @@ async function verifyAccess(request,env,ctx) {
       new TextEncoder().encode(parts[0]+"."+parts[1]));
   }catch{return false;}
 }
+// Structured, evidence-bound daily briefing. No model calls, cloud billing
+// assumptions or automated remediation. Always distinguish HTTP from features.
+function makeFounderBriefing(assets,findings,opportunities,hypotheses,metadata,used,at=nowIso()){
+  const tools=assets.filter(x=>x.kind==="tool");
+  const checked=tools.filter(x=>Boolean(x.last_checked));
+  const pending=tools.length-checked.length;
+  const reachable=checked.filter(x=>x.status==="reachable").length;
+  const degraded=checked.filter(x=>x.status==="degraded").length;
+  const uncertain=checked.length-reachable-degraded;
+  const website=assets.find(x=>x.kind==="website");
+  const lastCron=metadata.find(x=>x.key==="last_cron")?.checked_at||"";
+  const cronAge=Date.parse(at)-Date.parse(lastCron);
+  const collectorCurrent=Number.isFinite(cronAge)&&cronAge>=0&&cronAge<30*60000;
+  const siteAge=Date.parse(at)-Date.parse(website?.last_checked||"");
+  const siteCurrent=Number.isFinite(siteAge)&&siteAge>=0&&siteAge<60*60000;
+  const site=siteCurrent&&website?.status==="reachable"?"reported-reachable":
+    siteCurrent&&website?.status==="degraded"?"issue-reported":"not-verified";
+  const discovery=metadata.find(x=>x.key==="discovery");
+  const discoveryCurrent=discovery&&Date.parse(at)-Date.parse(discovery.checked_at)<12*3600000;
+  const inventoryComplete=Boolean(discoveryCurrent&&discovery.value.startsWith("observed:manifest-complete:"));
+  const urgent=[...findings].filter(x=>x.priority==="high"||x.priority==="critical");
+  const alternatives=hypotheses.length;
+  const suggested=urgent.length?
+    {label:"Review a reported problem",description:urgent[0].title,section:"monitoring",kind:"alert"}:
+    !collectorCurrent?{label:"Check monitoring freshness",description:"The scheduled collector's latest heartbeat is missing or stale.",
+      section:"monitoring",kind:"coverage"}:
+    pending?{label:"Finish the first tool checks",description:pending+" tool routes await their first HTTP observation.",
+      section:"products",kind:"coverage"}:
+    !inventoryComplete?{label:"Review catalog completeness",
+      description:"The public site does not yet certify a complete inventory; unlinked tools may be missing.",
+      section:"products",kind:"coverage"}:
+    alternatives?{label:"Review a possible alternative",
+      description:"External public pages suggest features to investigate; no YorpHives feature gap is established.",
+      section:"products",kind:"research"}:
+    {label:"Review new ideas",description:"No urgent findings are recorded. Public ideas remain unvalidated.",
+      section:"opportunities",kind:"research"};
+  return {
+    generatedAt:at,
+    collector:{current:collectorCurrent,lastSeen:lastCron},
+    site:{status:site,lastCheck:website?.last_checked||"",httpStatus:website?.http_status||null},
+    coverage:{discovered:tools.length,checked:checked.length,awaitingFirstCheck:pending,
+      checkedPercent:tools.length?Math.round(checked.length/tools.length*100):0,
+      httpReachable:reachable,httpIssue:degraded,httpUnverified:uncertain,
+      inventoryComplete,method:"Read-only HTTP; no interactive feature testing"},
+    alerts:{open:findings.length,highPriority:urgent.length},
+    research:{leads:opportunities.length,alternatives,verifiedRevenue:0,
+      limitation:"Research mentions and public feature claims are not proof of traffic, demand or feature gaps"},
+    usage:{used:Math.max(0,Number(used)||0),limit:FETCH_BUDGET_DAY,
+      note:"Internal public-GET safeguard, not an invoice or a price guarantee"},
+    nextAction:suggested,
+    safety:{readOnly:true,changeRequiresFounder:true,liveBrowserTests:false,paidAi:false}
+  };
+}
+
 async function report(env) {
   const [assets,findings,leads,quota,status,security,hypotheses]=await Promise.all([
     env.DB.prepare("SELECT * FROM assets ORDER BY kind ASC,name ASC LIMIT 150").all(),
@@ -707,6 +872,7 @@ async function report(env) {
   const now=nowIso();
   return {
     schemaVersion:"yorphives.hq-intelligence.v1", generatedAt:now,
+    briefing:makeFounderBriefing(a,f,o,hypotheses.results||[],metadata,quotaUsed.public_fetches||0,now),
     verification:{method:"cloudflare-worker-readonly-http",complete:discoveryComplete,
       limitations:"Public GET evidence only. A complete catalog requires an explicit owner manifest; page changes and functionality need independent verification.",
       generatedAt:last?.checked_at||"",notes:fresh?[]:["Collector heartbeat stale or absent"]},
@@ -740,7 +906,10 @@ async function report(env) {
       applicability:"Not evaluated against YorpHives dependencies"})),
     comparisons:(hypotheses.results||[]).map(x=>({
       id:x.id,product:x.product_name,competitor:x.competing_title,
-      missingFeatures:[],confidence:"Public title similarity only · no feature gap verified",
+      missingFeatures:[],evidenceSummary:x.evidence_summary,
+      confidence:String(x.evidence_summary||"").startsWith("Official page mentions:")?
+        "Official public description · feature parity unverified":
+        "Public title similarity only · feature parity unverified",
       recommendation:x.recommendation,evidence:[x.product_url,x.competing_url],
       observedAt:x.observed_at
     })),agents:[],
@@ -798,4 +967,4 @@ export default {
     }));
   }
 };
-export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,schedulePlan,verifyAccess,report};
+export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report};
