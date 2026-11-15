@@ -42,8 +42,9 @@ Founder login through Cloudflare Access has not been independently tested from t
 - Every 5 minutes: public GET availability check of `https://yorphives.com/`.
 - Every hour: GET availability checks on up to four least-recently-checked automatically enrolled tools.
 - Every six hours: inspect the public sitemap, tool/free-tool/explore catalog links, and optional product JSON manifest. Insert newly found tool URLs into a dedicated D1 inventory.
-- Daily: inspect a limited public Show HN RSS feed to identify **unvalidated** product-research leads.
-- Store compact findings, status, links to evidence and internal daily request usage for private dashboard review.
+- Daily (and once after first activation): inspect a limited **Show HN and Ask HN** RSS feed for potential products and unmet user needs. Compare title keywords against known YorpHives tools, labeling each lead **possible existing** or **potentially missing**, never proven inferior or profitable.
+- Daily (and once after first activation): inspect a small sample of GitHub-reviewed npm security advisories. Record package names, severity and source, **without claiming an advisory affects YorpHives** until the package and deployed version are independently verified.
+- Store compact findings, status, source links and internal daily request usage for private dashboard review.
 - Report repeated failures; require founder approval for any proposed change.
 - Restrict public request targets to the founder website and one fixed research feed.
 - Cap public HTTP fetches to **900/day** using a D1 budget counter. If exhausted, checks stop rather than spend.
@@ -57,9 +58,25 @@ This is intentionally **passive monitoring and research**. There is no browser a
 - HTTP availability does **not** validate tool functionality or security.
 - A public RSS product mention does **not** establish customer demand, organic traffic or revenue potential.
 - Cloudflare Free Workers CPU time is small; extensive crawls, vulnerability scans, and full model inference are not appropriate.
-- Competitor feature-gap checking, dependency vulnerability intelligence, verified revenue intelligence, and event-driven free AI analysis remain later modular adapters. The existing local Python research prototype is separate and not running on Cloudflare.
+- Explicit competitor feature-gap checking, **verified dependency/version vulnerability matching**, validated revenue intelligence, and event-driven free AI analysis remain later modular adapters. Public npm advisory monitoring has been added, but cannot verify relevance without an accurate dependency inventory. The existing local Python research prototype is separate and not running on Cloudflare.
 - An independent external outage monitor still requires an environment outside Cloudflare. The old isolated Python watchdog is not part of this Cloudflare deployment.
 - A Cloudflare Account, D1 and Access are managed services: no immediate SaaS bill within Free quotas, but **not full self-hosting** or guaranteed indefinite free access.
+
+## Extended opportunity and security intelligence
+
+The new read-only add-on uses **only public GET sources**:
+
+- `https://hnrss.org/show`: software launches and product ideas.
+- `https://hnrss.org/ask`: publicly discussed user problems.
+- GitHub's public reviewed npm advisory listing (up to three records per retrieval) to identify advisories worth checking against the actual website stack.
+
+All sources are fixed, allowlisted, subject to the same hard 900 public-fetch/day cap, and run only on the daily schedule or a staged first invocation. The new collector **staggers discovery, growth feeds and security-feed requests over successive five-minute Cron cycles** after initial deployment to limit Worker CPU pressure.
+
+A product research lead is marked `possible-existing-product` only when multiple title keywords resemble an enrolled product; all other results remain `potential-missing-product`. These are triage labels, **not** proof of demand, feature parity or organic search volume. Actual competitor feature tests are not performed.
+
+The new `security_watch` table stores publicly available advisory metadata with `applicability='unverified'`. The dashboard displays it in a separate **Security advisories to review** panel; it never silently converts a general advisory into an active vulnerability finding.
+
+To claim a genuine affected dependency, a future founder-approved, **read-only** dependency inventory with exact version matching is required. No source/dependency manifest is written to the live site as part of this phase.
 
 ## Founder budget visibility
 
@@ -85,7 +102,7 @@ If the private report is unavailable, it clearly shows that telemetry is not con
 | File | Purpose |
 | --- | --- |
 | `cloudflare/src/worker.mjs` | Event-driven, read-only Cloudflare Worker |
-| `cloudflare/migrations/0001_initial.sql` | Five compact portable evidence tables |
+| `cloudflare/migrations/0001_initial.sql` | Six compact portable evidence tables |
 | `cloudflare/wrangler.jsonc` | Isolated Worker/Free Cron/D1 configuration |
 | `cloudflare/build-assets.mjs` | Strict three-file UI asset packaging |
 | `cloudflare/build-standalone.mjs` | Zero-dependency bundled pilot file for authenticated API deployment |
