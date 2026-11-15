@@ -154,6 +154,12 @@
           <div class="inner-insight"><svg class="icon"><use href="#i-lock"/></svg><span>Observation only. No agent can edit code, change configuration, or deploy a fix.</span></div>
           <div class="filter-bar"><div class="filter-chips" role="group" aria-label="Filter findings"><button class="filter-chip is-selected" data-finding-filter="all">All findings</button><button class="filter-chip" data-finding-filter="security">Security</button><button class="filter-chip" data-finding-filter="dependencies">Dependencies</button><button class="filter-chip" data-finding-filter="reliability">Reliability</button><button class="filter-chip" data-finding-filter="quality">Quality</button></div><span class="filter-detail" id="monitoring-count"></span></div>
           <div class="records-panel"><div class="records-head"><span>OBSERVATION</span><span>PRIORITY</span><span>SYSTEM</span><span>REVIEW</span></div><div id="findings-list"></div></div>
+          <section class="panel security-watch-panel" aria-labelledby="security-watch-heading">
+            <div class="panel-heading"><div><span class="small-eyebrow">PUBLIC SECURITY INTELLIGENCE · FREE SOURCES</span>
+              <h2 id="security-watch-heading">Security advisories to review</h2></div><span class="outline-pill">SOURCE-BASED</span></div>
+            <p class="intel-caption">Public npm advisories are not proof of a vulnerability in YorpHives. Relevance and affected versions require a verified dependency inventory.</p>
+            <div id="security-watch-list" aria-live="polite"></div>
+          </section>
         </section>
 
         <section id="view-opportunities" class="view" aria-labelledby="opportunities-heading" hidden>
