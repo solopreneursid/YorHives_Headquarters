@@ -300,7 +300,14 @@ async function addFinding(env,{key,category,priority,asset,title,description,evi
 async function checkSite(env) {
   let result, reason=""; try {
     result=await getPublic(env,SITE+"/",{body:false});
-  } catch(error) { reason=clampText(error.message,80); result={status:0}; }
+  } catch(error) {
+    reason=clampText(error.message,80);
+    if(reason==="daily-free-budget-exhausted"){
+      await saveStatus(env,"monitoring_paused","Daily request budget exhausted; no failed health check inferred.");
+      return {status:null,skipped:true};
+    }
+    result={status:0};
+  }
   const rows=await env.DB.prepare("SELECT failures FROM assets WHERE url=?").bind(SITE+"/").first();
   const ok=result.status>=200 && result.status<300;
   const fails=ok?0:Number(rows?.failures||0)+1;
@@ -444,25 +451,52 @@ async function discoverTools(env) {
 }
 async function checkProducts(env) {
   const list=await env.DB.prepare(
-    "SELECT url,name,failures FROM assets WHERE kind='tool' ORDER BY (last_checked IS NOT NULL) ASC,last_checked ASC LIMIT ?"
+    "SELECT url,name,failures,page_fingerprint,inventory_confidence FROM assets WHERE kind='tool' "+
+    "ORDER BY (last_checked IS NOT NULL) ASC,last_checked ASC LIMIT ?"
   ).bind(MAX_CHECKS_PER_HOUR).all();
+  const homepage=await env.DB.prepare("SELECT value FROM status WHERE key='home_content_fingerprint'").first();
+  let checked=0;
   for(const item of list.results||[]){
-    let status=0;
-    try{ status=(await getPublic(env,item.url,{body:false})).status; }catch{}
-    const ok=status>=200 && status<300;
+    let result={status:0,text:null};
+    try{ result=await getPublic(env,item.url,{body:true}); }
+    catch(error){
+      if(error?.message==="daily-free-budget-exhausted"){
+        await saveStatus(env,"monitoring_paused",
+          "Daily request allowance exhausted. Remaining tool checks skipped, not failed.");
+        break;
+      }
+    }
+    checked++;
+    const ok=result.status>=200&&result.status<300;
+    const hash=ok&&result.text?publicPageFingerprint(result.text):"";
+    const shell=Boolean(hash&&homepage?.value&&hash===homepage.value);
+    const previous=item.page_fingerprint||"";
     const fails=ok?0:Number(item.failures||0)+1;
-    await env.DB.prepare("UPDATE assets SET last_checked=?,http_status=?,failures=?,status=? WHERE url=?")
-      .bind(nowIso(),status,fails,ok?"reachable":fails>=2?"degraded":"pending",item.url).run();
-    if(ok && Number(item.failures||0)>=2) {
+    await env.DB.prepare(
+      "UPDATE assets SET last_checked=?,http_status=?,failures=?,status=?,page_fingerprint=? WHERE url=?"
+    ).bind(nowIso(),result.status,fails,ok?(shell?"unverified":"reachable"):
+      fails>=2?"degraded":"pending",hash||previous,item.url).run();
+    if(ok && Number(item.failures||0)>=2){
       await env.DB.prepare("UPDATE findings SET status='resolved' WHERE id=?")
         .bind(fnv("tool-down:"+item.url)).run();
     }
-    if(fails===2) await addFinding(env,{key:"tool-down:"+item.url,category:"reliability",priority:"high",
-      asset:item.name,title:"Tool appears repeatedly unavailable: "+item.name,
-      description:"Two consecutive read-only requests failed. Last observed HTTP "+status,
+    if(fails===2)await addFinding(env,{key:"tool-down:"+item.url,category:"reliability",priority:"high",
+      asset:item.name,title:"Tool route repeatedly unavailable: "+item.name,
+      description:"Two HTTP GET checks failed (last status "+result.status+
+        "). This is a route observation, not functional browser testing.",
       evidence:item.url});
+    if(ok && hash && previous && hash!==previous && !shell){
+      await saveStatus(env,"tool_change_"+fnv(item.url),
+        "Public title, heading or description changed for "+item.url+
+        ". Review new features; page metadata is not proof of functionality.");
+      await env.DB.prepare("UPDATE assets SET changed_at=? WHERE url=?")
+        .bind(nowIso(),item.url).run();
+    }
+    // A generic SPA shell is not a verified product response, even at HTTP 200.
+    if(shell)await saveStatus(env,"spa_shell_"+fnv(item.url),
+      "Generic site shell returned for "+item.url+"; tool functionality remains unverified.");
   }
-  return (list.results||[]).length;
+  return checked;
 }
 async function research(env) {
   const catalog=await env.DB.prepare("SELECT url,name FROM assets WHERE kind='tool' LIMIT 150").all();
