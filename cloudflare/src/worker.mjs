@@ -12,7 +12,7 @@ const HUBS = ["/", "/free-tools", "/tools", "/explore"];
 const RESEARCH = "https://hnrss.org/show";
 const RESEARCH_SOURCES = [RESEARCH, "https://hnrss.org/ask"];
 // Strictly allowlisted, public, anonymous, GET-only; not an applicability assessment.
-const ADVISORY_SOURCE = "https://api.github.com/advisories?type=reviewed&ecosystem=npm&per_page=5";
+const ADVISORY_SOURCE = "https://api.github.com/advisories?type=reviewed&ecosystem=npm&per_page=3";
 const MAX_ROUTES_PER_DISCOVERY = 45;
 const MAX_CHECKS_PER_HOUR = 4;
 const FETCH_BUDGET_DAY = 900; // intentionally far below platform ceilings
@@ -338,9 +338,11 @@ async function scheduledCycle(env, scheduledTime) {
     "SELECT key FROM status WHERE key IN ('discovery','research','security_watch')"
   ).all();
   const observed=new Set((first.results||[]).map(x=>x.key));
+  // Stagger expensive first-run discovery/research/watch across separate Cron
+  // invocations. Never try to run all public collectors in one Free-tier event.
   if(plan.discovery || !observed.has("discovery")) await discoverTools(env);
-  if(plan.research || !observed.has("research")) await research(env);
-  if(plan.security || !observed.has("security_watch")) await securityWatch(env);
+  else if(plan.research || !observed.has("research")) await research(env);
+  else if(plan.security || !observed.has("security_watch")) await securityWatch(env);
   if(plan.retention) {
     await env.DB.prepare("DELETE FROM quota WHERE day < ?").bind(nowIso().slice(0,10)).run();
     await env.DB.prepare("DELETE FROM opportunities WHERE observed_at < ?")
