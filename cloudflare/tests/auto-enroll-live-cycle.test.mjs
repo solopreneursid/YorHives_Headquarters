@@ -43,6 +43,7 @@ function evidenceDatabase(){
         },
         async first(){
           if(sql.includes("SELECT failures FROM assets WHERE url"))return {failures:0};
+          if(sql.includes("discovery_engine_version"))return status.get("discovery_engine_version")||null;
           if(sql.includes("SELECT value FROM status WHERE key"))return status.get(record.args[0]||"discovery")||null;
           return null;
         },
