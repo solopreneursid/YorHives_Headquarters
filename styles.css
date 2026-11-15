@@ -881,3 +881,18 @@ body.session-ending::after {
   }
   .filter-chip {flex:0 0 auto;}
 }
+
+/* Mid-size phones in landscape and compact tablets need the mobile header,
+   even though their viewport width is slightly above 640px. */
+@media (min-width:641px) and (max-width:860px) {
+  .topbar {gap:8px;padding-left:16px;padding-right:16px;}
+  .topbar-left,.topbar-right {gap:9px;min-width:0;}
+  .breadcrumb-root,.breadcrumb-divider,.top-divider,.top-avatar {display:none;}
+  .quick-search {min-width:44px;width:44px;min-height:44px;padding:9px;justify-content:center;flex:none;}
+  .quick-search span,.quick-search kbd {display:none;}
+  .topbar-signout {min-width:44px;width:44px;min-height:44px;padding:9px;}
+  .topbar-signout span {display:none;}
+  .topbar-signout .icon {width:20px;height:20px;}
+  .mode-chip {max-width:162px;min-width:0;}
+  .mode-chip #mode-label {display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+}
