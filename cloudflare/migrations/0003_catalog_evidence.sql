@@ -5,6 +5,7 @@ ALTER TABLE assets ADD COLUMN evidence_url TEXT NOT NULL DEFAULT '';
 ALTER TABLE assets ADD COLUMN inventory_confidence TEXT NOT NULL DEFAULT 'unverified';
 ALTER TABLE assets ADD COLUMN page_fingerprint TEXT NOT NULL DEFAULT '';
 ALTER TABLE assets ADD COLUMN changed_at TEXT;
+ALTER TABLE assets ADD COLUMN features_json TEXT NOT NULL DEFAULT '[]';
 CREATE INDEX IF NOT EXISTS idx_assets_confidence ON assets(kind,inventory_confidence);
 CREATE TABLE IF NOT EXISTS product_hypotheses (
   id TEXT PRIMARY KEY,
