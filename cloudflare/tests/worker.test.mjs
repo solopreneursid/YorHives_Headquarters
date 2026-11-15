@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {dirname,resolve} from "node:path";
-import handler,{safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,schedulePlan,verifyAccess,report}
+import handler,{safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,schedulePlan,verifyAccess,report}
   from "../src/worker.mjs";
 
 test("same-origin discovery rejects arbitrary external URLs and strips tracking parameters",()=>{
@@ -150,4 +150,19 @@ test("security schedule is daily and independent from daily product research",()
   assert.equal(at("2026-11-15T04:00:00Z").security,true);
   assert.equal(at("2026-11-15T04:00:00Z").research,false);
   assert.equal(at("2026-11-15T04:05:00Z").security,false);
+});
+
+test("passive site release tracking sees only same-origin JS/CSS assets, never executes a browser",()=>{
+  const html=[
+    '<script type="module" src="/assets/index.123abc.js"></script>',
+    '<link rel="stylesheet" href="/assets/base.def999.css?ver=2">',
+    '<script src="https://evil.example/malicious.js"></script>',
+    '<script src="javascript:evil.js"></script>',
+    '<script src="/assets/index.123abc.js"></script>'
+  ].join("");
+  assert.deepEqual(siteBundleRefs(html),[
+    "https://yorphives.com/assets/base.def999.css",
+    "https://yorphives.com/assets/index.123abc.js"
+  ]);
+  assert.deepEqual(siteBundleRefs("not a page"),[]);
 });
