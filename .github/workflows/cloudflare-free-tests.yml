@@ -1,0 +1,51 @@
+name: Cloudflare Free Headquarters verification
+on:
+  pull_request:
+    paths:
+      - 'cloudflare/**'
+      - 'dashboard.js'
+      - 'index.html'
+      - '.github/workflows/cloudflare-free-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  free-architecture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout unprivileged snapshot
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Check Cloudflare worker JavaScript
+        run: |
+          node --check cloudflare/src/worker.mjs
+          node --test cloudflare/tests/worker.test.mjs
+      - name: Build vetted public assets only
+        run: |
+          node cloudflare/build-assets.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('cloudflare/dist')
+          actual={p.name for p in root.iterdir() if p.is_file()}
+          required={'index.html','styles.css','dashboard.js'}
+          assert actual == required,(actual, required)
+          print('PASS: only three vetted UI files would be published')
+          PY
+      - name: Validate SQLite-compatible schema
+        run: |
+          python3 - <<'PY'
+          import sqlite3
+          from pathlib import Path
+          conn=sqlite3.connect(':memory:')
+          conn.executescript(Path('cloudflare/migrations/0001_initial.sql').read_text())
+          tables={r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+          assert {'assets','findings','opportunities','quota','status'} <= tables
+          print('PASS: five required evidence tables created without external dependencies')
+          PY
+      - name: Run existing frontend contracts
+        run: |
+          node --check dashboard.js
+          node --test tests/quality.test.mjs
+          node scripts/qa-check.mjs
