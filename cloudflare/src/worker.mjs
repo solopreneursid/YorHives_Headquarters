@@ -160,7 +160,7 @@ function feedLeads(xml) {
   return found;
 }
 // Only compares words in titles to the observed catalog; does NOT establish feature parity.
-function classifyLead(title, catalog) {
+function classifyLead(title, catalog, complete=false) {
   if(!Array.isArray(catalog) || !catalog.length) {
     return {kind:"catalog-unverified",related:null,
       recommendation:"First verify the YorpHives product catalog. The current site inventory is incomplete, so this is only an external research mention."};
@@ -178,10 +178,13 @@ function classifyLead(title, catalog) {
     const similarity=matched/known.size;
     if(matched>=2 && similarity>score){best=product;score=similarity;}
   }
-  if(best && score >= .6) return {kind:"possible-existing-product",related:best.name,
-    recommendation:"Review the public evidence for "+best.name+" before assessing feature differences; no feature gap is verified."};
+  if(best && score >= .6) return {kind:"possible-existing-product",related:best.name,relatedUrl:best.url,
+    recommendation:"Potential alternative for "+best.name+
+      ". Compare published source claims and verified tool capabilities; no inferior feature is established."};
+  if(!complete)return {kind:"catalog-unverified",related:null,
+    recommendation:"The published YorpHives catalog is incomplete. Review this lead; do not assume the product is missing."};
   return {kind:"potential-missing-product",related:null,
-    recommendation:"Validate user need, competing products, search demand and differentiation before proposing a new tool."};
+    recommendation:"Catalog suggests a possible missing product. Verify demand, competition, feasibility and differentiation before proposing it."};
 }
 function parseAdvisories(text) {
   let parsed; try { parsed=JSON.parse(text); }catch{return [];}
@@ -229,7 +232,7 @@ function productManifest(text) {
     }
     // An explicitly completed, nonempty owner manifest is the only basis for
     // treating the inventory as comprehensive. All other sources are partial.
-    return {items,complete:!Array.isArray(data)&&data.complete===true&&items.length>0};
+    return {items,complete:!Array.isArray(data)&&data.complete===true&&items.length>0&&list.length===items.length};
   }catch{return {items:[],complete:false};}
 }
 function sitemapEntries(xml) {
@@ -499,30 +502,46 @@ async function checkProducts(env) {
   return checked;
 }
 async function research(env) {
-  const catalog=await env.DB.prepare("SELECT url,name FROM assets WHERE kind='tool' LIMIT 150").all();
+  const catalog=await env.DB.prepare(
+    "SELECT url,name,features_json FROM assets WHERE kind='tool' AND inventory_confidence='published' LIMIT 150"
+  ).all();
   const products=catalog.results||[];
-  let created=0, successful=0;
-  for(const feed of RESEARCH_SOURCES) {
-    try {
+  const completeness=await env.DB.prepare("SELECT value FROM status WHERE key='discovery'").first();
+  const complete=Boolean(completeness?.value?.startsWith("observed:manifest-complete:"));
+  let created=0,successful=0,linked=0;
+  for(const feed of RESEARCH_SOURCES){
+    try{
       const response=await getPublic(env,feed,{body:true,allowResearch:true});
-      if(response.status!==200 || response.text===null) continue;
+      if(response.status!==200||response.text===null)continue;
       successful++;
-      const leads=feedLeads(response.text);
-      for(const item of leads){
-        const classification=classifyLead(item.title,products);
-        const result=await env.DB.prepare(
+      for(const item of feedLeads(response.text)){
+        const result=classifyLead(item.title,products,complete);
+        const stored=await env.DB.prepare(
           "INSERT OR IGNORE INTO opportunities(id,title,description,recommendation,source_url,observed_at,score,kind) "+
           "VALUES(?,?,?,?,?,?,?,?)"
         ).bind(fnv(item.link),item.title,
           "Public "+(feed.endsWith("/ask")?"problem discussion":"product mention")+
-          "; audience demand, traffic, features and revenue remain unverified.",
-          classification.recommendation,item.link,nowIso(),15,classification.kind).run();
-        created+=Number(result.meta?.changes||0);
+          "; demand, traffic, feature equivalence and revenue are unverified.",
+          result.recommendation,item.link,nowIso(),15,result.kind).run();
+        created+=Number(stored.meta?.changes||0);
+        // Public mentions can suggest alternatives, but never prove that any
+        // current YorpHives feature is missing, inferior, or profitable.
+        if(result.kind==="possible-existing-product" && result.relatedUrl){
+          const hypothesisId=fnv(result.relatedUrl+"|"+item.link);
+          await env.DB.prepare(
+            "INSERT INTO product_hypotheses(id,product_url,product_name,competing_title,competing_url,evidence_summary,recommendation,status,observed_at)"+
+            " VALUES(?,?,?,?,?,?,?,'unverified',?)"+
+            " ON CONFLICT(id) DO UPDATE SET observed_at=excluded.observed_at"
+          ).bind(hypothesisId,result.relatedUrl,result.related,item.title,item.link,
+            "A public RSS title resembles an enrolled tool; no competitor feature audit performed.",
+            result.recommendation,nowIso()).run();
+          linked++;
+        }
       }
-    } catch { /* Each source is optional; always expose partial research status. */ }
+    }catch{}
   }
   await saveStatus(env,"research",successful?"sources:"+successful+"/"+RESEARCH_SOURCES.length+
-    ":new:"+created:"unavailable:no-public-feeds");
+    ":new:"+created+":alternatives:"+linked:"unavailable:no-public-feeds");
   return created;
 }
 async function securityWatch(env) {
