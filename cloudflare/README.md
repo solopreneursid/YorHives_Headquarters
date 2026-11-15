@@ -2,6 +2,16 @@
 
 **Status on November 15, 2026:** Isolated pilot Worker and dedicated D1 database created in the founder's Cloudflare account. One 5-minute Cron Trigger is enabled. A founder-only Cloudflare Access application protects the pilot hostname. The frontend is served by a self-contained module bundle generated from three allowlisted UI files. The existing live YorpHives Worker and the website repository were NOT edited.
 
+## Authentication repair — verified 2026-11-15
+
+The private `workers.dev` pilot initially displayed a bare Worker `403` before the founder could sign in. The Access application had been configured as a public hostname destination, but it was not intercepting requests to the private Worker.
+
+**Fix applied only to the Headquarters pilot:** moved the existing founder-only Cloudflare Access application from a hostname destination to a direct **Worker-level Access destination** using the Worker's immutable `tag` ID. The same existing Access application and audience were preserved, so the Worker's RS256 JWT verification remains configured. No DNS changes, existing website Worker changes, billing upgrades, browser automation, or public bypass.
+
+Verification: [Cloudflare Free authentication test run](https://github.com/solopreneursid/YorHives_Headquarters/actions/runs/43663900404) passed. A credential-free request from an independent GitHub runner received **HTTP 302 redirect to Cloudflare Access sign-in** rather than a raw Worker `403` or the private UI. The Access account has a one-time PIN identity provider available.
+
+This proves the **anonymous authentication gate**, not the complete interactive login. The founder still needs to complete sign-in and confirm that the dashboard and private D1 report load after authentication. If sign-in succeeds but the Worker still returns `403`, inspect the JWT signature/issuer/audience verification without disabling the authentication gate.
+
 ## Pilot access
 
 Private URL: https://yorphives-hq-free-pilot.solopreneursid-proy.workers.dev/
