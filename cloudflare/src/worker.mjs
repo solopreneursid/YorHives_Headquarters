@@ -339,7 +339,7 @@ function publicPageFingerprint(html){
   return stable?fnv(stable):"";
 }
 async function discoverTools(env) {
-  const choices=new Map(); let validSources=0,manifestComplete=false,scriptCandidateCount=0;
+  const choices=new Map(),manifestDeclared=new Set(); let validSources=0,manifestComplete=false,scriptCandidateCount=0;
   const rank={manifest:5,structured:4,link:3,sitemap:2,script:1};
   const insert=(url,source,evidence,name="",features=[])=>{
     const safe=safeProductUrl(url,SITE,source==="manifest"||source==="structured");
@@ -356,7 +356,10 @@ async function discoverTools(env) {
     if(result.status===200 && result.text){
       const parsed=productManifest(result.text);
       if(parsed.items.length){validSources++;manifestComplete=parsed.complete;}
-      for(const item of parsed.items)insert(item.url,"manifest",SITE+"/.well-known/yorphives-products.json",item.name,item.features);
+      for(const item of parsed.items){
+        manifestDeclared.add(item.url);
+        insert(item.url,"manifest",SITE+"/.well-known/yorphives-products.json",item.name,item.features);
+      }
     }
   }catch{}
   const sitemaps=[SITE+"/sitemap.xml",SITE+"/free-tools-tool-sitemap.xml",SITE+"/sitemap_index.xml"];
@@ -448,9 +451,15 @@ async function discoverTools(env) {
       item.confidence,JSON.stringify(item.features),JSON.stringify(item.features),item.url).run();
   }
   const confirmed=[...choices.values()].filter(x=>x.confidence==="published").length;
+  // A manifest cannot certify a comprehensive inventory if the website
+  // also publicly links tools omitted from it. Preserve those discoveries,
+  // but warn the founder that the catalog is inconsistent.
+  const mismatch=manifestComplete&&[...choices.values()].some(x=>
+    x.confidence==="published"&&!manifestDeclared.has(x.url));
+  if(mismatch)manifestComplete=false;
   const label=manifestComplete?"observed:manifest-complete:":"partial:";
   await saveStatus(env,"discovery",label+"published:"+confirmed+":candidates:"+scriptCandidateCount+
-    ":sources:"+validSources);
+    ":sources:"+validSources+(mismatch?":manifest-mismatch":""));
   // Discoveries are never removed on missing scans; a missing source is NOT
   // evidence of deletion, and literal JS routes never prove functionality.
   return {discovered:choices.size,newlyEnrolled:enrolled,confirmed,manifestComplete,scriptCandidateCount};
@@ -599,9 +608,9 @@ async function scheduledCycle(env, scheduledTime) {
   const version=await env.DB.prepare(
     "SELECT value FROM status WHERE key='discovery_engine_version'"
   ).first();
-  if(plan.discovery || !observed.has("discovery") || version?.value!=="v3") {
+  if(plan.discovery || !observed.has("discovery") || version?.value!=="v4") {
     await discoverTools(env);
-    await saveStatus(env,"discovery_engine_version","v3");
+    await saveStatus(env,"discovery_engine_version","v4");
   }else if(plan.research || !observed.has("research")) await research(env);
   else if(plan.security || !observed.has("security_watch")) await securityWatch(env);
   if(plan.retention) {
