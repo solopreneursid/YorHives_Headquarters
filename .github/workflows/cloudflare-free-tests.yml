@@ -25,6 +25,8 @@ jobs:
       - name: Build vetted public assets only
         run: |
           node cloudflare/build-assets.mjs
+          node cloudflare/build-standalone.mjs
+          node --check cloudflare/.generated/standalone-worker.mjs
           python3 - <<'PY'
           from pathlib import Path
           root=Path('cloudflare/dist')
