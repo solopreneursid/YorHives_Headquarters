@@ -26,6 +26,15 @@ test('self-hosted login, same-origin protection, reports and real logout',async(
   const report=await result.json();assert.equal(report.decisionJournal.available,true);assert.equal(report.pipeline.readOnly,true);
   result=await fetch(base+'/README.md',{headers:{cookie}});assert.equal(result.status,404);
   result=await fetch(base+'/api/decisions',{method:'POST',headers:{cookie,'content-type':'application/json'},body:'{}'});assert.equal(result.status,403);
+  runtime.database.sqlite.prepare("INSERT INTO findings(id,category,priority,asset,title,description,recommendation,evidence,observed_at) VALUES(?,?,?,?,?,?,?,?,?)").run('release-test','reliability','low','Fixture','Release fixture','Synthetic evidence','Review fixture','https://example.com/evidence',new Date().toISOString());
+  const decide=async(state,revision)=>fetch(base+'/api/decisions',{method:'POST',headers:{cookie,origin:base,'content-type':'application/json','x-hq-founder-action':'decision-v1'},body:JSON.stringify({kind:'finding',id:'release-test',state,revision,note:'Integration test only'})});
+  assert.equal((await decide('accepted',0)).status,201);
+  assert.equal((await decide('rejected',0)).status,409,'stale tabs cannot overwrite history');
+  assert.equal((await decide('snoozed',1)).status,201);
+  result=await fetch(base+'/api/report',{headers:{cookie}});
+  const saved=(await result.json()).decisionJournal.events;
+  assert.deepEqual(saved.map(event=>event.state),['snoozed','accepted']);
+  assert.equal(runtime.database.sqlite.prepare('SELECT count(*) n FROM founder_decisions').get().n,2);
   result=await fetch(base+'/cdn-cgi/access/logout',{headers:{cookie},redirect:'manual'});assert.match(result.headers.get('set-cookie'),/Max-Age=0/);
   result=await fetch(base+'/api/report',{headers:{cookie},redirect:'manual'});assert.equal(result.status,303);
  }finally{await runtime.close();rmSync(dir,{recursive:true,force:true});}
