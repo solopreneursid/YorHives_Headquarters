@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1019">
   <meta name="description" content="YorpHives Headquarters — a founder-controlled AI office for monitoring, research, opportunity discovery, and long-term growth.">
-  <title>YorpHives Headquarters — Mission Control</title>
+  <title>YorpHives Headquarters — Your Daily Feed</title>
   <link rel="stylesheet" href="./styles.css">
   <script defer src="./dashboard.js"></script>
 </head>
@@ -49,29 +49,29 @@
         <span><strong>YorpHives</strong><small>HEADQUARTERS</small></span>
       </a>
 
-      <div class="sidebar-scope"><span class="scope-indicator"></span> FOUNDER COMMAND CENTER</div>
+      <div class="sidebar-scope"><span class="scope-indicator"></span> YOUR PRIVATE SPACE</div>
 
       <nav class="side-nav" aria-label="Sections">
-        <div class="nav-group-title">WORKSPACE</div>
-        <button class="nav-item is-active" data-nav="overview" aria-current="page"><svg class="icon"><use href="#i-grid"/></svg><span>Overview</span></button>
-        <button class="nav-item" data-nav="monitoring"><svg class="icon"><use href="#i-activity"/></svg><span>Monitoring</span><span class="nav-count" id="nav-finding-count">—</span></button>
-        <button class="nav-item" data-nav="products"><svg class="icon"><use href="#i-layers"/></svg><span>Product intelligence</span></button>
-        <button class="nav-item" data-nav="opportunities"><svg class="icon"><use href="#i-radar"/></svg><span>Opportunities</span></button>
-        <button class="nav-item" data-nav="workforce"><svg class="icon"><use href="#i-bots"/></svg><span>AI workforce</span></button>
-        <div class="nav-group-title nav-group-spaced">INTELLIGENCE</div>
-        <button class="nav-item" data-nav="activity"><svg class="icon"><use href="#i-clock"/></svg><span>Activity & evidence</span></button>
-        <button class="nav-item" data-nav="governance"><svg class="icon"><use href="#i-lock"/></svg><span>Governance</span></button>
+        <div class="nav-group-title">YOUR SPACE</div>
+        <button class="nav-item is-active" data-nav="overview" aria-current="page"><svg class="icon"><use href="#i-grid"/></svg><span>Home</span></button>
+        <button class="nav-item" data-nav="monitoring"><svg class="icon"><use href="#i-activity"/></svg><span>Alerts</span><span class="nav-count" id="nav-finding-count">—</span></button>
+        <button class="nav-item" data-nav="products"><svg class="icon"><use href="#i-layers"/></svg><span>My tools</span></button>
+        <button class="nav-item" data-nav="opportunities"><svg class="icon"><use href="#i-radar"/></svg><span>Ideas</span></button>
+        <button class="nav-item" data-nav="workforce"><svg class="icon"><use href="#i-bots"/></svg><span>AI team</span></button>
+        <div class="nav-group-title nav-group-spaced">MORE</div>
+        <button class="nav-item" data-nav="activity"><svg class="icon"><use href="#i-clock"/></svg><span>History</span></button>
+        <button class="nav-item" data-nav="governance"><svg class="icon"><use href="#i-lock"/></svg><span>Safety & access</span></button>
       </nav>
 
       <div class="sidebar-bottom">
         <div class="principle-box">
           <span class="principle-icon"><svg class="icon"><use href="#i-shield"/></svg></span>
-          <strong>Observer by design</strong>
-          <p>Agents investigate and recommend. Only you authorize changes.</p>
+          <strong>You stay in charge</strong>
+          <p>Headquarters watches and suggests. Only you decide what changes.</p>
           <button class="text-link" data-nav="governance">View guardrails <svg class="icon"><use href="#i-chevron"/></svg></button>
         </div>
         <div class="founder">
-          <span class="avatar">F</span><span class="founder-label"><strong>Founder workspace</strong><small>Private workspace</small></span><svg class="icon founder-chevron"><use href="#i-chevron"/></svg>
+          <span class="avatar">F</span><span class="founder-label"><strong>Only you</strong><small>Founder access</small></span><svg class="icon founder-chevron"><use href="#i-chevron"/></svg>
         </div>
       </div>
     </aside>
@@ -82,10 +82,10 @@
       <header class="topbar">
         <div class="topbar-left">
           <button type="button" class="icon-button mobile-menu" id="mobile-menu" aria-label="Open navigation" aria-expanded="false"><svg class="icon"><use href="#i-menu"/></svg></button>
-          <span class="breadcrumb-root">Workspace</span><svg class="icon breadcrumb-divider"><use href="#i-chevron"/></svg><span class="breadcrumb-current" id="breadcrumb-current">Overview</span>
+          <span class="breadcrumb-root">My Headquarters</span><svg class="icon breadcrumb-divider"><use href="#i-chevron"/></svg><span class="breadcrumb-current" id="breadcrumb-current">Home</span>
         </div>
         <div class="topbar-right">
-          <button class="quick-search" id="search-trigger" aria-label="Search findings and opportunities"><svg class="icon"><use href="#i-search"/></svg><span>Search anything</span><kbd>⌘ K</kbd></button>
+          <button class="quick-search" id="search-trigger" aria-label="Search findings and opportunities"><svg class="icon"><use href="#i-search"/></svg><span>Find an update</span><kbd>⌘ K</kbd></button>
           <span class="top-divider"></span>
           <span class="mode-chip" id="mode-chip"><span class="mode-dot"></span><span id="mode-label">Preview mode</span></span>
           <button class="top-avatar" aria-label="Founder account">F</button>
@@ -94,26 +94,87 @@
 
       <main id="main-content" tabindex="-1">
         <section id="view-overview" class="view is-visible" aria-labelledby="overview-heading">
-          <div class="welcome-grid">
-            <div class="welcome">
-              <div class="eyebrow"><span class="eyebrow-line"></span> MISSION CONTROL <span class="eyebrow-muted">/</span> YOUR AI OFFICE</div>
-              <h1 id="overview-heading">A clearer view of<br><em>everything that matters.</em></h1>
-              <p>Your company in one place. Watch what needs attention, uncover what is next, and make every decision with evidence.</p>
-              <div class="welcome-actions">
-                <button class="button button-primary" id="import-trigger"><svg class="icon"><use href="#i-upload"/></svg> Import intelligence report</button>
-                <button class="button button-secondary" id="how-trigger"><svg class="icon"><use href="#i-info"/></svg> How it works</button>
-              </div>
+          <div class="home-welcome">
+            <div class="home-welcome-copy">
+              <span class="home-kicker"><span class="home-kicker-dot"></span> YOUR HQ · PRIVATE</span>
+              <h1 id="overview-heading">Hello, founder <span aria-hidden="true">👋</span></h1>
+              <p>The important things happening at YorpHives, without the noise.</p>
+              <span class="home-updated" id="home-updated">Loading your updates…</span>
             </div>
-            <div class="hero-art" aria-hidden="true">
-              <div class="orbit orbit-outer"></div><div class="orbit orbit-mid"></div><div class="orbit orbit-inner"></div>
-              <div class="orbit-point point-a"></div><div class="orbit-point point-b"></div><div class="orbit-point point-c"></div><div class="orbit-point point-d"></div>
-              <div class="art-core"><svg viewBox="0 0 64 64" fill="none"><path d="M32 6 54.5 19v26L32 58 9.5 45V19L32 6Z" stroke="currentColor" stroke-width="1.6"/><path d="m32 19 12 7v13l-12 7-12-7V26l12-7Z" fill="currentColor"/><path d="M32 19v27M20 26l24 13m0-13L20 39" stroke="#13211F" stroke-width="2"/></svg></div>
-              <span class="art-tag tag-one"><span></span> Detect</span><span class="art-tag tag-two"><span></span> Discover</span><span class="art-tag tag-three"><span></span> Decide</span>
+            <div class="home-welcome-actions">
+              <button class="button button-secondary" id="import-trigger"><svg class="icon"><use href="#i-upload"/></svg> Open a report</button>
+              <button class="button button-secondary help-button" id="how-trigger"><svg class="icon"><use href="#i-info"/></svg> Help</button>
             </div>
           </div>
 
           <div class="notice-bar" id="data-notice"><svg class="icon"><use href="#i-info"/></svg><div><strong>Preview workspace</strong> — Everything below is clearly marked sample data, not a live scan. Import a report to explore your own observations.</div><button id="notice-dismiss" type="button" aria-label="Dismiss preview notice"><svg class="icon"><use href="#i-close"/></svg></button></div>
 
+          <div class="home-stories" aria-label="Quick overview">
+            <button class="home-story story-alerts" type="button" data-nav="monitoring">
+              <span class="story-icon"><svg class="icon"><use href="#i-bell"/></svg></span>
+              <span class="story-number" id="home-alert-count">—</span>
+              <span class="story-label">Needs review</span>
+            </button>
+            <button class="home-story story-ideas" type="button" data-nav="opportunities">
+              <span class="story-icon"><svg class="icon"><use href="#i-spark"/></svg></span>
+              <span class="story-number" id="home-idea-count">—</span>
+              <span class="story-label">Ideas found</span>
+            </button>
+            <button class="home-story story-tools" type="button" data-nav="products">
+              <span class="story-icon"><svg class="icon"><use href="#i-layers"/></svg></span>
+              <span class="story-number" id="home-tool-count">—</span>
+              <span class="story-label">Tools seen</span>
+            </button>
+            <button class="home-story story-history" type="button" data-nav="activity">
+              <span class="story-icon"><svg class="icon"><use href="#i-clock"/></svg></span>
+              <span class="story-number" id="home-update-count">—</span>
+              <span class="story-label">New updates</span>
+            </button>
+          </div>
+
+          <div class="home-layout">
+            <div class="home-main-feed">
+              <section class="home-feed-section" aria-labelledby="home-feed-heading">
+                <div class="home-section-heading">
+                  <div><span class="home-kicker subtle">YOUR TIMELINE</span><h2 id="home-feed-heading">Latest updates <span class="home-wave" aria-hidden="true">✦</span></h2>
+                  <p>Like a personal feed—tap a card to see the evidence and next step.</p></div>
+                  <button class="home-small-link" type="button" data-nav="activity">See history <svg class="icon"><use href="#i-arrow"/></svg></button>
+                </div>
+                <div class="home-feed-filters" role="group" aria-label="Filter your updates">
+                  <button type="button" class="feed-filter is-selected" data-feed-filter="all" aria-pressed="true">For you</button>
+                  <button type="button" class="feed-filter" data-feed-filter="alerts" aria-pressed="false">Needs attention</button>
+                  <button type="button" class="feed-filter" data-feed-filter="ideas" aria-pressed="false">Ideas</button>
+                  <button type="button" class="feed-filter" data-feed-filter="changes" aria-pressed="false">Changes</button>
+                </div>
+                <div id="home-feed-list" class="home-feed-list" aria-live="polite"></div>
+              </section>
+            </div>
+
+            <aside class="home-right-rail" aria-label="Quick status and help">
+              <section class="home-side-card home-site-status" aria-labelledby="home-site-heading">
+                <div class="home-side-title"><span class="home-side-emoji" aria-hidden="true">🌐</span><h2 id="home-site-heading">Your website</h2></div>
+                <span class="home-site-pill" id="home-site-pill">Checking evidence…</span>
+                <p id="home-site-copy">Headquarters will show its most recent observation here.</p>
+                <button class="home-side-link" type="button" data-nav="monitoring">View monitoring <svg class="icon"><use href="#i-arrow"/></svg></button>
+              </section>
+
+              <section class="home-side-card home-next-card" aria-labelledby="home-next-heading">
+                <div class="home-side-title"><span class="home-side-emoji" aria-hidden="true">✨</span><h2 id="home-next-heading">Your next move</h2></div>
+                <p id="home-next-copy">We'll suggest a clear next step once there's evidence to review.</p>
+                <button class="home-side-link" type="button" id="home-next-action" data-nav="monitoring">Open alerts <svg class="icon"><use href="#i-chevron"/></svg></button>
+              </section>
+
+              <section class="home-side-card home-private-card" aria-labelledby="home-safe-heading">
+                <div class="home-side-title"><span class="home-side-emoji" aria-hidden="true">🔒</span><h2 id="home-safe-heading">You're in control</h2></div>
+                <p>HQ looks for problems and opportunities. It <strong>never edits your website</strong> or deploys fixes.</p>
+                <button class="home-side-link" type="button" data-nav="governance">How it stays safe <svg class="icon"><use href="#i-arrow"/></svg></button>
+              </section>
+            </aside>
+          </div>
+
+          <details class="home-full-report" id="home-full-report">
+            <summary><span class="full-report-icon"><svg class="icon"><use href="#i-grid"/></svg></span><span><strong>Full report</strong><small>More numbers, records and system details</small></span><svg class="icon full-report-chevron"><use href="#i-chevron"/></svg></summary>
+            <div class="home-full-report-body">
           <div class="section-label-row"><div><span class="small-eyebrow">THE BIG PICTURE</span><h2>At a glance</h2></div><span class="section-footnote" id="snapshot-date">Illustrative dashboard</span></div>
           <div class="metric-grid">
             <article class="metric-card"><div class="metric-top"><span>Assets monitored</span><span class="metric-icon violet"><svg class="icon"><use href="#i-layers"/></svg></span></div><div class="metric-value" id="metric-assets">2</div><p id="metric-assets-caption">Illustrative system inventory</p><span class="metric-bottom"><span class="mini-dash violet-line"></span><span id="metric-assets-footer">Website + headquarters</span></span></article>
@@ -147,6 +208,8 @@
               <div id="opportunity-preview" class="opportunity-preview"></div>
             </section>
           </div>
+            </div>
+          </details>
         </section>
 
         <section id="view-monitoring" class="view" aria-labelledby="monitoring-heading" hidden>
@@ -243,6 +306,14 @@
       </main>
     </div>
   </div>
+
+  <nav class="home-mobile-tabs" aria-label="Quick navigation on mobile">
+    <button type="button" data-nav="overview" class="mobile-tab is-active" aria-current="page"><svg class="icon"><use href="#i-grid"/></svg><span>Home</span></button>
+    <button type="button" data-nav="monitoring" class="mobile-tab"><svg class="icon"><use href="#i-bell"/></svg><span>Alerts</span></button>
+    <button type="button" data-nav="products" class="mobile-tab"><svg class="icon"><use href="#i-layers"/></svg><span>Tools</span></button>
+    <button type="button" data-nav="opportunities" class="mobile-tab"><svg class="icon"><use href="#i-spark"/></svg><span>Ideas</span></button>
+    <button type="button" id="mobile-more" class="mobile-tab" aria-label="More sections" aria-expanded="false"><svg class="icon"><use href="#i-menu"/></svg><span>More</span></button>
+  </nav>
 
   <input id="report-upload" type="file" accept=".json,application/json" hidden>
   <dialog id="detail-dialog" class="detail-dialog" aria-labelledby="detail-title">
