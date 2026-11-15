@@ -1,4 +1,4 @@
-// Copy ONLY three vetted browser assets. Never publish repository, secrets or evidence files.
+// Copy only three vetted browser files and two approved logo images. Never publish repository, secrets or evidence files.
 import { copyFileSync, mkdirSync, rmSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,4 +14,9 @@ for(const item of ["index.html","styles.css","dashboard.js"]){
  }
  writeFileSync(target,text,"utf8");
 }
-console.log("Cloudflare staging assets built: index.html, styles.css, dashboard.js (no secrets or project files).");
+// Brand assets are fixed, local, and explicitly allowlisted.
+mkdirSync(join(dest,"assets"),{recursive:true});
+for(const imageName of ["yorphives-logo.webp","yorphives-mark.webp"]){
+  copyFileSync(join(root,"assets",imageName),join(dest,"assets",imageName));
+}
+console.log("Cloudflare assets: three UI files and two official logo images (no secrets).");

@@ -18,13 +18,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,[tabindex]:focus-visibl
 .skip-link:focus{top:10px}
 .app-shell{min-height:100vh}
 .sidebar{position:fixed;z-index:30;inset:0 auto 0 0;width:246px;background:#fff;border-right:1px solid var(--border);padding:27px 16px 18px;display:flex;flex-direction:column}
-.brand-wrap{padding:0 10px 34px}
-.brand{display:flex;align-items:center;gap:11px;width:fit-content}
-.brand-symbol{width:43px;height:43px;display:grid;place-items:center;background:linear-gradient(140deg,#243fbf,#6074ee);color:#fff;border-radius:14px;letter-spacing:-5px;font-weight:900;font-size:21px;padding-right:5px;box-shadow:0 8px 16px #304dd528}
-.brand-symbol span{opacity:.72}
-.brand-text strong{display:block;font-size:17px;letter-spacing:-.55px;line-height:1.1}
-.brand-text small{display:block;font-size:9px;font-weight:750;letter-spacing:2px;color:#8190a9;margin-top:5px}
-.brand-tag{display:inline-block;margin-top:26px;border:1px solid #dfe8eb;background:#f2f8f7;padding:7px 10px;border-radius:8px;color:#49877e;font-size:9px;letter-spacing:1px;font-weight:850}
+.brand-wrap{padding:13px 12px 14px;margin:0 0 18px;border-radius:15px;background:linear-gradient(145deg,#0d1020,#16182d);box-shadow:inset 0 0 0 1px #ffffff12}
+.brand{display:block;width:100%;outline-offset:4px}
+.brand-logo{display:block;width:100%;height:auto;object-fit:contain;max-height:86px}
+.brand-subtitle{margin:2px 0 0;text-align:center;color:#adb5dc;font-size:9px;font-weight:800;letter-spacing:2.5px}
 .desktop-nav{display:flex;flex-direction:column;gap:5px}
 .nav-btn{display:flex;align-items:center;gap:13px;width:100%;padding:14px 15px;border-radius:12px;font-size:13px;color:#66748e;font-weight:680;text-align:left;min-height:48px;transition:background .15s,color .15s}
 .nav-btn:hover{background:#f6f7fc;color:var(--ink)}
@@ -369,3 +366,9 @@ main{max-width:1420px}
 .copy-modal h2{margin:0 0 12px;font-size:18px}
 .copy-modal textarea{width:100%;height:175px;resize:vertical;border:1px solid var(--border);border-radius:10px;color:var(--ink);font:inherit;padding:12px;background:#f8faff;margin:0 0 12px}
 @media(max-width:500px){.pulse-tools{flex-wrap:wrap}.pulse-search{flex-basis:calc(100% - 70px);max-width:none}.pulse-count{margin-left:auto}}
+
+/* Shared official brand emblem for mobile navigation; sourced from the uploaded YorpHives logo. */
+.mobile-wordmark{display:inline-flex;align-items:center;gap:6px;min-width:0;flex-shrink:1;overflow:hidden}
+.mobile-wordmark>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mobile-brand-icon{display:block;width:32px;height:32px;object-fit:contain;flex:none}
+@media(max-width:375px){.mobile-top{gap:5px}.mobile-wordmark{font-size:14px;gap:4px}.mobile-brand-icon{width:26px;height:26px}}

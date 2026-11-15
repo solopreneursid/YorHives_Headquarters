@@ -1085,6 +1085,16 @@ export default {
     const path=route==="/" ? "/index.html" : route;
     const item=PILOT_STATIC_BUNDLE && PILOT_STATIC_BUNDLE[path];
     if(!item) return new Response("Private UI assets not configured",{status:503});
+    // Only these exact official logo images may be returned as binary assets.
+    if(path==="/assets/yorphives-logo.webp"||path==="/assets/yorphives-mark.webp"){
+      if(typeof item!=="string"||!/^[A-Za-z0-9+/]+={0,2}$/.test(item))
+        return new Response("Brand asset unavailable",{status:503});
+      const bytes=Uint8Array.from(atob(item),ch=>ch.charCodeAt(0));
+      return new Response(request.method==="HEAD"?null:bytes,{status:200,
+        headers:{"content-type":"image/webp","cache-control":"private,max-age=3600",
+          "x-content-type-options":"nosniff","x-frame-options":"DENY",
+          "referrer-policy":"no-referrer"}});
+    }
     const type=path.endsWith(".css")?"text/css; charset=utf-8":
       path.endsWith(".js")?"text/javascript; charset=utf-8":"text/html; charset=utf-8";
     return new Response(request.method==="HEAD"?null:item,{status:200,

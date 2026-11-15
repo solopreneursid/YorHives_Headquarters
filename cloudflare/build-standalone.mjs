@@ -12,6 +12,13 @@ for(const [route,path] of Object.entries(paths)){
   if(data.length>120000) throw new Error("Oversized UI asset: "+path);
   bundle[route]=data;
 }
+// Private pilot Worker serves only the two explicitly allowlisted binary brand assets.
+for(const name of ["yorphives-logo.webp","yorphives-mark.webp"]){
+  const content=readFileSync(resolve(here,"..","assets",name));
+  if(content.length>150000||content.toString("ascii",0,4)!=="RIFF"||
+      content.toString("ascii",8,12)!=="WEBP")throw new Error("Invalid logo image: "+name);
+  bundle["/assets/"+name]=content.toString("base64");
+}
 const worker=readFileSync(join(here,"src","worker.mjs"),"utf8");
 const marker="const PILOT_STATIC_BUNDLE = null;";
 if(worker.split(marker).length!==2)throw Error("Expected one pilot bundle injection point");
@@ -19,4 +26,4 @@ const compiled=worker.replace(marker,"const PILOT_STATIC_BUNDLE = "+JSON.stringi
 const target=join(here,".generated");
 mkdirSync(target,{recursive:true});
 writeFileSync(join(target,"standalone-worker.mjs"),compiled,"utf8");
-console.log("Built self-contained private pilot Worker with three allowlisted UI assets.");
+console.log("Built self-contained private pilot Worker with three UI files and two branded images.");
