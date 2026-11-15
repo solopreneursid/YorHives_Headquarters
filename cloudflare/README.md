@@ -54,7 +54,7 @@ This is intentionally **passive monitoring and research**. There is no browser a
 
 ### Current limitations (must not be misrepresented)
 
-- A sitemap or server-rendered catalog might omit SPA-only/unlinked tools. Missing routes cannot be inferred to be removed. A founder-approved product manifest is the preferred reliable coverage source.
+- A sitemap or server-rendered catalog might omit SPA-only/unlinked tools. Missing routes cannot be inferred to be removed. The first live discovery found zero discernible tool routes; a founder-approved product manifest remains the preferred reliable coverage source.
 - HTTP availability does **not** validate tool functionality or security.
 - A public RSS product mention does **not** establish customer demand, organic traffic or revenue potential.
 - Cloudflare Free Workers CPU time is small; extensive crawls, vulnerability scans, and full model inference are not appropriate.
@@ -77,6 +77,25 @@ A product research lead is marked `possible-existing-product` only when multiple
 The new `security_watch` table stores publicly available advisory metadata with `applicability='unverified'`. The dashboard displays it in a separate **Security advisories to review** panel; it never silently converts a general advisory into an active vulnerability finding.
 
 To claim a genuine affected dependency, a future founder-approved, **read-only** dependency inventory with exact version matching is required. No source/dependency manifest is written to the live site as part of this phase.
+
+## Passive release detection and catalog enrollment limit
+
+The current public YorpHives discovery pass, observed at `2026-11-15T01:20:47.268Z`, returned **`partial:no-discoverable-tool-routes`**. The Worker did not fabricate products or mark any existing tool as removed.
+
+To improve coverage without a browser, the collector now watches same-origin JavaScript/CSS asset references on the homepage during scheduled discovery. A changed build fingerprint becomes a **website revision observation requiring founder review**; it does NOT identify which tool changed or prove that any feature is superior/inferior.
+
+To support reliable automatic enrollment of a future JavaScript-only application, the website should eventually publish an owner-maintained manifest at `/.well-known/yorphives-products.json`:
+
+```json
+{
+  "products": [
+    {"url": "/free-tools/example-resizer", "name": "Example Resizer"},
+    {"url": "/explore/example-app", "name": "Example Application"}
+  ]
+}
+```
+
+**The JSON above is only an example, not a claim that these routes exist.** The manifest is not deployed to the website and no modification to the website repository is authorized by this collector. Adding it later is a separate founder-approved website change.
 
 ## Founder budget visibility
 
