@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {dirname,resolve} from "node:path";
-import handler,{safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,schedulePlan,verifyAccess,report}
+import handler,{safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,schedulePlan,verifyAccess,report}
   from "../src/worker.mjs";
 
 test("same-origin discovery rejects arbitrary external URLs and strips tracking parameters",()=>{
@@ -87,7 +87,7 @@ test("report returns well-labelled unverified evidence with no paid AI inference
     {results:[{url:"https://yorphives.com/",name:"YorpHives website",kind:"website",status:"reachable",first_seen:"2026-11-15T00:00:00Z",last_checked:"2026-11-15T00:05:00Z"}]},
     {results:[]},{results:[]},{results:[{kind:"public_fetches",used:2}]},
     {results:[{key:"last_cron",value:"cycle",checked_at:new Date().toISOString()},{key:"discovery",value:"unverified:no-readable-sources",checked_at:new Date().toISOString()}]},
-    {results:[]}
+    {results:[]},{results:[]}
   ];
   let i=0;
   const db={prepare(){return{bind(){return this},all:async()=>fixtures[i++]}}};
@@ -152,8 +152,8 @@ test("classifies similar product mentions cautiously and does not claim feature 
   const current=[{name:"PDF Compressor"},{name:"Image Resizer"}];
   const near=classifyLead("Show HN: New PDF compressor app",current);
   assert.equal(near.kind,"possible-existing-product");
-  assert.match(near.recommendation,/no feature gap is verified/);
-  const missing=classifyLead("Show HN: diagram storyboard generator",current);
+  assert.match(near.recommendation,/no inferior feature is established/i);
+  const missing=classifyLead("Show HN: diagram storyboard generator",current,true);
   assert.equal(missing.kind,"potential-missing-product");
   assert(!missing.recommendation.toLowerCase().includes("guarantee"));
 });
@@ -209,4 +209,49 @@ test("opportunity feeds exclude generic sentiment and unrelated games",()=>{
   const leads=feedLeads(xml);
   assert.equal(leads.length,1);
   assert.match(leads[0].title,/PDF invoices/);
+});
+
+test("owner manifest can declare complete inventory only with valid untruncated records",()=>{
+  const good=productManifest(JSON.stringify({complete:true,products:[
+    {url:"/pdf-to-word",name:"PDF to Word",features:["OCR","Offline mode"]},
+    {url:"/tools/resize-image",name:"Image Resizer",features:["Batch upload"]}
+  ]}));
+  assert.equal(good.complete,true);
+  assert.deepEqual(good.items.map(x=>x.url),["https://yorphives.com/pdf-to-word","https://yorphives.com/tools/resize-image"]);
+  assert.equal(good.items[0].features[0],"OCR");
+  const bad=productManifest(JSON.stringify({complete:true,products:[
+    {url:"https://attacker.example/tools/evil",name:"Bad"},
+    {url:"/api/private/settings",name:"Private"}
+  ]}));
+  assert.equal(bad.complete,false);
+  assert.deepEqual(bad.items,[]);
+  const oversized=productManifest(JSON.stringify({complete:true,products:
+    Array.from({length:49},(_,i)=>({url:"/tools/unit-"+i}))}));
+  assert.equal(oversized.complete,false,"Partial catalog may never be certified complete");
+});
+test("same-origin sitemap index, JSON-LD and public JS route hints stay bounded and provisional",()=>{
+  const xml='<sitemapindex><sitemap><loc>https://yorphives.com/sitemap-tools.xml</loc></sitemap>'+
+    '<sitemap><loc>https://elsewhere.example/sitemap.xml</loc></sitemap></sitemapindex>';
+  assert.deepEqual(sitemapEntries(xml).children,["https://yorphives.com/sitemap-tools.xml"]);
+  const body='<script type="application/ld+json">'+JSON.stringify({"@graph":[
+    {"@type":"WebApplication",url:"/pdf-to-word",name:"PDF tool"},
+    {"@type":"SoftwareApplication",url:"https://elsewhere.example/steal",name:"Not ours"}
+  ]})+'</script>';
+  assert.deepEqual(publicStructuredProducts(body),[{url:"https://yorphives.com/pdf-to-word",name:"PDF tool"}]);
+  const code='const routes=["/tools/image-resizer","/apps/pdf-studio","/api/admin","https://evil.example/tools/unsafe"];';
+  assert.deepEqual(publicBundleToolHints(code),["https://yorphives.com/tools/image-resizer","https://yorphives.com/apps/pdf-studio"]);
+  assert.equal(safeProductUrl("/api/admin/config",undefined,true),null);
+  assert.equal(safeProductUrl("https://evil.example/tools/resize"),null);
+});
+test("only visible page metadata is used for change fingerprints",()=>{
+  const a=publicPageFingerprint("<title>Image Resize</title><h1>Resize image</h1>");
+  const b=publicPageFingerprint("<title>Image Resize</title><h1>Resize image</h1><div>Timestamp 2026-11-15</div>");
+  const c=publicPageFingerprint("<title>Image Resize</title><h1>Resize and compress image</h1>");
+  assert.equal(a,b);
+  assert.notEqual(a,c);
+});
+test("partial inventory never claims the absence of an unrelated competitor tool",()=>{
+  const current=[{name:"Image Converter",url:"https://yorphives.com/tools/image-converter"}];
+  assert.equal(classifyLead("Show HN: Digital sketchbook creator",current).kind,"catalog-unverified");
+  assert.equal(classifyLead("Show HN: Digital sketchbook creator",current,true).kind,"potential-missing-product");
 });
