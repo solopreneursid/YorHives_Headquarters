@@ -374,3 +374,27 @@ main{max-width:1420px}
 .mobile-wordmark>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mobile-brand-icon{display:block;width:32px;height:32px;object-fit:contain;flex:none}
 @media(max-width:375px){.mobile-top{gap:5px}.mobile-wordmark{font-size:14px;gap:4px}.mobile-brand-icon{width:26px;height:26px}}
+
+/* Discover — two clean, separate research sources and a compact live search. */
+.discover-sources{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 15px;padding-bottom:13px;border-bottom:1px solid var(--border)}
+.discover-sources .filter{min-height:42px;min-width:133px;font-size:12px}
+.discover-search-form{display:flex;align-items:center;gap:9px;margin:0 0 12px;min-width:0}
+.discover-search-form .inline-search{min-width:0;flex:1;height:43px}
+.discover-submit{white-space:nowrap;min-height:43px}
+.discover-submit:disabled{opacity:.5;cursor:progress}
+.discover-controls{display:flex;align-items:flex-start;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+.discover-controls .filter-scroller{min-width:0;flex:1;margin-bottom:0}
+.discover-controls>.select,.discover-controls>.button{min-height:39px}
+.discover-live-status{font-size:12px;color:var(--muted);padding:3px 0 12px;min-height:27px}
+.discover-error{color:#9a2b43;font-weight:750}
+.lead-meta{font-size:11px;color:#536581;font-weight:700;line-height:1.4}
+@media(max-width:760px){
+ .discover-sources .filter{flex:1}
+ .discover-controls .filter-scroller{flex-basis:100%}
+ .discover-controls>.select{flex:1}
+}
+@media(max-width:375px){
+ .discover-search-form{flex-wrap:wrap}
+ .discover-search-form .inline-search{flex-basis:100%}
+ .discover-search-form .discover-submit{width:100%;justify-content:center}
+}
