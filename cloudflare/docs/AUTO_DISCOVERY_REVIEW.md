@@ -11,7 +11,7 @@ Headquarters inventories public YorpHives tool URLs from the deployed site, with
 3. Examine the homepage and known tool hubs for same-origin tool hyperlinks and JSON-LD application descriptions.
 4. Inspect **at most one** same-origin public JavaScript bundle for literal tool-route hints; they remain **candidates**, never proven tools. Scripts are read as text, never executed.
 5. Enroll the resulting URLs into the **dedicated HQ D1 database only**. Do not write to the website, GitHub, Pages or production configurations.
-6. The existing hourly passive monitor automatically checks up to four least-recently-checked enrolled tools. For generic SPA shells, report unverified functionality even if GET returns HTTP 200.
+6. The revised monitor checks **up to three** least-recently-checked enrolled tools every **15 minutes**, using the existing single five-minute Cron. With 22 routes this completes a round in about two hours. Generic SPA shells and redirects remain unverified even at successful/redirect HTTP statuses.
 7. Compare stable public page titles/headings/descriptions to identify possible page revisions. Do not infer that product functionality changed.
 8. Research free public product mentions. A name match can create a *potential alternative* for an existing product; no real feature gap, customer traffic or revenue is claimed without evidence.
 
@@ -75,7 +75,7 @@ Adds source/confidence/evidence and public-page metadata fields to HQ `assets`, 
 Tests:
 - Strict source, host, scheme, admin-path and completeness checks.
 - Sitemap index, public JSON-LD, bounded JavaScript candidate extraction.
-- Simulated two releases of a manifest, automatic enrollment, next-hour checking and audit trail.
+- Simulated two releases of a manifest, automatic enrollment, scheduled monitoring, public Pages sitemap and no-website-write audit trail.
 - Mocked public GET only, no redirects, no website writes, no paid AI/browsers.
 - SQLite-compatible migration tests, existing UI regression tests, founder-only Access regression tests.
 
@@ -84,3 +84,9 @@ The upgraded v4 discovery engine has a one-time versioned scan at its first norm
 ## Remaining limitations
 
 A website with all tool definitions hidden behind large minified JavaScript or runtime API calls cannot be fully and reliably inventoried using bounded passive HTTP alone. Public tool manifest or server-rendered tool links remain necessary for full coverage. No commercial competitor-traffic analytics, full feature-functionality test or verified revenue intelligence is claimed. The same fixed free-tier resources and founder-only permissions remain in place.
+
+## First verified live v4 enrollment (Nov 15, 2026)
+
+At `2026-11-15T05:40:50Z`, the private scheduled Worker successfully enrolled **22 public tool routes** from the YorpHives website (including File Studio, PDF, JSON, URL and Base64 utilities). The public source health record shows HTTP 200 for the dedicated tool sitemap and `/free-tools/` hub; `/free-tools/index.html` returned a 308 directory redirect. Catalog status correctly remains **partial**. Tool routes were inserted into HQ D1 only and start in `unverified` state until scheduled HTTP observations occur. Daily request budget at that point: **86/900**.
+
+The stricter monitor now checks **three routes every 15 minutes** (approximately 288 product requests/day for a full catalog plus 288 website checks/day and limited discovery/research requests). This remains below the hard 900 requests/day cap with headroom; CPU and third-party quotas must still be watched.
