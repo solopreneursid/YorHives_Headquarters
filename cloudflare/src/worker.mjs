@@ -14,6 +14,8 @@ const MAX_ROUTES_PER_DISCOVERY = 45;
 const MAX_CHECKS_PER_HOUR = 4;
 const FETCH_BUDGET_DAY = 900; // intentionally far below platform ceilings
 const MAX_TEXT_BYTES = 100000;
+// Build-time replacement for the isolated API pilot; Wrangler Static Assets take priority.
+const PILOT_STATIC_BUNDLE = null;
 const JSON_HEADERS = {"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer"};
 
 function nowIso(date = new Date()) { return date.toISOString(); }
@@ -362,8 +364,19 @@ export default {
       return json({collector:health?"reported":"not-started",lastCheck:health?.checked_at||null,
         readOnly:true,aiDisabled:true,paidServices:false});
     }
-    if(!env.ASSETS) return new Response("Private assets not configured",{status:503});
-    return env.ASSETS.fetch(request);
+    if(env.ASSETS) return env.ASSETS.fetch(request);
+    // Isolated pilot fallback; replaced only by build-standalone.mjs.
+    // Never serve unrecognized paths or project/source/evidence files.
+    const path=route==="/" ? "/index.html" : route;
+    const item=PILOT_STATIC_BUNDLE && PILOT_STATIC_BUNDLE[path];
+    if(!item) return new Response("Private UI assets not configured",{status:503});
+    const type=path.endsWith(".css")?"text/css; charset=utf-8":
+      path.endsWith(".js")?"text/javascript; charset=utf-8":"text/html; charset=utf-8";
+    return new Response(request.method==="HEAD"?null:item,{status:200,
+      headers:{"content-type":type,"cache-control":"no-store","x-content-type-options":"nosniff",
+        "x-frame-options":"DENY","referrer-policy":"no-referrer",
+        "content-security-policy":"default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"}
+    });
   },
   async scheduled(event,env,ctx) {
     if(!env.DB) return;
