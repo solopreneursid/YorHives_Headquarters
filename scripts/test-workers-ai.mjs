@@ -13,6 +13,14 @@ const env={AI:{run:async(model,options)=>{
   if(sql.includes('FROM findings'))return {bind:id=>({first:async()=>id==='finding-1'?
     {id,title:'HTTP unavailable',category:'reliability',priority:'high',asset:'https://yorphives.com',
      description:'Two failed checks',recommendation:'Verify upstream',evidence:'https://yorphives.com',observed_at:now}:null})};
+  if(sql.includes('FROM nano_memories'))return {bind:()=>({all:async()=>({results:[
+    {department:'Engineering & Operations',title:'Related uptime incident',evidence_state:'source-recorded-unverified',
+      recommendation:'Review independent uptime check',source_url:'https://yorphives.com/'},
+    {department:'Revenue & Business',title:'Unrelated revenue case',evidence_state:'source-recorded-unverified',
+      recommendation:'Assess customer demand',source_url:'https://yorphives.com/'},
+    {department:'Security & Independent QA',title:'Old security observation',evidence_state:'source-recorded-unverified',
+      recommendation:'Check findings',source_url:'https://yorphives.com/'}
+  ]})})};
   if(sql.includes('INSERT INTO quota'))return {bind:day=>({first:async()=>count<2?{used:++count}:null})};
   throw Error('Unexpected query: '+sql);
 }}};
@@ -36,7 +44,12 @@ assert.equal(result.provider,'cloudflare-workers-ai');
 assert.equal(calls.length,1);
 assert.equal(calls[0].options.max_tokens,260);assert.equal(calls[0].options.stream,false);
 assert.equal(calls[0].options.messages[0].role,'system');
-assert.ok(!('tools' in calls[0].options));assert.ok(!('tool_choice' in calls[0].options));
+assert.ok(!('tools' in calls[0].options));
+const context=JSON.parse(calls[0].options.messages[1].content);
+assert.equal(context.relatedHQMemory.length,2,'Only two bounded prior memories supplied');
+assert.equal(context.relatedHQMemory[0].department,'Engineering & Operations');
+assert.equal(context.relatedHQMemory[0].verified,false);
+assert.ok(!calls[0].options.messages[1].content.includes('local-owned-token'),'Secrets not in memory context');assert.ok(!('tool_choice' in calls[0].options));
 resp=await sandbox.analyze(request('Security & Independent QA'),env);assert.equal(resp.status,200);
 resp=await sandbox.analyze(request(),env);assert.equal(resp.status,429);
 assert.equal(calls.length,2,'Budget must prevent third inference');
@@ -49,6 +62,7 @@ assert.equal(sandbox.status({HQ_PRIVATE_AI_URL:'http://bad'}).configured,false);
 console.log('PASS: binding detection and Granite default model');
 console.log('PASS: invalid roles and unknown findings rejected before inference');
 console.log('PASS: bounded non-streaming prompts, no tools');
+console.log('PASS: only two relevant unverified memory entries included when founder invokes AI');
 console.log('PASS: exactly two daily requests, third rejected without inference');
 console.log('PASS: fail-closed quota errors, self-hosted adapter remains swappable');
 console.log('NOTE: synthetic Workers AI binding; real Neuron use and model response untested.');
