@@ -83,6 +83,15 @@ const report={
       outcome:'defer-until-hardware-budget-established',
       blockers:['Repository-paper connection not confirmed','Direct and transitive dependencies not inspected'],
       steps:['Verify upstream provenance','Obtain founder approval before any isolated execution']} ]},
+  manifestEvidence:{pipelineStatus:'complete:robot-paper',eligible:1,filesObserved:2,licenseFilesObserved:1,
+   verifiedLegalClearances:0,budget:'Max two public GitHub GETs per UTC day',
+   scope:'SHA-pinned root files only; license and dependencies not approved',entries:[
+   {paperId:'robot-paper',title:'Robot-use agents from simulation',paperUrl:'https://arxiv.org/abs/2611.18562',
+    repositoryUrl:'https://github.com/research-team/robot-kit',state:'complete',selectedRootFiles:['package.json','LICENSE'],
+    files:[{path:'package.json',kind:'manifest',sha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      bytes:120,manifestParser:'package-json-names-only',directNamesObserved:2,exampleNames:['react','zod']},
+      {path:'LICENSE',kind:'license',sha:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+       bytes:800,licenseFileObserved:true}]}]},
   scienceReviews:{pipelineStatus:'review-recorded:workflow-resilience',reviewed:2,needsReview:2,watch:0,
    independentCodeChecks:0,experimentalRuns:0,commercialValidation:0,top:[
     {paperId:'paper-test-a',title:'Synthetic resilient autonomous laboratory workflows',
@@ -324,6 +333,27 @@ try{
       await page.locator('[data-page="discover"]:visible').first().click();
       await page.locator('[data-discover-source="journals"]').click();
       assert.equal(await page.locator('.panel').filter({hasText:'Phase 13 · Implementation feasibility'})
+        .locator('details.implementation-entry').count(),1);
+    });
+    await test(profile.name+': Phase 14 SHA-pinned manifest evidence, no legal clearance',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      const panel=page.locator('.panel').filter({hasText:'Phase 14 · Manifest & license evidence'});
+      await panel.getByText('Phase 14 · Manifest & license evidence',{exact:true}).waitFor();
+      assert.ok((await panel.innerText()).includes('0 legal clearances'));
+      const card=panel.locator('details.implementation-entry').first();
+      assert.equal(await card.getAttribute('open'),null);
+      await card.locator('summary').click();
+      const txt=await card.innerText();
+      assert.ok(txt.includes('not approval to copy or run code'));
+      assert.ok(txt.includes('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'));
+      assert.ok(txt.includes('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'));
+      assert.ok(txt.includes('License text observed, NOT legal approval.'));
+      assert.ok(txt.includes('not a complete inventory'));
+      assert.ok(txt.includes('No code was run'));
+      assert.equal(await card.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),2);
+      await page.locator('[data-page="discover"]:visible').first().click();
+      await page.locator('[data-discover-source="journals"]').click();
+      assert.equal(await page.locator('.panel').filter({hasText:'Phase 14 · Manifest & license evidence'})
         .locator('details.implementation-entry').count(),1);
     });
     await test(profile.name+': scientific evidence reviews preserve unknowns',async()=>{
