@@ -2,6 +2,9 @@ name: Independent website and HQ availability
 on:
   schedule:
     - cron: '17,47 * * * *'
+  push:
+    paths:
+      - '.github/workflows/independent-health.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,6 +19,7 @@ jobs:
           set -euo pipefail
           code="$(curl --silent --show-error --location --max-time 20 --retry 1             --output /dev/null --write-out '%{http_code}'             --user-agent 'YorpHives-Independent-Health/1.0'             'https://yorphives.com/')"
           echo "YorpHives.com HTTPS: $code"
+          echo "- Website: HTTP $code" >> "$GITHUB_STEP_SUMMARY"
           [[ "$code" =~ ^2[0-9][0-9]$ ]]
       - name: Check private HQ sign-in gate
         shell: bash
@@ -25,7 +29,9 @@ jobs:
           trap 'rm -f "$headers"' EXIT
           code="$(curl --silent --show-error --max-time 20 --retry 1             --dump-header "$headers" --output /dev/null --write-out '%{http_code}'             --user-agent 'YorpHives-Independent-Health/1.0'             'https://yorphives-hq-free-pilot.solopreneursid-proy.workers.dev/')"
           echo "HQ private sign-in gate: HTTP $code"
+          echo "- HQ anonymous access gate: HTTP $code" >> "$GITHUB_STEP_SUMMARY"
           [[ "$code" == "302" || "$code" == "303" ]]
           grep -qiE '^location:.*(/cdn-cgi/access/|cloudflareaccess\.com)' "$headers"
           echo 'PASS: HQ private entrypoint responds and redirects to Access.'
           echo 'Scope: anonymous HTTPS and login gate only; authenticated API/D1 checks are internal.'
+          echo '- Scope: external HTTPS and private login gate only; authenticated D1 and app checks are excluded.' >> "$GITHUB_STEP_SUMMARY"
