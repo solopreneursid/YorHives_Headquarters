@@ -11,8 +11,8 @@ const now='2026-11-16T12:30:00.000Z';
 const fnv=x=>{let h=2166136261;for(const c of String(x)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return (h>>>0).toString(16);};
 const sandbox={nowIso:()=>now,clampText:(s,n=240)=>String(s||'').replace(/\s+/g,' ').trim().slice(0,n),
   fnv,JSON,String,Number,Date,RegExp,console};
-runInNewContext(source.slice(start,end)+'\nthis.nanoRoute=nanoRoute;this.nanoPlan=nanoPlan;this.nanoPersist=nanoPersist;this.nanoScheduled=nanoScheduled;',sandbox);
-const {nanoRoute,nanoPlan,nanoPersist,nanoScheduled}=sandbox;
+runInNewContext(source.slice(start,end)+'\nthis.nanoRoute=nanoRoute;this.nanoPlan=nanoPlan;this.nanoPersist=nanoPersist;this.nanoScheduled=nanoScheduled;this.nanoRemember=nanoRemember;this.nanoRecall=nanoRecall;',sandbox);
+const {nanoRoute,nanoPlan,nanoPersist,nanoScheduled,nanoRemember,nanoRecall}=sandbox;
 const finding={id:'f-001',category:'security',priority:'high',title:'SSL certificate issue',description:'External HTTP certificate warning',evidence:'https://yorphives.com',recommendation:'Founder should verify certificate independently',observed_at:now};
 const opportunity={id:'o-001',kind:'market-demand',title:'Market research lead',description:'Public source mention',source_url:'https://example.org/report',recommendation:'Research customer interviews',observed_at:now};
 const plan=nanoPlan('finding',finding);
@@ -24,7 +24,7 @@ assert.equal(JSON.parse(plan.stages_json)[5].state,'pending');
 assert.equal(nanoRoute('opportunity',opportunity),'Global Market Intelligence');
 assert.equal(nanoPlan('opportunity',{...opportunity,source_url:''}).review_state,'evidence-required');
 assert.equal(nanoPlan('opportunity',{...opportunity,source_url:''}).evidence_state,'missing');
-const records=[];
+const records=[],memories=[];
 let runCalls=0;
 const env={DB:{prepare(sql){
   return {bind(...args){
@@ -35,6 +35,12 @@ const env={DB:{prepare(sql){
         throw Error('Unexpected select: '+sql);
       },
       run:async()=>{
+        if(sql.startsWith('INSERT INTO nano_memories')){
+          const [memory_id,run_id,source_kind,source_id,department,title,evidence_state,source_url,recommendation,review_state,observed_at,recorded_at,verifyRun]=args;
+          if(run_id!==verifyRun||!records.some(x=>x.run_id===run_id)||memories.some(x=>x.memory_id===memory_id)||memories.length>=1000)return {meta:{changes:0}};
+          memories.push({memory_id,run_id,source_kind,source_id,department,title,evidence_state,source_url,recommendation,review_state,observed_at,recorded_at});
+          return {meta:{changes:1}};
+        }
         if(!sql.startsWith('INSERT INTO workflow_runs'))throw Error('Unexpected write: '+sql);
         ++runCalls;
         if(records.length>=1000||records.some(x=>x.run_id===args[0]))return {meta:{changes:0}};
@@ -63,6 +69,13 @@ assert.equal(records.length,2);
 assert.equal(await nanoScheduled(env,'2026-11-16T12:15:00Z'),0);
 assert.equal(await nanoScheduled(env,'2026-11-16T12:30:00Z'),1,'Unseen opportunity should be stored, unchanged finding skipped');
 assert.equal(records.length,3);
+assert.equal(memories.length,2,'Both scheduled items remembered independently');
+assert.equal(await nanoRemember(env,plan,finding),true,'Missing earlier workflow memory repaired');
+assert.equal(await nanoRemember(env,plan,finding),false,'Duplicate memory ignored');
+assert.equal(memories.length,3);
+assert.equal(nanoRecall(memories,'Security & Independent QA',5).length,2);
+assert.equal(nanoRecall(memories,'all',5).length,3);
+assert.ok(nanoRecall(memories,'all',5).every(x=>x.evidenceState==='source-recorded-unverified'));
 assert.equal(await nanoScheduled(env,'2026-11-16T13:00:00Z'),0);
 assert.equal(records.length,3);
 assert.ok(!source.slice(start,end).includes('env.AI.run'),'Orchestrator must spend zero inference');
@@ -74,4 +87,5 @@ console.log('PASS: evidence source recorded, explicitly not independently verifi
 console.log('PASS: founder review stage and missing-evidence gate');
 console.log('PASS: immutable prior revision, idempotent unchanged polling');
 console.log('PASS: schedule every 30 min, no AI inference or external tools');
+console.log('PASS: shared memory idempotency, repair, provenance and departmental recall');
 console.log('PASS: all tests use synthetic observations and fake D1');
