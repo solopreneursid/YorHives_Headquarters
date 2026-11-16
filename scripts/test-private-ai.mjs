@@ -12,7 +12,7 @@ const sandbox={URL,AbortController,Response,JSON,String,Number,Date,setTimeout,c
 runInNewContext(src.slice(a,b)+'\nthis.privateAiConfig=privateAiConfig;this.privateAiStatus=privateAiStatus;this.privateAiAnalyze=privateAiAnalyze;',sandbox);
 const config=sandbox.privateAiConfig,status=sandbox.privateAiStatus,analyze=sandbox.privateAiAnalyze;
 const env={HQ_PRIVATE_AI_URL:'https://founder-model.example.org/v1/chat/completions',HQ_PRIVATE_AI_MODEL:'example-open-weight-model',HQ_PRIVATE_AI_TOKEN:'local-owned-token',DB:{prepare:(sql)=>({bind:(id)=>({first:async()=>id==='finding-1'?{id,title:'Website unreachable',category:'reliability',priority:'high',asset:'https://yorphives.com/',description:'Two HTTP checks failed',recommendation:'Check incident',evidence:'https://yorphives.com/',observed_at:new Date().toISOString()}:null})})}};
-const req=(department,id)=>({headers:{get:()=>null},json:async()=>({department,findingId:id})});
+const req=(department,id)=>({headers:{get:()=>null},text:async()=>JSON.stringify({department,findingId:id})});
 assert.equal(config({}) ,null);
 assert.equal(status({}).configured,false);
 assert.equal(config({...env,HQ_PRIVATE_AI_URL:'http://founder-model.example.org/v1/chat/completions'}),null,'HTTP should be disabled');
