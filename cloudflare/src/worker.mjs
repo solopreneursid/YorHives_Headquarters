@@ -1118,7 +1118,7 @@ function classifyInternetOpportunity(title){
   const t=String(title||"").toLowerCase();
   if(/\b(alternative to|compare|vs\.?|competitor|replacement for)\b/.test(t))return "competitors";
   if(/\b(mrr|arr|monetiz|subscription|billing|payment|checkout|pricing|sales|affiliate|invoice|marketplace|ecommerce|e-commerce)\b/.test(t))return "revenue";
-  if(/\b(education|students?|teacher|health|travel|tourism|housing|real estate|hiring|recruit|farm|agriculture|finance|insurance|legal|restaurant|school|caregiving)\b/.test(t))return "markets";
+  if(/\b(education|students?|teachers?|health|travel|tourism|housing|real estate|hiring|recruit|farm|agriculture|finance|insurance|legal|restaurant|school|caregiving)\b/.test(t))return "markets";
   if(/\b(llm|open.source|agentic|ai agents?|model|inference|sdk|framework|library|compiler|database|vector|api|developer|kubernetes|linux|rust|python|machine.learning|benchmark)\b/.test(t))return "technology";
   return "apps";
 }
