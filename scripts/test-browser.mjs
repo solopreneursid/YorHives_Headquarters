@@ -387,7 +387,7 @@ try{
       assert.ok(content.includes('pyproject.toml'));
       assert.ok(content.includes('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'));
       assert.ok(content.includes('8 distinct observed names'));
-      assert.ok(content.includes('optional/group'));
+      assert.ok(content.includes('extras/group names'));
       assert.ok(content.includes('possible-gpu-or-accelerator-stack'));
       assert.ok(content.includes('not verified hardware requirements'));
       assert.ok(content.includes('no reliable cost estimate'));
