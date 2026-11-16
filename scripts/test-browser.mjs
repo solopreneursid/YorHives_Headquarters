@@ -36,6 +36,16 @@ const report={
     {id:'inc-1',title:'Synthetic incident — OPEN',category:'reliability',severity:'high',asset:'https://yorphives.com',status:'open',firstSeen:'2026-11-16T09:50:00Z',lastSeen:'2026-11-16T10:00:00Z',resolvedAt:null,description:'Test-only record',recommendation:'Review external evidence',evidence:'https://yorphives.com/',occurrences:1,recoveryVerified:false},
     {id:'inc-2',title:'Synthetic incident — RECOVERED',category:'reliability',severity:'medium',asset:'https://yorphives.com',status:'resolved',firstSeen:'2026-11-16T08:00:00Z',lastSeen:'2026-11-16T09:00:00Z',resolvedAt:'2026-11-16T09:00:00Z',description:'Test-only resolved record',recommendation:'Independently verify recovery',evidence:'https://yorphives.com/',occurrences:2,recoveryVerified:false}
   ],
+  workflows:[{runId:'finding-abc',kind:'finding',sourceId:'finding-1',department:'Security & Independent QA',revision:1,
+    stage:'founder_review',reviewState:'founder-review',evidenceState:'source-recorded-unverified',
+    title:'Synthetic orchestrated investigation',recommendation:'Founder to review source',
+    stages:[{name:'observe',state:'recorded',note:'Already in HQ evidence'},
+      {name:'route',state:'routed',note:'Security & Independent QA'},
+      {name:'evaluate',state:'evaluated',note:'Description exists'},
+      {name:'evidence_check',state:'source-recorded',note:'Not independently verified'},
+      {name:'recommend',state:'draft-recorded',note:'Existing HQ recommendation'},
+      {name:'founder_review',state:'pending',note:'Founder decision'}],
+    observedAt:'2026-11-16T10:00:00Z',createdAt:'2026-11-16T10:00:00Z'}],
   incidentEvents:[
     {sequence:3,incidentId:'inc-1',transition:'detected',observedAt:'2026-11-16T10:00:00Z',evidence:'https://yorphives.com/'},
     {sequence:2,incidentId:'inc-2',transition:'resolved',observedAt:'2026-11-16T09:00:00Z',evidence:'https://yorphives.com/'},
@@ -115,6 +125,19 @@ try{
       assert.equal(await page.evaluate(()=>document.cookie),'');
       await page.locator('[data-page="home"]:visible').first().click();
       assert.ok(page.url().endsWith('#home'));
+    });
+    await test(profile.name+': Nano workflow pipeline and evidence review',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      await page.getByText('Workflow pipeline').waitFor();
+      const workflow=page.locator('.nano-run').first();
+      await workflow.locator('summary').click();
+      assert.equal(await workflow.getAttribute('open'),'');
+      const body=await workflow.innerText();
+      assert.ok(body.includes('Synthetic orchestrated investigation'));
+      assert.ok(body.includes('source-recorded-unverified'));
+      assert.ok(body.includes('evidence_check'));
+      assert.ok(body.includes('Founder review pending'));
+      assert.equal(await page.locator('.nano-run').count(),1);
     });
     await test(profile.name+': private AI controls fail safely without model server',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
