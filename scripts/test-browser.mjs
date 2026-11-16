@@ -37,6 +37,7 @@ const report={
     {id:'inc-2',title:'Synthetic incident — RECOVERED',category:'reliability',severity:'medium',asset:'https://yorphives.com',status:'resolved',firstSeen:'2026-11-16T08:00:00Z',lastSeen:'2026-11-16T09:00:00Z',resolvedAt:'2026-11-16T09:00:00Z',description:'Test-only resolved record',recommendation:'Independently verify recovery',evidence:'https://yorphives.com/',occurrences:2,recoveryVerified:false}
   ],
   memory:{entries:[{memoryId:'memory-finding-abc',runId:'finding-abc',kind:'finding',department:'Security & Independent QA',title:'Synthetic shared memory evidence',evidenceState:'source-recorded-unverified',sourceUrl:'https://yorphives.com/',recommendation:'Founder check source',reviewState:'founder-review',observedAt:'2026-11-16T10:00:00Z',recordedAt:'2026-11-16T10:00:00Z'}]},
+  nanoPipeline:{status:'created:2',checkedAt:'2026-11-16T10:00:00Z'},
   workflows:[{runId:'finding-abc',kind:'finding',sourceId:'finding-1',department:'Security & Independent QA',revision:1,
     stage:'founder_review',reviewState:'founder-review',evidenceState:'source-recorded-unverified',
     title:'Synthetic orchestrated investigation',recommendation:'Founder to review source',
@@ -130,6 +131,7 @@ try{
     await test(profile.name+': Nano workflow pipeline and evidence review',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
       await page.getByText('Workflow pipeline').waitFor();
+      await page.getByText('Scheduler: created:2', {exact:false}).waitFor();
       const workflow=page.locator('.nano-run').first();
       await workflow.locator('summary').click();
       assert.equal(await workflow.getAttribute('open'),'');
