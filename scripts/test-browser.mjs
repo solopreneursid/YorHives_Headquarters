@@ -93,6 +93,31 @@ const report={
       {path:'LICENSE',kind:'license',sha:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
        bytes:800,licenseFileObserved:true}]}]},
 
+  experimentGateEvidence:{available:true,eligible:1,recordedEntries:1,
+   currentGateEvidence:0,staleGateEvidence:1,currentBlockers:0,independentlyVerified:0,
+   preflightReady:0,executionAuthorized:false,commercialUseApproved:false,
+   caution:'All gates remain UNVERIFIED. Submitted links are not independent audit evidence.',
+   cost:'No external verification or paid services.',
+   entries:[{paperId:'robot-paper',title:'Robot-use agents from simulation',
+     repositoryUrl:'https://github.com/research-team/robot-kit',
+     manifestSha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+     founderReviewVersion:1,founderReviewCurrent:false,status:'review-stale',
+     gateCount:10,currentEvidenceEntries:0,staleEvidenceEntries:1,
+     independentClearances:0,legallyApproved:false,executionApproved:false,
+     gates:Array.from({length:10},(_,i)=>({
+       key:['authorship','source','dependencies','licenses','data',
+        'isolation','hardware','cost','acceptance','permission'][i],
+       name:i===0?'Research-to-code identity':i===3?'Full software and asset rights':'Verification gate '+(i+1),
+       proofNeeded:'Collect independent source-linked proof before considering action.',
+       existingObservation:'No legal, hardware or execution clearance.',
+       revision:i===0?1:0,
+       latest:i===0?{revision:1,assessment:'evidence-submitted',
+         type:'research-source',
+         evidenceUrl:'https://github.com/research-team/robot-kit/blob/main/LICENSE',
+         explanation:'The linked file belongs to an older source snapshot, not independently checked.',
+         recordedAt:'2026-11-16T19:30:00Z',sourceCurrent:false,verifiedIndependently:false}:null,
+       history:i===0?[{revision:1,assessment:'evidence-submitted',sourceCurrent:false}]:[],
+       independentlyVerified:false,approved:false}))}]},
   experimentPlans:{eligible:1,preflightReady:0,automaticallyRun:0,commerciallyApproved:0,
    plansWithCurrentFounderIntent:0,
    scope:'Evidence-linked MANUAL experiment design. All execution/legal/hardware gates remain unverified.',
@@ -536,6 +561,49 @@ try{
       await page.locator('[data-page="discover"]:visible').first().click();
       await page.locator('[data-discover-source="journals"]').click();
       assert.equal(await page.locator('.panel').filter({hasText:'Phase 17 · Manual experiment plans'})
+        .locator('details.implementation-entry').count(),1);
+    });
+    await test(profile.name+': Phase 18 founder evidence checklist and rejected synthetic write',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      const panel=page.locator('.panel').filter({hasText:'Phase 18 · Evidence checklist'});
+      await panel.getByText('Phase 18 · Evidence checklist',{exact:true}).waitFor();
+      assert.ok((await panel.innerText()).includes('0 independently verified'));
+      const candidate=panel.locator('details.implementation-entry').first();
+      assert.equal(await candidate.getAttribute('open'),null);
+      await candidate.locator('summary').first().click();
+      const gates=candidate.locator('details.gate-evidence-item');
+      assert.equal(await gates.count(),10);
+      const gate=gates.first();
+      await gate.locator('summary').first().click();
+      const t=await gate.innerText();
+      assert.ok(t.includes('Outdated evidence'));
+      assert.ok(t.includes('older research snapshot'));
+      assert.ok(t.includes('not independent verification')||t.includes('not independently verified'));
+      assert.equal(await gate.locator('a[href="https://github.com/research-team/robot-kit/blob/main/LICENSE"][rel="noopener noreferrer"]').count(),1);
+      const section=gate.locator('details.science-evidence-more').last();
+      await section.locator('summary').first().click();
+      const form=section.locator('form.gate-evidence-form');
+      await form.locator('select[name="assessment"]').selectOption('blocker-reported');
+      await form.locator('select[name="evidenceType"]').selectOption('code-or-license');
+      await form.locator('input[name="evidenceUrl"]').fill('https://github.com/research-team/robot-kit/blob/main/LICENSE');
+      await form.locator('textarea[name="explanation"]').fill('The license and all transitive library terms remain legally unreviewed.');
+      const [request]=await Promise.all([
+        page.waitForRequest(r=>r.url().endsWith('/api/experiment/evidence')&&r.method()==='POST'),
+        form.locator('button[type="submit"]').click()
+      ]);
+      assert.equal(request.headers()['x-hq-founder-action'],'gate-evidence-v1');
+      const data=request.postDataJSON();
+      assert.equal(data.paperId,'robot-paper');
+      assert.equal(data.gateKey,'authorship');
+      assert.equal(data.expectedGateVersion,1);
+      assert.equal(data.expectedFounderVersion,1);
+      assert.equal(data.expectedManifestSha,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+      assert.equal(data.assessment,'blocker-reported');
+      assert.equal(data.evidenceType,'code-or-license');
+      await form.locator('.gate-evidence-error').getByText('Test server: external lookups disabled').waitFor();
+      await page.locator('[data-page="discover"]:visible').first().click();
+      await page.locator('[data-discover-source="journals"]').click();
+      assert.equal(await page.locator('.panel').filter({hasText:'Phase 18 · Evidence checklist'})
         .locator('details.implementation-entry').count(),1);
     });
     await test(profile.name+': scientific evidence reviews preserve unknowns',async()=>{
