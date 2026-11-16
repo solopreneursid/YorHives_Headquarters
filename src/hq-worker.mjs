@@ -1173,7 +1173,7 @@ async function nano12Investigate(env,paper,existing,at=nowIso()){
  if(existing?.next_check_at&&Date.parse(existing.next_check_at)>Date.parse(at))
   return "not-due";
  const candidate=existing?.repository_url&&nano12RepoLink(existing.repository_url);
- const stage=existing?.state==="repository-link-observed"&&candidate?"repo":"paper";
+ const stage=candidate&&["repository-link-observed","repository-unavailable","repository-metadata-checked"].includes(existing?.state)?"repo":"paper";
  const target=stage==="repo"?nano12ApiUrl(candidate):page;
  const attempts=Math.min(20,Math.max(0,Number(existing?.attempts)||0)+1);
  let state="page-unavailable",repository=candidate||null,license=null,facts={};
