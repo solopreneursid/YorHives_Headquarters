@@ -1163,7 +1163,10 @@ async function nano12Get(env,url,type){
  return type==="repo"?JSON.parse(raw):raw;
 }
 function nano12NextCheck(state,attempts,at=nowIso()){
- const days=state==="repository-link-observed"?1:state==="repository-metadata-checked"?14:
+ // A discovered link can get its own metadata check on a later 5-min tick.
+ // Daily quota still gates every HTTP request.
+ if(state==="repository-link-observed")return new Date(Date.parse(at)+5*60000).toISOString();
+ const days=state==="repository-metadata-checked"?14:
   state==="page-unavailable"||state==="repository-unavailable"?Math.min(7,Math.pow(2,Math.max(0,Math.min(3,attempts-1)))):7;
  return new Date(Date.parse(at)+days*86400000).toISOString();
 }
