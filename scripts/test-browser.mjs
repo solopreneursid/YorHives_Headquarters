@@ -92,6 +92,24 @@ const report={
       bytes:120,manifestParser:'package-json-names-only',directNamesObserved:2,exampleNames:['react','zod']},
       {path:'LICENSE',kind:'license',sha:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
        bytes:800,licenseFileObserved:true}]}]},
+  dependencySignals:{eligible:1,partiallyParsed:1,computeSignalsObserved:1,legallyApproved:0,
+    hardwareBenchmarked:0,automatedExecution:false,
+    scope:'Partial declared names; no legal or cost verification.',
+    networkCost:'Zero extra API calls; Phase 14 shared budget.',
+    entries:[{paperId:'robot-paper',title:'Robot-use agents from simulation',
+      paperUrl:'https://arxiv.org/abs/2611.18562',repositoryUrl:'https://github.com/research-team/robot-kit',
+      relationship:'Title-search candidate only; paper/repository authorship NOT confirmed',
+      manifestStatus:'Some declared names extracted from one root manifest',
+      manifestName:'pyproject.toml',manifestSha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      manifestParser:'pyproject-declared-subset-v1',declaredNameCount:8,
+      requiredNameCount:0,optionalNameCount:8,nameExamples:['torch','mujoco','vllm'],
+      computeSignals:['possible-gpu-or-accelerator-stack','robotics-or-simulation'],
+      hardwareAssessment:'Possible specialized-compute signal, not a requirement',
+      cashCost:'unmeasured; no reliable cost estimate',repoSpdx:'Apache-2.0',
+      repoSpdxStatus:'GitHub-reported license identifier, not clearance',
+      licenseFileObserved:true,licenseAssessment:'Unreviewed: copyright, dependency licenses, models and datasets',
+      codeExecuted:false,commercialUseCleared:false,
+      steps:['Founder approval before running external code','Verify dependency copyright and licenses']}]},
   scienceReviews:{pipelineStatus:'review-recorded:workflow-resilience',reviewed:2,needsReview:2,watch:0,
    independentCodeChecks:0,experimentalRuns:0,commercialValidation:0,top:[
     {paperId:'paper-test-a',title:'Synthetic resilient autonomous laboratory workflows',
@@ -355,6 +373,31 @@ try{
       await page.locator('[data-discover-source="journals"]').click();
       assert.equal(await page.locator('.panel').filter({hasText:'Phase 14 · Manifest & license evidence'})
         .locator('details.implementation-entry').count(),1);
+    });
+    await test(profile.name+': Phase 15 dependency evidence is cautious on mobile and desktop',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      const panel=page.locator('.panel').filter({hasText:'Phase 15 · Dependency & compute signals'});
+      await panel.getByText('Phase 15 · Dependency & compute signals',{exact:true}).waitFor();
+      assert.ok((await panel.innerText()).includes('0 license approvals or benchmarks'));
+      const row=panel.locator('details.implementation-entry').first();
+      assert.equal(await row.getAttribute('open'),null);
+      await row.locator('summary').click();
+      const content=await row.innerText();
+      assert.ok(content.includes('repository authorship proved'));
+      assert.ok(content.includes('pyproject.toml'));
+      assert.ok(content.includes('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'));
+      assert.ok(content.includes('8 distinct observed names'));
+      assert.ok(content.includes('optional/group'));
+      assert.ok(content.includes('possible-gpu-or-accelerator-stack'));
+      assert.ok(content.includes('not verified hardware requirements'));
+      assert.ok(content.includes('no reliable cost estimate'));
+      assert.ok(content.includes('not clearance'));
+      assert.ok(content.includes('founder')||content.includes('Founder'));
+      assert.equal(await row.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),2);
+      await page.locator('[data-page="discover"]:visible').first().click();
+      await page.locator('[data-discover-source="journals"]').click();
+      assert.equal(await page.locator('.panel').filter({hasText:'Phase 15 · Dependency & compute signals'})
+       .locator('details.implementation-entry').count(),1);
     });
     await test(profile.name+': scientific evidence reviews preserve unknowns',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
