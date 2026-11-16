@@ -27,7 +27,7 @@ HTTP requests use HTTPS fixed allowlisted URLs only, manual redirects (no follow
 ## Journal feed and analysis
 
 - New UI in **Discover → Research journals**; a secondary Research journals panel also appears in **AI Employees**.
-- Source status/last check/next check displayed alongside up to 12 publication cards, a publisher link, publication date, topic, optional *author-provided* abstract excerpt and a safe validation checklist.
+- Source status/last check/next check displayed alongside up to 12 publication cards, a publisher link, publication date, **publication-age label** (within one year / older / unverified), topic, optional *author-provided* abstract excerpt and a safe validation checklist. The original 2021 paper remains preserved as an older publication and is not misrepresented as a fresh discovery.
 - Existing database also retains papers and a deterministic research-relevance assessment in `nano_journal_papers`. Relevance scores are **not** confidence, scientific impact or market valuation.
 - Four rotating topic areas: AI & agents, cybersecurity & privacy, robotics and software infrastructure.
 - Does **not** promote papers into the founder decision queue or claim a technical breakthrough. Scientific reproducibility, code/weights availability, and any commercial application require stronger independent evidence and founder approval.
