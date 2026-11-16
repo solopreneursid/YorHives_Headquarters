@@ -867,7 +867,7 @@ function nano7Normalize(provider,data){
   let title="",url="",summary="",signals={};
   if(provider.id==="dev"){
    title=clampText(x.title,150);url=nano7Link(x.url,provider.id);
-   if(!/\b(ai|agent|llm|model|automation|open.source|self.host|workflow|software|developer|business)\b/i.test(title))continue;
+   if(!/\b(ai|agent|llm|model|automation|automate|automating|open.source|self.host|workflows?|customer|support|problem|software|developer|business)\b/i.test(title))continue;
    summary=clampText(x.description,210);
    signals={reactions:Math.min(1000000,Math.max(0,Number(x.public_reactions_count)||0)),
      comments:Math.min(1000000,Math.max(0,Number(x.comments_count)||0))};
