@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import handler,{classifyInternetOpportunity,normalizeHackerNewsItem,discoverInternetFeed} from "../src/worker.mjs";
+import handler,{classifyInternetOpportunity,normalizeHackerNewsItem,discoverInternetFeed,persistDiscovery,loadStoredDiscovery,normalizeDevArticle,scoutReview,DISCOVERY_ROLES} from "../src/worker.mjs";
 const ctx={access:{aud:"tests-access-audience",async getIdentity(){return {email:"founder@example.com"};}}};
 const env={ACCESS_AUD:"tests-access-audience",ACCESS_OWNER_EMAIL:"founder@example.com"};
 const origin="https://hq.example.workers.dev";
@@ -72,4 +72,43 @@ test("Unreachable external sources fail closed without synthetic products",async
     assert.match(body.error,/unavailable/i);
     assert.equal(body.items,undefined);
   }finally{globalThis.fetch=original}
+});
+
+test("Six read-only scouts and evaluator never claim model inference",()=>{
+ assert.equal(DISCOVERY_ROLES.length,6);
+ assert.equal(new Set(DISCOVERY_ROLES.map(x=>x.id)).size,6);
+ const review=scoutReview("Invoice helper","revenue","DEV Community",10);
+ assert.equal(review.scout,"Revenue Scout");
+ assert.equal(review.reviewer,"Opportunity Evaluator");
+ assert.equal(review.aiInference,false);
+ assert.equal(review.stage,"unverified-lead");
+});
+test("DEV source normalization excludes unsafe and private pseudo-links",()=>{
+ const good=normalizeDevArticle({id:442,title:"Open-source test library",
+   path:"/devauthor/test-library-123",published_at:"2026-11-16T00:00:00Z",
+   public_reactions_count:13});
+ assert.equal(good.url,"https://dev.to/devauthor/test-library-123");
+ assert.equal(good.verified,false);
+ assert.equal(good.source,"DEV Community");
+ assert.equal(normalizeDevArticle({id:443,title:"unsafe",path:"//evil.example/attack"}),null);
+ assert.equal(normalizeDevArticle({id:444,title:"unsafe",path:"/bad?url=https://evil.example"}),null);
+});
+test("D1 status snapshots store full evidence; no 500-character truncation",async()=>{
+ let statement="",params=[],stored=null;
+ const env={DB:{prepare(sql){
+    statement=sql;
+    return {bind(...args){params=args;
+      return {async run(){stored={key:args[0],value:args[1],checked_at:new Date().toISOString()};},
+        async first(){return stored;}};}};} }};
+ const payload={source:"public-research",channel:"launches",items:Array.from({length:12},(_,i)=>({
+   id:"hn-"+(i+100),title:"Public project "+i,description:"Description containing "+("x".repeat(130)),source:"Hacker News",
+   sourceUrl:"https://news.ycombinator.com/item?id="+(i+100)
+ }))};
+ await persistDiscovery(env,"launches",payload);
+ assert.match(statement,/INSERT INTO status/);
+ assert.equal(params[0],"public_scouts_launches");
+ assert(params[1].length>1500,"D1 must not clip the evidence JSON");
+ const loaded=await loadStoredDiscovery(env,"launches");
+ assert.equal(loaded.data.items.length,12);
+ assert.equal(loaded.data.items[11].id,"hn-111");
 });
