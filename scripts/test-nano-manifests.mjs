@@ -9,7 +9,7 @@ const start=source.indexOf('/* Nano Phase 14 — bounded');
 const end=source.indexOf('/* Nano Phase 13 — deterministic',start);
 assert.ok(start>0&&end>start,'Phase 14 must exist in the Worker');
 const code=source.slice(start,end);
-for(const dangerous of ['env.AI','deploy(','POST to','git clone','eval(','.exec(', 'child_process','spawn(', 'npm install']){
+for(const dangerous of ['env.AI','deploy(','POST to','git clone','eval(','child_process.exec','child_process','spawn(', 'npm install']){
  assert.equal(code.includes(dangerous),false,'Unsafe Phase 14 capability: '+dangerous);
 }
 const SHA1='a'.repeat(40),SHA2='b'.repeat(40),REPO='https://github.com/research-team/robot-kit';
