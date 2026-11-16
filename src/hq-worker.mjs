@@ -1082,7 +1082,7 @@ function nano7Report(scans,leads){
  */
 const NANO11_VERSION="science-evidence-v1";
 const NANO11_APPLICATIONS=Object.freeze([
- Object.freeze({id:"workflow-resilience",pattern:/\b(fault|failure|recover|resilien|intervention|unexpected|self.driving lab)\b/i,
+ Object.freeze({id:"workflow-resilience",pattern:/\b(fault\w*|failur\w*|recover\w*|resilien\w*|intervention\w*|unexpected|self.driving lab\w*)\b/i,
   label:"Workflow resilience",
   fit:"Potential lessons for HQ incident recovery and resilient agent workflows",
   experiment:"Create an isolated synthetic incident and test whether a human-reviewed recovery checklist catches it; do not connect experimental code to production.",
