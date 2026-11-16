@@ -48,8 +48,14 @@ with sync_playwright() as p:
    errors=[];page.on('pageerror',lambda e: errors.append(str(e)))
    current=datetime.now(timezone.utc).isoformat();bootstrap={'site':{'state':'online','checkedAt':current},'siteUpdatedAt':current,'hq':{'state':'online','checkedAt':current},'mind':{'state':'ready','detail':'AI available','model':'@cf/ibm-granite/granite-4.0-h-micro'},'scan':{'count':2,'completed':current,'failedSources':[]},'opportunities':LEADS,'saved':[], 'decisions':[], 'evaluations':[], 'learning':[], 'sources':[], 'updateCandidates':[], 'budget':{'aiEnabled':True,'aiUsed':0,'aiLimit':3,'scansUsed':1,'scansLimit':8,'sourceFetchesPerScan':5}, 'watchdog':{'state':'online','checkedAt':current},'watchdogUpdatedAt':current}
    script='''window.MOCK='''+json.dumps(bootstrap)+''';window.fetch=async function(path,options={}){let p=String(path);if(p==='/api/bootstrap')return new Response(JSON.stringify(window.MOCK),{status:200,headers:{'content-type':'application/json'}});if(p==='/api/saved'){let d=JSON.parse(options.body);window.MOCK.saved=d.saved?[...new Set([...window.MOCK.saved,d.id])]:window.MOCK.saved.filter(x=>x!==d.id);return new Response('{"ok":true}',{status:200})}if(p==='/api/ai/evaluate'){let d=JSON.parse(options.body);window.MOCK.evaluations=[...window.MOCK.evaluations,{opportunity_id:d.id,model:'granite',reason:'Possible fit',risk:'Unverified demand',next_step:'Interview users',fit_score:4,evaluated_at:new Date().toISOString()}];return new Response('{"ok":true}',{status:200})}if(p==='/api/decision'){let d=JSON.parse(options.body);window.MOCK.decisions=window.MOCK.decisions.filter(x=>x.opportunity_id!==d.id).concat([{opportunity_id:d.id,action:d.action,updated_at:new Date().toISOString()}]);return new Response('{"ok":true}',{status:200})}return new Response('{"ok":true}',{status:200})};'''
-   html=(ROOT/'index.html').read_text().replace('<script>','<script>'+script+'</script><script>',1)
-   page.set_content(html,wait_until='domcontentloaded');page.locator('.demo-chip').get_by_text('Live').wait_for(timeout=5000)
+   # CI uses a real local URL to test actual browser history. Restricted local runners may block loopback.
+   if os.environ.get('YHQ_REQUIRE_3_BROWSERS')=='1':
+    page.add_init_script(script)
+    page.goto(f'http://127.0.0.1:{srv.server_port}/',wait_until='domcontentloaded')
+   else:
+    html=(ROOT/'index.html').read_text().replace('<script>','<script>'+script+'</script><script>',1)
+    page.set_content(html,wait_until='domcontentloaded')
+   page.locator('.demo-chip').get_by_text('Live').wait_for(timeout=5000)
    assert page.get_by_text('YorpHives.com').count()>0
    assert page.locator('.status-grid .status-panel').count()==3
    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),(browser_type.name,width,'overflow home')
@@ -88,9 +94,13 @@ with sync_playwright() as p:
    page.wait_for_timeout(75)
    page.evaluate("location.hash='#/discover'")
    page.get_by_role('heading',name='Discover').wait_for()
-   page.go_back()
-   page.get_by_role('heading',name='Home').wait_for()
-   assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),(browser_type.name,width,'history overflow')
+   if os.environ.get('YHQ_REQUIRE_3_BROWSERS')=='1':
+    page.go_back()
+    page.get_by_role('heading',name='Home').wait_for()
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),(browser_type.name,width,'history overflow')
+   else:
+    page.evaluate("location.hash='#/home'")
+    page.get_by_role('heading',name='Home').wait_for()
    page.evaluate("document.querySelector('#toast').classList.remove('show')")
    page.wait_for_timeout(400)
    if width==390 and browser_type.name=='chromium':
