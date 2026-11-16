@@ -123,7 +123,7 @@
   }
 
   function discoverSourceTabs(){
-    return `<div class="discover-sources" role="group" aria-label="Research source">${tab('Explore internet','explore',state.discoverSource,'discover-source')}${tab('Open source','github',state.discoverSource,'discover-source')}${tab('My site','hq',state.discoverSource,'discover-source')}</div>`;
+    return `<div class="discover-source-modes" role="group" aria-label="Research source">${tab('Explore internet','explore',state.discoverSource,'discover-source')}${tab('Open source','github',state.discoverSource,'discover-source')}</div>`;
   }
   function githubCandidates(){
     if(!state.githubSavedOnly)return state.githubResults;
@@ -211,7 +211,7 @@
       q||state.webCategory!=='all'?blank('No matching signals','Browse the sources below or change your filters.'):
       blank('No signals loaded','Use Scan now or browse the sources below.');
     return header('Discover','Find what to build, study or monetize',button('web-refresh','Scan now','refresh'))+
-      `<div class="discover-sources" role="group" aria-label="Discovery mode">${discoverSourceTabs()}</div>`+
+      discoverSourceTabs()+
       `<div class="discover-world-tools"><div class="filter-scroller compact-tabs" role="group" aria-label="Opportunity category">${CATEGORIES.map(([id,label])=>tab(label,id,state.webCategory,'web-filter')).join('')}</div><div class="discover-channel" role="group" aria-label="Public signal channel">${tab('Launches','launches',state.webChannel,'web-channel')}${tab('Market signals','signals',state.webChannel,'web-channel')}</div></div>`+
       `<div class="discover-world-search"><label class="inline-search">${icon('search')}<input id="web-query" type="search" placeholder="Filter loaded discoveries" value="${esc(state.webQuery)}" aria-label="Filter loaded discoveries" /></label><select class="select" id="web-sort" aria-label="Sort external opportunities"><option value="newest" ${state.webSort==='newest'?'selected':''}>Newest</option><option value="score" ${state.webSort==='score'?'selected':''}>Points</option><option value="name" ${state.webSort==='name'?'selected':''}>A–Z</option></select>${button('web-saved',state.webSavedOnly?'★ Saved':'☆ Saved','check',state.webSavedOnly?'button-active':'button-subtle')}${button('web-export','Export saved','upload','button-subtle',state.webSaved.size?'':'disabled title="Save a signal first"')}</div>`+
       `<div class="discover-live-status" role="status" aria-live="polite">${notice}</div><div class="lead-grid scroll-grid" role="region" tabindex="0" aria-label="Internet opportunity signals">${tiles||empty}</div>`+

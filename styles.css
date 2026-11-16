@@ -398,3 +398,28 @@ main{max-width:1420px}
  .discover-search-form .inline-search{flex-basis:100%}
  .discover-search-form .discover-submit{width:100%;justify-content:center}
 }
+
+/* Internet-first discovery: accessible channels and balanced research source cards. */
+.discover-source-modes{display:flex;align-items:center;gap:8px;margin:0 0 15px;padding:0 0 13px;border-bottom:1px solid var(--border)}
+.discover-source-modes .filter{min-height:44px;padding:10px 16px;font-size:12px}
+.discover-world-tools{display:flex;flex-direction:column;gap:9px;margin-bottom:12px}
+.discover-world-tools .filter-scroller{margin:0;flex-wrap:nowrap;scrollbar-width:thin}
+.discover-channel{display:flex;gap:8px;flex-wrap:wrap}
+.discover-channel .filter{min-height:39px;padding:8px 14px}
+.discover-world-search{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 11px}
+.discover-world-search .inline-search{flex:1 1 250px;min-width:0}
+.discover-world-search>.select{flex:0 0 auto}
+.discover-world-search>.button{min-height:41px}
+.discover-sources-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:20px 0 10px}
+.discover-sources-header h2{font-size:15px;font-weight:800;margin:0}
+.discover-sources-header small{color:var(--muted);font-size:11px}
+.discover-source-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;max-height:315px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.discover-source-card{display:flex;flex-direction:column;gap:8px;min-height:126px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;padding:15px;color:var(--ink);text-decoration:none;min-width:0}
+.discover-source-card:hover,.discover-source-card:focus-visible{border-color:#9baeff;box-shadow:0 5px 15px #2338730a;outline-offset:2px}
+.discover-source-card strong{font-size:13px;font-weight:800;line-height:1.4}
+.discover-source-card small{font-size:11px;color:var(--muted);line-height:1.5;flex:1}
+.discover-source-card span{font-size:11px;color:var(--accent);display:flex;align-items:center;gap:5px;font-weight:760}
+.discover-source-card .icon{width:13px;height:13px}
+@media(max-width:1100px){.discover-source-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.discover-source-modes .filter{flex:1}.discover-source-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.discover-world-search .inline-search{flex-basis:100%}.discover-sources-header{align-items:flex-start;flex-direction:column;gap:3px}}
+@media(max-width:440px){.discover-source-grid{grid-template-columns:minmax(0,1fr);max-height:340px}.discover-source-card{min-height:112px}.discover-world-search>.select{flex:1}.discover-world-search>.button{flex:1;justify-content:center;min-width:116px}.discover-source-modes .filter{font-size:11px;min-width:0}}
