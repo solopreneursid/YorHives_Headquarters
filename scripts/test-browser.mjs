@@ -61,7 +61,7 @@ const report={
   opportunities:[{id:'opp-1',title:'Synthetic research result',category:'product',description:'Test-only',observedAt:'2026-11-16T09:00:00Z'}],
   activity:[{id:'activity-1',title:'Scheduler checked',summary:'Test-only',occurredAt:'2026-11-16T09:30:00Z'}],
   changes:[],
-  operating:{pending:1,queue:[],threads:[],aiStatus:'Not connected'},
+  operating:{pending:1,queue:[],threads:[{id:'finding-1',thread:'finding:finding-1',type:'finding',title:'Synthetic homepage outage',status:'proposed',needsDecision:true,contract:{freshness:'recent'}}],aiStatus:'Not connected'},
   decisionJournal:{available:false,events:[]},
   hqHealth:{status:'responding',api:'responding',database:'responding',collector:'current',lastCollectorCheck:'2026-11-16T09:30:00Z'}
 };
