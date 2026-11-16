@@ -91,7 +91,9 @@ const check=checks.get('robot-paper');
 assert.equal(check.license_spdx,'Apache-2.0');
 assert.equal(JSON.parse(check.facts_json).sourceCodeInspected,false);
 assert.equal(publicBudget,2);
-assert.equal(await sandbox.scheduled(env,'2026-11-16T17:30:00Z'),'budget-reached');
+assert.equal(await sandbox.scheduled(env,'2026-11-16T17:30:00Z'),'outside-window');
+await assert.rejects(()=>sandbox.get(env,'https://arxiv.org/abs/2611.18496','paper'),
+ /implementation-daily-budget/);
 assert.equal(requestCount,2);
 assert.equal(await sandbox.scheduled(env,'2026-11-16T18:25:00Z'),'outside-window');
 await assert.rejects(()=>sandbox.get(env,'https://evil.example/bad','paper'),/not-approved/);
