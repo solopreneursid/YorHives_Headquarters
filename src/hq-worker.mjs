@@ -1342,7 +1342,7 @@ function nano13Assess(row){
   "Record results and costs with source links; do not promote to production automatically."
  ];
  return {paperId:clampText(row?.paper_id,130),title:clampText(row?.paper_title,200),
-  paperUrl:row?.source_url||"",repositoryUrl:metadata?repo:null,sourceState:row?.state||"unavailable",
+  paperUrl:nano12PageUrl(row)||"",repositoryUrl:metadata?repo:null,sourceState:row?.state||"unavailable",
   relationship,licenseSpdx:spdx,licenseDisposition:"human-review-required; not cleared",
   dependencyDisposition:"not-inspected",hardwareDisposition:hardware,
   codeInspected:false,dependencyFilesInspected:false,licenseLegallyReviewed:false,
