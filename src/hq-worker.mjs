@@ -1172,8 +1172,8 @@ function nano9Fingerprint(row){
 }
 async function nano9Scheduled(env,scheduledTime){
  const clock=new Date(scheduledTime);
- const first=await env.DB.prepare("SELECT memory_id FROM nano_opportunity_briefs LIMIT 1").first();
- if(first&&![15,45].includes(clock.getUTCMinutes()))return "outside-window";
+ const count=await env.DB.prepare("SELECT COUNT(*) n FROM nano_opportunity_briefs").first();
+ if(Number(count?.n||0)>=3&&![15,45].includes(clock.getUTCMinutes()))return "outside-window";
  const q=await env.DB.prepare(
   "SELECT m.memory_id,m.run_id,m.source_id,m.source_kind,m.title,m.source_url,m.recommendation,"+
   "o.kind opportunity_kind,l.kind listing_kind,l.summary listing_summary,"+
@@ -1191,6 +1191,8 @@ async function nano9Scheduled(env,scheduledTime){
  const candidate=rows[0];
  if(!candidate)return "up-to-date";
  const p=candidate.profile;
+ const payload=JSON.stringify(p);
+ if(payload.length>7500)throw Error("dossier-too-large");
  const r=await env.DB.prepare(
   "INSERT INTO nano_opportunity_briefs(memory_id,source_id,title,category,stage,priority,source_fingerprint,brief_json,created_at,updated_at) "+
   "SELECT ?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM nano_opportunity_briefs)<250 "+
@@ -1199,7 +1201,7 @@ async function nano9Scheduled(env,scheduledTime){
   "brief_json=excluded.brief_json,updated_at=excluded.updated_at "+
   "WHERE nano_opportunity_briefs.source_fingerprint!=excluded.source_fingerprint")
   .bind(p.memoryId,p.sourceId,p.title,p.category,p.stage,p.rank,candidate.fingerprint,
-   JSON.stringify(p).slice(0,7500),nowIso(),nowIso()).run();
+   payload,nowIso(),nowIso()).run();
  return r.meta?.changes===1?"brief-recorded:"+p.category:"storage-limit-or-unchanged";
 }
 function nano9Report(rows){
