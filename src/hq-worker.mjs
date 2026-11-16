@@ -1073,6 +1073,230 @@ function nano7Report(scans,leads){
 }
 
 
+
+/* Phase 10 — independent academic research journals, zero-cost and evidence-safe.
+ * Two public metadata fetches/day have their OWN D1 quota, not the discovery quota.
+ * No API keys, page scraping, PDF crawling, LLM calls, commercial assertions or actions.
+ */
+const NANO10_VERSION="journal-v1";
+const NANO10_TOPICS=Object.freeze([
+  Object.freeze({id:"ai",label:"AI & autonomous agents",
+    arxiv:"https://export.arxiv.org/api/query?search_query=cat%3Acs.AI&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
+    crossref:"https://api.crossref.org/works?query.title=artificial%20intelligence%20agents&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"}),
+  Object.freeze({id:"security",label:"Cybersecurity & privacy",
+    arxiv:"https://export.arxiv.org/api/query?search_query=cat%3Acs.CR&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
+    crossref:"https://api.crossref.org/works?query.title=cybersecurity%20privacy&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"}),
+  Object.freeze({id:"robotics",label:"Robotics & intelligent systems",
+    arxiv:"https://export.arxiv.org/api/query?search_query=cat%3Acs.RO&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
+    crossref:"https://api.crossref.org/works?query.title=robotics%20autonomous%20systems&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"}),
+  Object.freeze({id:"systems",label:"Software engineering & infrastructure",
+    arxiv:"https://export.arxiv.org/api/query?search_query=cat%3Acs.SE&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
+    crossref:"https://api.crossref.org/works?query.title=software%20engineering%20automation&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"})
+]);
+const NANO10_SOURCES=Object.freeze([
+ Object.freeze({id:"crossref",name:"Crossref",format:"json",host:"api.crossref.org"}),
+ Object.freeze({id:"arxiv",name:"arXiv",format:"atom",host:"export.arxiv.org"})
+]);
+const NANO10_DAILY_REQUESTS=2;
+function nano10Url(target,provider){
+ if(!NANO10_SOURCES.includes(provider))throw Error("unapproved-journal-provider");
+ if(!NANO10_TOPICS.some(t=>t[provider.id]===target))throw Error("unapproved-journal-endpoint");
+ return target;
+}
+function nano10Topic(at,provider){
+ const day=Math.floor(Date.parse(at)/86400000);
+ if(!Number.isFinite(day))throw Error("invalid-schedule-date");
+ // Each provider gets a rotating, fixed-query subject; broad coverage over four days.
+ return NANO10_TOPICS[(day+(provider.id==="arxiv"?1:0))%NANO10_TOPICS.length];
+}
+function nano10Link(value,id){
+ const str=String(value||"");
+ if(str.length>350)return null;
+ let u;try{u=new URL(str);}catch{return null;}
+ if(u.protocol!=="https:"||u.username||u.password||u.port||u.search||u.hash)return null;
+ if(id==="arxiv"&&u.hostname==="arxiv.org"&&/^\/abs\/(?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[A-Z]{2})?\/\d{7})(?:v\d{1,3})?$/i.test(u.pathname))
+   return "https://arxiv.org"+u.pathname.replace(/v\d{1,3}$/,"");
+ if(id==="crossref"&&u.hostname==="doi.org"&&/^\/10\.\d{4,9}\/[A-Za-z0-9._;()/:+-]{2,130}$/.test(u.pathname))
+   return "https://doi.org"+u.pathname;
+ return null;
+}
+function nano10CleanXml(raw){
+ const txt=String(raw||"").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1")
+  .replace(/<[^>]*>/g," ").replace(/&(?:amp|lt|gt|quot|apos);|&#\d+;|&#x[0-9a-f]+;/gi,x=>{
+   const named={"&amp;":"&","&lt;":"<","&gt;":">","&quot;":'"',"&apos;":"'"};
+   if(named[x.toLowerCase()])return named[x.toLowerCase()];
+   const n=x.startsWith("&#x")?parseInt(x.slice(3,-1),16):parseInt(x.slice(2,-1),10);
+   return Number.isInteger(n)&&n>0&&n<=0x10ffff&&!(n>=0xd800&&n<=0xdfff)?String.fromCodePoint(n):" ";
+  });
+ return clampText(txt,550);
+}
+function nano10ExtractAtom(xml){
+ if(typeof xml!=="string"||!/http:\/\/www\.w3\.org\/2005\/Atom/.test(xml.slice(0,3000)))throw Error("invalid-atom-feed");
+ const items=[];
+ for(const match of xml.matchAll(/<entry(?:\s[^>]*)?>([\s\S]*?)<\/entry>/gi)){
+  const body=match[1],get=(tag)=>{const m=body.match(new RegExp("<"+tag+"(?:\\s[^>]*)?>([\\s\\S]*?)<\\/"+tag+">","i"));return m?nano10CleanXml(m[1]):""};
+  const title=get("title"),link=nano10Link(get("id"),"arxiv");
+  if(!link||!title||title.length<12)continue;
+  const published=get("published");
+  items.push({sourceId:"arxiv",title,url:link,abstract:get("summary"),published,sourceType:"preprint",citationCount:null});
+  if(items.length>=5)break;
+ }
+ return items;
+}
+function nano10ExtractCrossref(payload){
+ const rows=payload?.message?.items;
+ if(!Array.isArray(rows))throw Error("invalid-crossref-json");
+ const items=[];
+ for(const item of rows.slice(0,10)){
+  if(!item||typeof item!=="object")continue;
+  const title=clampText(Array.isArray(item.title)?item.title[0]:item.title,230);
+  const doi=String(item.DOI||"");
+  if(!/^10\.\d{4,9}\/[A-Za-z0-9._;()/:+-]{2,130}$/.test(doi))continue;
+  const url=nano10Link("https://doi.org/"+doi,"crossref");
+  const type=String(item.type||"");
+  if(!["journal-article","proceedings-article","posted-content","book-chapter"].includes(type)||!url||title.length<12)continue;
+  const dateParts=item.published?.["date-parts"]?.[0];
+  const date=Array.isArray(dateParts)&&Number.isInteger(dateParts[0])&&dateParts[0]>=1900&&dateParts[0]<=2100
+   ?String(dateParts[0])+"-"+String(dateParts[1]||1).padStart(2,"0")+"-"+String(dateParts[2]||1).padStart(2,"0"):"";
+  items.push({sourceId:"crossref",title,url,abstract:"",
+    published:date,sourceType:type,citationCount:Math.max(0,Math.min(100000000,Number(item["is-referenced-by-count"])||0))});
+  if(items.length>=5)break;
+ }
+ return items;
+}
+function nano10Assessment(item,topic){
+ const title=String(item.title||"").toLowerCase(),text=(title+" "+String(item.abstract||"")).toLowerCase();
+ const related=/\b(agent|intelligence|language model|llm|robot|security|privacy|workflow|automation|software|code|cyber|neural|model|infra|system|comput|developer|learning|data)\b/i.test(text);
+ let rank=related?35:15;
+ if(/\b(self.host|open.source|reproducib|efficien|low.cost|benchmark|tool|framework|systems|automation|verification)\b/i.test(text))rank+=12;
+ rank=Math.min(55,rank);
+ const possible=topic.id==="security"?"Could inform future privacy or security checks in HQ":
+  topic.id==="robotics"?"Could inform a long-term robotics or edge-AI opportunity":
+  topic.id==="systems"?"Could inform a modular developer or operations capability":
+   "Could inform a replaceable AI model, agent, or automation component";
+ const checks=[
+  "Read the original paper and distinguish measured results from authors' assertions",
+  "Confirm reproducible code, datasets and licenses before recommending reuse",
+  "Compare with at least two independent papers or implementations",
+  "Check real user needs, local resource cost and safety before any product experiment"
+ ];
+ return {version:NANO10_VERSION,topicId:topic.id,relevanceRank:rank,researchStatus:"metadata-only",
+  possibleUse:possible,summary:"Research direction to investigate, not an established scientific breakthrough or business opportunity",
+  nextStep:"Founder-independent evidence review is required before a project proposal",
+  checks,claimsReproduced:false,customerDemandVerified:false,licenseVerified:false,founderApproved:false};
+}
+async function nano10Budget(env){
+ const day=nowIso().slice(0,10);
+ const ticket=await env.DB.prepare(
+  "INSERT INTO quota(day,kind,used) VALUES(?,'nano_journal_fetches',1) "+
+  "ON CONFLICT(day,kind) DO UPDATE SET used=used+1 WHERE used<"+NANO10_DAILY_REQUESTS+" RETURNING used"
+ ).bind(day).first();
+ return Boolean(ticket)&&await reserveFetch(env); // Shared free Worker budget, separate journal allocation.
+}
+async function nano10Fetch(env,provider,topic){
+ const endpoint=nano10Url(topic[provider.id],provider);
+ if(!(await nano10Budget(env)))throw Error("journal-budget-exhausted");
+ const response=await fetch(endpoint,{method:"GET",redirect:"manual",cache:"no-store",
+  signal:AbortSignal.timeout(7000),headers:{
+   accept:provider.format==="json"?"application/json":"application/atom+xml, application/xml, text/xml",
+   "user-agent":"YorpHivesHQ-ReadOnly-Science/1.0"}});
+ if(response.status!==200){
+  const err=Error("source-http-"+response.status);
+  err.status=response.status;
+  err.retryAfter=response.headers.get("retry-after");
+  await response.body?.cancel();
+  throw err;
+ }
+ const ct=response.headers.get("content-type")||"";
+ if(provider.format==="json"&&!/\bapplication\/(?:[\w.+-]*\+)?json\b/i.test(ct)){
+  await response.body?.cancel();throw Error("journal-type-mismatch");
+ }
+ if(provider.format==="atom"&&!/\b(?:atom\+xml|application\/xml|text\/xml)\b/i.test(ct)){
+  await response.body?.cancel();throw Error("journal-type-mismatch");
+ }
+ const body=await boundedText(response,100000);
+ if(body===null)throw Error("journal-response-too-large");
+ return provider.format==="json"?nano10ExtractCrossref(JSON.parse(body)):nano10ExtractAtom(body);
+}
+async function nano10Persist(env,provider,topic,item,at){
+ if(item.sourceId!==provider.id||!nano10Link(item.url,provider.id))throw Error("unsafe-journal-item");
+ const assessment=JSON.stringify(nano10Assessment(item,topic));
+ const id=fnv(NANO10_VERSION+"|"+item.sourceId+"|"+item.url);
+ const query="INSERT INTO nano_journal_papers(paper_id,source_id,topic_id,title,source_url,source_type,abstract_text,published_at,citation_count,assessment_json,first_seen,last_seen) "+
+  "SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM nano_journal_papers)<600 "+
+  "ON CONFLICT(paper_id) DO UPDATE SET last_seen=excluded.last_seen,assessment_json=excluded.assessment_json";
+ const r=await env.DB.prepare(query).bind(id,item.sourceId,topic.id,
+  clampText(item.title,230),item.url,clampText(item.sourceType,50),
+  clampText(item.abstract,450),clampText(item.published,32),item.citationCount,
+  assessment,at,at).run();
+ return r.meta?.changes===1;
+}
+async function nano10Scan(env,provider,at=nowIso()){
+ if(!NANO10_SOURCES.includes(provider))throw Error("source-not-approved");
+ const before=await env.DB.prepare("SELECT state,detail,next_check_at FROM nano_journal_scans WHERE source_id=? LIMIT 1")
+  .bind(provider.id).first();
+ if(before?.next_check_at&&Date.parse(before.next_check_at)>Date.parse(at))return "cooldown:"+provider.id;
+ const topic=nano10Topic(at,provider);
+ let state="unavailable",detail="source-unavailable",newCount=0,nextDelay=86400;
+ try{
+  const items=await nano10Fetch(env,provider,topic);
+  for(const item of items.slice(0,5)){
+   if(await nano10Persist(env,provider,topic,item,at))newCount++;
+  }
+  state="ok";detail="metadata:"+items.length;
+ }catch(e){
+  const message=String(e?.message||"");
+  if(message==="journal-budget-exhausted")return "budget-reached";
+  if(e?.status===429){
+   state="rate-limited";detail="source-http-429";
+   const raw=String(e.retryAfter||"");
+   const secs=/^\d+$/.test(raw)?Number(raw):Math.ceil((Date.parse(raw)-Date.parse(at))/1000);
+   nextDelay=Number.isFinite(secs)?Math.min(14*86400,Math.max(86400,secs)):86400;
+  }else if(/^source-http-\d{3}$/.test(message)){detail=message;}
+  else detail="fetch-or-parse-failed";
+ }
+ const r=await env.DB.prepare(
+  "INSERT INTO nano_journal_scans(source_id,state,detail,topic_id,added,checked_at,next_check_at) VALUES(?,?,?,?,?,?,?) "+
+  "ON CONFLICT(source_id) DO UPDATE SET state=excluded.state,detail=excluded.detail,topic_id=excluded.topic_id,"+
+  "added=excluded.added,checked_at=excluded.checked_at,next_check_at=excluded.next_check_at"
+ ).bind(provider.id,state,detail,topic.id,newCount,at,new Date(Date.parse(at)+nextDelay*1000).toISOString()).run();
+ return r.meta?.changes===1?state+":"+provider.id+":saved:"+newCount:"scan-not-recorded";
+}
+async function nano10Scheduled(env,scheduledTime){
+ const t=new Date(scheduledTime),at=nowIso();
+ const results=await env.DB.prepare("SELECT source_id,next_check_at FROM nano_journal_scans LIMIT 4").all();
+ const existing=new Map((results.results||[]).map(x=>[x.source_id,x]));
+ // First installation: bootstrap one source per ordinary five-minute Cron;
+ // unlike global discovery, academic requests have their own 2/day allocation.
+ const bootstrap=NANO10_SOURCES.find(x=>!existing.has(x.id));
+ if(bootstrap)return nano10Scan(env,bootstrap,at);
+ // Daily rotation; two separate slots, one request in each (UTC 02:10 / 14:10).
+ if(t.getUTCMinutes()!==10||![2,14].includes(t.getUTCHours()))return "outside-window";
+ const due=NANO10_SOURCES.find(x=>Date.parse(existing.get(x.id)?.next_check_at||"")<=Date.parse(at));
+ return due?nano10Scan(env,due,at):"not-due";
+}
+function nano10Report(scans,rows){
+ const past=new Map((Array.isArray(scans)?scans:[]).map(x=>[x.source_id,x]));
+ const sources=NANO10_SOURCES.map(p=>{const r=past.get(p.id);
+  return {id:p.id,name:p.name,status:r?.state||"not-attempted",detail:r?.detail||"",
+   topic:r?.topic_id||"",lastChecked:r?.checked_at||null,nextCheckAt:r?.next_check_at||null};
+ });
+ const entries=(Array.isArray(rows)?rows:[]).slice(0,60).map(x=>{
+  let a={};try{a=JSON.parse(String(x.assessment_json||"{}"));}catch{}
+  return {id:x.paper_id,title:x.title,url:x.source_url,sourceId:x.source_id,
+   sourceType:x.source_type,topicId:x.topic_id,publishedAt:x.published_at,
+   lastSeen:x.last_seen,citations:x.citation_count,
+   abstract:clampText(x.abstract_text,320),
+   ...a,claimsReproduced:false,customerDemandVerified:false,licenseVerified:false,founderApproved:false};
+ });
+ entries.sort((a,b)=>String(b.publishedAt||"").localeCompare(String(a.publishedAt||""))||
+   Number(b.relevanceRank||0)-Number(a.relevanceRank||0));
+ return {sources,entries:entries.slice(0,25),totalShown:Math.min(entries.length,25),
+  recordCount:entries.length,active:sources.filter(s=>s.status==="ok").length,
+  budget:"Two journal-source requests per UTC day; separate from general discovery",
+  scope:"Public publication/preprint metadata only; peer review, reproducibility, technical value and market demand not validated."};
+}
+
 /* Nano Phase 9: zero-inference, evidence-aware opportunity dossiers.
  * Creates research hypotheses and validation steps, NOT facts, founder decisions,
  * customer/revenue proof or permission for any autonomous implementation.
@@ -1580,6 +1804,12 @@ async function scheduledCycle(env, scheduledTime) {
     const result=await nano7Scheduled(env,scheduledTime);
     if(result!=="outside-window"&&result!=="not-due")await saveStatus(env,"nano_global_sources",result);
   }catch(e){try{await saveStatus(env,"nano_global_sources","error:"+clampText(e?.message,70));}catch{}}
+  // Dedicated academic research ingestion: independent 2/day D1 quota, no LLM calls.
+  try{
+    const result=await nano10Scheduled(env,scheduledTime);
+    if(result!=="outside-window"&&result!=="not-due")
+      await saveStatus(env,"nano_research_journals",result);
+  }catch(e){try{await saveStatus(env,"nano_research_journals","error:"+clampText(e?.message,70));}catch{}}
   // Phase 9 creates at most one read-only opportunity dossier from stored evidence per bounded Cron.
   try{
     const state=await nano9Scheduled(env,scheduledTime);
@@ -1911,6 +2141,8 @@ async function report(env) {
   const sourceScanRows=await env.DB.prepare("SELECT * FROM nano_source_scans ORDER BY checked_at DESC LIMIT 10").all();
   const sourceLeadRows=await env.DB.prepare("SELECT * FROM nano_source_leads ORDER BY observed_at DESC LIMIT 12").all();
   const briefRows=await env.DB.prepare("SELECT * FROM nano_opportunity_briefs ORDER BY priority DESC,updated_at DESC LIMIT 60").all();
+  const journalScanRows=await env.DB.prepare("SELECT * FROM nano_journal_scans ORDER BY checked_at DESC LIMIT 4").all();
+  const journalPaperRows=await env.DB.prepare("SELECT * FROM nano_journal_papers ORDER BY last_seen DESC LIMIT 60").all();
   const [incidentRows,incidentEvents]=await Promise.all([
     env.DB.prepare("SELECT * FROM incident_history ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, last_seen DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM incident_events ORDER BY sequence DESC LIMIT 150").all()
@@ -1941,6 +2173,7 @@ async function report(env) {
   return {
     nanoPipeline:{status:metadata.find(x=>x.key==="nano_workflows")?.value||"not-attempted",
       checkedAt:metadata.find(x=>x.key==="nano_workflows")?.checked_at||""},
+    researchJournals:{...nano10Report(journalScanRows.results||[],journalPaperRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_research_journals")?.value||"not-attempted"},
     opportunityBriefs:{...nano9Report(briefRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_opportunity_briefs")?.value||"not-attempted"},
     globalSources:{...nano7Report(sourceScanRows.results||[],sourceLeadRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_global_sources")?.value||"not-attempted"},
     investigations:{...nanoInvestigationReport(investigationRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_investigations")?.value||"not-attempted"},
