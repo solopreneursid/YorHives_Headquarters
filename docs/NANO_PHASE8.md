@@ -21,6 +21,7 @@ Reduce noisy leads and unavailable-source alerts while preserving traceability a
 ### 3. Research quality filtering
 - Deterministic `nano8Quality` tags each source lead as `candidate`, `monitor`, or `filtered` with a short explanation and rubric version `source-quality-v1`.
 - Publicity, award winners, giveaways, roundups and similar announcements are **still retained** in the source ledger but **not newly inserted into the business opportunities workflow**.
+- Among the maximum eight received listing records, the two highest priority items are selected. This avoids wasting a fixed two-item quota on announcements when concrete problems are also present. Lower-ranked items not selected are not stored.
 - Developer problem/implementation posts may be candidates for investigation; model pages and papers remain watch-only pending safety, license, performance and independent validation.
 - The same rules apply to existing legacy D1 source leads at report time. Nothing is silently deleted. Already-recorded opportunities and founder decisions are preserved.
 - All leads remain unverified; a candidate grade is priority for additional research, not business viability, technical compatibility or independent customer validation.
