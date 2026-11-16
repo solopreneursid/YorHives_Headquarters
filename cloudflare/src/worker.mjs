@@ -738,6 +738,8 @@ async function scheduledCycle(env, scheduledTime) {
     await env.DB.prepare("DELETE FROM security_watch WHERE observed_at < ?")
       .bind(new Date(Date.now()-120*86400000).toISOString()).run();
   }
+  // Lower-priority scouts never block uptime or the normal scheduler heartbeat.
+  try{await scheduledInternetScouts(env,scheduledTime);}catch{}
   await saveStatus(env,"last_cron","cycle:"+nowIso());
 }
 function base64UrlBytes(value) {
@@ -1111,63 +1113,170 @@ async function discoverPublicGithub(request){
 }
 
 
+// Zero-paid-source research scouts. These are deterministic classifiers, NOT running LLMs.
+// Each output has an original source and an explicit human-review checkpoint.
+const DISCOVERY_ROLES=Object.freeze([
+  {id:"product",name:"Product Scout",focus:"apps"},
+  {id:"technology",name:"Technology Scout",focus:"technology"},
+  {id:"market",name:"Market Scout",focus:"markets"},
+  {id:"competitor",name:"Competitor Scout",focus:"competitors"},
+  {id:"revenue",name:"Revenue Scout",focus:"revenue"},
+  {id:"evaluator",name:"Opportunity Evaluator",focus:"evidence"}
+]);
 const HN_CHANNELS=Object.freeze({launches:"showstories",signals:"newstories"});
-const hnFeedCache=new Map();
-const hnFeedLastFetch=new Map();
+const hnFeedCache=new Map(),hnFeedLastFetch=new Map();
+const DISCOVERY_TTL_MS=45*60*1000;
 function classifyInternetOpportunity(title){
   const t=String(title||"").toLowerCase();
-  if(/\b(alternative to|compare|vs\.?|competitor|replacement for)\b/.test(t))return "competitors";
+  if(/\b(alternative to|compare|versus|competitor|replacement for)\b/.test(t))return "competitors";
   if(/\b(mrr|arr|monetiz|subscription|billing|payment|checkout|pricing|sales|affiliate|invoice|marketplace|ecommerce|e-commerce)\b/.test(t))return "revenue";
   if(/\b(education|students?|teachers?|health|travel|tourism|housing|real estate|hiring|recruit|farm|agriculture|finance|insurance|legal|restaurant|school|caregiving)\b/.test(t))return "markets";
   if(/\b(llm|open.source|agentic|ai agents?|model|inference|sdk|framework|library|compiler|database|vector|api|developer|kubernetes|linux|rust|python|machine.learning|benchmark)\b/.test(t))return "technology";
   return "apps";
 }
+function scoutReview(title,category,source,engagement=0){
+  const clean=String(title||"").slice(0,160);
+  const matched=DISCOVERY_ROLES.find(x=>x.focus===category)||DISCOVERY_ROLES[0];
+  // Lightweight triage is NOT evidence of demand, ownership, profitability or feasibility.
+  const signals=Math.min(3,Math.floor(Math.log10(Math.max(1,Number(engagement)||1))));
+  return {scout:matched.name,reviewer:"Opportunity Evaluator",stage:"unverified-lead",
+    priority:signals>=2?"Review":"Explore",why:"Public listing in "+source+
+      ". Topic suggests "+category.replace("apps","a possible product")+" research.",
+    next:"Read original source; verify actual product, demand, license, competition and costs.",
+    rulesOnly:true,aiInference:false};
+}
 function normalizeHackerNewsItem(x){
   if(!x||x.deleted||x.dead||!Number.isSafeInteger(x.id)||x.id<=0||typeof x.title!=="string")return null;
   const title=x.title.replace(/^Show HN:\s*/i,"").trim().slice(0,160);
   if(!title)return null;
-  const postedAt=Number.isFinite(x.time)&&x.time>0?new Date(x.time*1000).toISOString():"";
-  let originalUrl=null;
-  try{const u=new URL(String(x.url||""));if(["https:","http:"].includes(u.protocol)&&!u.username&&!u.password)originalUrl=u.href;}catch{}
-  return {id:"hn-"+x.id,title,description:"Public Hacker News submission — research lead, not a product recommendation.",
-    category:classifyInternetOpportunity(title),source:"Hacker News",sourceUrl:"https://news.ycombinator.com/item?id="+x.id,
-    url:originalUrl||"https://news.ycombinator.com/item?id="+x.id,
-    price:"Unknown",license:null,postedAt,score:Number.isInteger(x.score)&&x.score>=0?x.score:0,
-    commentCount:Number.isInteger(x.descendants)&&x.descendants>=0?x.descendants:0,
-    evidence:"Title and public listing only",verified:false};
+  let postedAt="";try{if(Number.isFinite(x.time)&&x.time>0)postedAt=new Date(x.time*1000).toISOString();}catch{}
+  let url=null;
+  try{const u=new URL(String(x.url||""));if(["https:","http:"].includes(u.protocol)&&!u.username&&!u.password)url=u.href;}catch{}
+  const category=classifyInternetOpportunity(title),score=Number.isInteger(x.score)?Math.max(0,x.score):0;
+  return {id:"hn-"+x.id,title,description:"Public Hacker News submission — unverified research lead.",
+    category,source:"Hacker News",sourceUrl:"https://news.ycombinator.com/item?id="+x.id,
+    url:url||"https://news.ycombinator.com/item?id="+x.id,price:"Unknown",license:null,postedAt,
+    score,commentCount:Number.isInteger(x.descendants)?Math.max(0,x.descendants):0,
+    evidence:"Public submission; category inferred from title",verified:false,
+    review:scoutReview(title,category,"Hacker News",score)};
 }
-async function fetchPublicJson(url,deadline=6000,maxChars=400000){
-  const r=await fetch(url,{method:"GET",redirect:"error",cache:"no-store",signal:AbortSignal.timeout(deadline),
-    headers:{"accept":"application/json","user-agent":"YorpHives-HQ-ReadOnly-Discovery"}});
+function normalizeAlgoliaHit(x){
+  if(!x||!/^\d+$/.test(String(x.objectID||"")))return null;
+  const id=Number(x.objectID);
+  return normalizeHackerNewsItem({id,title:String(x.title||x.story_title||""),
+    time:Number(x.created_at_i),url:x.url||x.story_url,score:x.points,descendants:x.num_comments});
+}
+function normalizeDevArticle(x){
+  if(!x||!Number.isSafeInteger(x.id)||typeof x.title!=="string")return null;
+  const title=x.title.trim().slice(0,160);
+  if(!title)return null;
+  const url="https://dev.to"+String(x.path||"");
+  if(!/^https:\/\/dev\.to\/[a-z0-9_-]+\/[a-z0-9_-]+(?:\/)?$/i.test(url))return null;
+  const category=classifyInternetOpportunity(title),score=Math.max(0,Number(x.public_reactions_count)||0);
+  return {id:"devto-"+x.id,title,description:String(x.description||"Technical article; not a verified product.").slice(0,220),
+    category,source:"DEV Community",sourceUrl:url,url,price:"Unknown",license:null,
+    postedAt:String(x.published_at||""),score,commentCount:Number(x.comments_count)||0,
+    evidence:"Public developer article; not necessarily a launched product",verified:false,
+    review:scoutReview(title,category,"DEV Community",score)};
+}
+async function fetchPublicJson(url,deadline=5500,maxChars=250000){
+  const r=await fetch(url,{method:"GET",redirect:"error",cache:"no-store",
+    signal:AbortSignal.timeout(deadline),
+    headers:{accept:"application/json","user-agent":"YorpHives-HQ-ReadOnly-Discovery"}});
   if(!r.ok)throw Error("Public source unavailable");
   const len=Number(r.headers.get("content-length")||0);
   if(len>maxChars)throw Error("Public source response too large");
-  const body=await r.text();
-  if(body.length>maxChars)throw Error("Public source response too large");
+  const body=await boundedText(r,maxChars);
+  if(body===null)throw Error("Public source response too large");
   return JSON.parse(body);
 }
-async function discoverInternetFeed(request){
-  const u=new URL(request.url),channel=u.searchParams.get("channel")||"launches";
-  const remote=HN_CHANNELS[channel];
-  if(!remote)return json({error:"Unknown discovery channel"},400);
-  const now=Date.now(),cached=hnFeedCache.get(channel);
-  if(cached&&now-cached.checkedAt<15*60000)return json({...cached.data,cached:true});
-  if(now-(hnFeedLastFetch.get(channel)||0)<30*1000)return json({error:"This source was recently checked. Try again shortly."},429);
-  hnFeedLastFetch.set(channel,now);
-  const base="https://hacker-news.firebaseio.com/v0/";
+async function collectSource(channel){
+  // One bounded primary call to HN or DEV. Fallback uses max 5 subrequests total,
+  // avoiding the former 14 parallel connections and public-source rate exhaustion.
+  let items=[],origin="",failed=[];
   try{
-    const ids=await fetchPublicJson(base+remote+".json",7000,100000);
-    if(!Array.isArray(ids))throw Error("Public source returned no list");
-    const selected=ids.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,14);
-    const stories=await Promise.allSettled(selected.map(x=>fetchPublicJson(base+"item/"+x+".json",6000,12000)));
-    const items=stories.filter(x=>x.status==="fulfilled").map(x=>normalizeHackerNewsItem(x.value)).filter(Boolean).slice(0,12);
-    if(!items.length)throw Error("No public records available");
-    const result={source:"hacker-news-public",channel,checkedAt:new Date(now).toISOString(),items,
-      incomplete:stories.some(x=>x.status!=="fulfilled"),
-      note:"Public HN submissions. Categories inferred from titles; prices, demand, ownership and feasibility unverified."};
-    hnFeedCache.set(channel,{checkedAt:now,data:result});
-    return json(result);
-  }catch{return json({error:"Public source unavailable. Browse directories directly or retry later."},503);}
+    if(channel==="launches"){
+      const ids=await fetchPublicJson("https://hacker-news.firebaseio.com/v0/showstories.json",5000,18000);
+      if(!Array.isArray(ids))throw Error("Invalid source list");
+      const four=ids.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,4);
+      const details=await Promise.allSettled(four.map(x=>
+        fetchPublicJson("https://hacker-news.firebaseio.com/v0/item/"+x+".json",4800,10000)));
+      items=details.filter(x=>x.status==="fulfilled").map(x=>normalizeHackerNewsItem(x.value)).filter(Boolean);
+      origin="Hacker News Firebase"; 
+    }else{
+      const articles=await fetchPublicJson("https://dev.to/api/articles?per_page=12&top=7",6000,120000);
+      if(!Array.isArray(articles))throw Error("Invalid developer article list");
+      items=articles.slice(0,12).map(normalizeDevArticle).filter(Boolean);
+      origin="DEV Community";
+    }
+  }catch(e){failed.push(channel==="launches"?"Hacker News Firebase":"DEV Community");}
+  if(items.length)return {items:items.slice(0,12),origin,partial:failed.length>0};
+  try{
+    const tags=channel==="launches"?"show_hn":"front_page";
+    const api="https://hn.algolia.com/api/v1/search_by_date?tags="+tags+"&hitsPerPage=12";
+    const data=await fetchPublicJson(api,6000,150000);
+    if(!Array.isArray(data.hits))throw Error("Invalid search hits");
+    items=data.hits.map(normalizeAlgoliaHit).filter(Boolean);
+    origin="Hacker News Search"; 
+  }catch{failed.push("Hacker News Search");}
+  if(!items.length)throw Error("Public sources unavailable: "+failed.join(", "));
+  return {items:items.slice(0,12),origin,partial:true};
+}
+async function loadStoredDiscovery(env,channel){
+  if(!env?.DB)return null;
+  try{
+    const row=await env.DB.prepare("SELECT value,checked_at FROM status WHERE key=?")
+      .bind("public_scouts_"+channel).first();
+    if(!row)return null;
+    const data=JSON.parse(row.value);
+    if(data?.source!=="hacker-news-public"||!Array.isArray(data.items)||data.channel!==channel)return null;
+    return {data,at:Date.parse(row.checked_at)||0};
+  }catch{return null;}
+}
+async function persistDiscovery(env,channel,data){
+  if(!env?.DB)return;
+  // Existing status table; no schema migrations or third-party storage.
+  try{await saveStatus(env,"public_scouts_"+channel,JSON.stringify(data));}
+  catch(e){console.warn("Public discovery cache unavailable");}
+}
+async function getDiscoveryResult(channel,env,{force=false}={}){
+  if(!(channel in HN_CHANNELS))return {status:400,error:"Unknown discovery channel"};
+  const now=Date.now(),hit=hnFeedCache.get(channel);
+  const stored=await loadStoredDiscovery(env,channel);
+  const candidate=stored?.at>(hit?.at||0)?stored:hit;
+  if(candidate&&!force&&now-candidate.at<DISCOVERY_TTL_MS)
+    return {status:200,data:{...candidate.data,cached:true,stale:false}};
+  if(now-(hnFeedLastFetch.get(channel)||0)<60000){
+    if(candidate)return {status:200,data:{...candidate.data,cached:true,stale:true,notice:"Showing last verified public-source snapshot; retry later."}};
+    return {status:429,error:"Source cooldown. Browse source directories or retry later."};
+  }
+  hnFeedLastFetch.set(channel,now);
+  try{
+    const scan=await collectSource(channel);
+    const payload={source:"hacker-news-public",channel,checkedAt:new Date(now).toISOString(),items:scan.items,
+      origin:scan.origin,incomplete:scan.partial,cached:false,stale:false,
+      scouts:DISCOVERY_ROLES.map(x=>x.name),
+      note:"Six rule-based research roles; no running LLM. Public listings only. No verified demand, cost or reuse rights."};
+    hnFeedCache.set(channel,{at:now,data:payload});
+    await persistDiscovery(env,channel,payload);
+    return {status:200,data:payload};
+  }catch{
+    if(candidate)return {status:200,data:{...candidate.data,cached:true,stale:true,
+      notice:"Live sources unavailable. Showing last successful recorded results."}};
+    return {status:503,error:"Live public sources unavailable. No stored results yet; browse the source directory below."};
+  }
+}
+async function discoverInternetFeed(request,env){
+  const u=new URL(request.url),channel=u.searchParams.get("channel")||"launches";
+  const result=await getDiscoveryResult(channel,env,{force:u.searchParams.get("refresh")==="1"});
+  return result.status===200?json(result.data):json({error:result.error},result.status);
+}
+async function scheduledInternetScouts(env,scheduledTime){
+  // Two scans in 24 hours per channel, no extra Cron trigger. No AI API billing.
+  const t=new Date(scheduledTime);
+  if(t.getUTCMinutes()!==35||![2,8,14,20].includes(t.getUTCHours()))return;
+  const channel=t.getUTCHours()%12===2?"launches":"signals";
+  await getDiscoveryResult(channel,env);
 }
 
 function json(value,status=200) {return new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});}
@@ -1182,7 +1291,7 @@ export default {
     }
     if(route==="/api/decisions"&&request.method==="GET")return json(await decisionJournal(env));
     if(route==="/api/discover"&&request.method==="GET")return discoverPublicGithub(request);
-    if(route==="/api/discover/feed"&&request.method==="GET")return discoverInternetFeed(request);
+    if(route==="/api/discover/feed"&&request.method==="GET")return discoverInternetFeed(request,env);
     if(route==="/api/discover"&&request.method==="HEAD")return new Response(null,{status:200,headers:JSON_HEADERS});
     if(route==="/api/report") {
       if(!env.DB) return json({error:"Evidence database is not configured"},503);
@@ -1226,4 +1335,4 @@ export default {
     }));
   }
 };
-export {classifyInternetOpportunity,normalizeHackerNewsItem,discoverInternetFeed,githubRepoMetadata,discoverPublicGithub,headquartersHealth,safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report,decisionTransition,evidenceContract,operatingBrief,saveDecision,validateExperiment};
+export {DISCOVERY_ROLES,scoutReview,normalizeDevArticle,normalizeAlgoliaHit,collectSource,getDiscoveryResult,scheduledInternetScouts,classifyInternetOpportunity,normalizeHackerNewsItem,discoverInternetFeed,githubRepoMetadata,discoverPublicGithub,headquartersHealth,safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report,decisionTransition,evidenceContract,operatingBrief,saveDecision,validateExperiment};
