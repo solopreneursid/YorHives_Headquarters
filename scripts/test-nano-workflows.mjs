@@ -70,6 +70,7 @@ assert.equal(await nanoScheduled(env,'2026-11-16T12:15:00Z'),0);
 assert.equal(await nanoScheduled(env,'2026-11-16T12:30:00Z'),1,'Unseen opportunity should be stored, unchanged finding skipped');
 assert.equal(records.length,3);
 assert.equal(memories.length,2,'Both scheduled items remembered independently');
+memories.splice(memories.findIndex(x=>x.run_id===plan.run_id),1); // Simulate lost memory after a workflow was recorded.
 assert.equal(await nanoRemember(env,plan,finding),true,'Missing earlier workflow memory repaired');
 assert.equal(await nanoRemember(env,plan,finding),false,'Duplicate memory ignored');
 assert.equal(memories.length,3);
