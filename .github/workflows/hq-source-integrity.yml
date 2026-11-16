@@ -1,0 +1,34 @@
+name: HQ source integrity
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'scripts/verify-hq.mjs'
+      - '.github/workflows/hq-source-integrity.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-hq:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check source and embedded dashboard
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --version
+          node scripts/verify-hq.mjs
+      - name: Record verification scope
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## HQ source integrity'
+            echo 'Checks: Worker syntax, embedded dashboard syntax, HQpulse UI,'
+            echo 'incident ledger references, access and read-only guards.'
+            echo ''
+            echo 'This job does not verify authenticated browser flows,'
+            echo 'Cloudflare bindings, D1 data, or real incident recovery.'
+          } >> "$GITHUB_STEP_SUMMARY"
