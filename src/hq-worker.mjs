@@ -722,6 +722,72 @@ async function syncIncidentHistory(env) {
     }
   }
 }
+
+/* YorpMind Nano Phase 2: original, dependency-free PocketFlow-style state machine.
+ * D1 writes record evidence and proposed recommendations only. No AI calls or actions. */
+const NANO_STAGES=Object.freeze(["observe","route","evaluate","evidence_check","recommend","founder_review"]);
+function nanoRoute(kind,record){
+ const words=String((record.category||record.kind||"")+" "+(record.title||"")).toLowerCase();
+ if(kind==="finding")return /security|vulnerab|dependency|malware|certificate|ssl/.test(words)?
+   "Security & Independent QA":"Engineering & Operations";
+ if(/revenue|monetiz|pricing|subscription|advertis/.test(words))return "Revenue & Business";
+ if(/market|customer|country|demand|industry/.test(words))return "Global Market Intelligence";
+ if(/product|launch|acquisition|conversion|growth/.test(words))return "Product & Growth";
+ return "Research & Innovation";
+}
+function nanoPlan(kind,record,at=nowIso()){
+ if(!["finding","opportunity"].includes(kind)||!record||!String(record.id||"").trim())
+   throw Error("Invalid observation");
+ const department=nanoRoute(kind,record),title=clampText(record.title,160);
+ const rawEvidence=kind==="finding"?record.evidence:record.source_url;
+ const evidence=clampText(rawEvidence,250),description=clampText(record.description,450);
+ const recommendation=clampText(record.recommendation,300);
+ const hasEvidence=Boolean(evidence);
+ const stages=[
+  {name:"observe",state:"recorded",note:"Existing HQ observation; no new web validation"},
+  {name:"route",state:"routed",note:department},
+  {name:"evaluate",state:"evaluated",note:description?"Record description available":"Insufficient description"},
+  {name:"evidence_check",state:hasEvidence?"source-recorded":"evidence-missing",
+    note:hasEvidence?"Source claimed by collector; not independently verified":"No cited evidence recorded"},
+  {name:"recommend",state:recommendation?"draft-recorded":"recommendation-missing",
+    note:recommendation?"Existing recommendation, not AI generated":"Founder should request additional research"},
+  {name:"founder_review",state:"pending",note:"Founder makes all release decisions"}
+ ];
+ const reviewState=hasEvidence&&recommendation?"founder-review":"evidence-required";
+ const snapshot=JSON.stringify([kind,record.id,title,description,recommendation,evidence,record.priority||"",record.kind||""]);
+ const runId=kind+"-"+fnv(snapshot); // deterministic dedupe; not an authentication token
+ return {run_id:runId,source_kind:kind,source_id:String(record.id),department,
+  stage:"founder_review",review_state:reviewState,evidence_state:hasEvidence?"source-recorded-unverified":"missing",
+  title,recommendation,stages_json:JSON.stringify(stages),observed_at:String(record.observed_at||at),created_at:at};
+}
+async function nanoPersist(env,plan){
+ const old=await env.DB.prepare("SELECT run_id,revision FROM workflow_runs WHERE source_kind=? AND source_id=? ORDER BY revision DESC LIMIT 1")
+   .bind(plan.source_kind,plan.source_id).first();
+ if(old?.run_id===plan.run_id)return false;
+ // Repeated earlier snapshot must never overwrite an existing review history.
+ const exists=await env.DB.prepare("SELECT run_id FROM workflow_runs WHERE run_id=?").bind(plan.run_id).first();
+ if(exists)return false;
+ const revision=(Number(old?.revision)||0)+1;
+ // Strict upper bound: never create an unbounded ledger or overflow Free storage.
+ const write=await env.DB.prepare("INSERT INTO workflow_runs(run_id,source_kind,source_id,department,revision,stage,review_state,evidence_state,title,recommendation,stages_json,observed_at,created_at) "+
+  "SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM workflow_runs)<1000 "+
+  "ON CONFLICT(run_id) DO NOTHING")
+  .bind(plan.run_id,plan.source_kind,plan.source_id,plan.department,revision,plan.stage,plan.review_state,
+   plan.evidence_state,plan.title,plan.recommendation,plan.stages_json,plan.observed_at,plan.created_at).run();
+ return write.meta?.changes===1;
+}
+async function nanoScheduled(env,scheduledTime){
+ if(new Date(scheduledTime).getUTCMinutes()%30!==0)return 0;
+ const [findings,opportunities]=await Promise.all([
+  env.DB.prepare("SELECT id,category,priority,title,description,recommendation,evidence,observed_at FROM findings WHERE status='open' ORDER BY observed_at DESC LIMIT 3").all(),
+  env.DB.prepare("SELECT id,kind,title,description,recommendation,source_url,observed_at FROM opportunities ORDER BY observed_at DESC LIMIT 3").all()
+ ]);
+ let created=0;
+ const items=[...(findings.results||[]).map(x=>["finding",x]),...(opportunities.results||[]).map(x=>["opportunity",x])].slice(0,4);
+ for(const [kind,item] of items)if(await nanoPersist(env,nanoPlan(kind,item)))created++;
+ return created;
+}
+
 async function scheduledCycle(env, scheduledTime) {
   if(!env.DB) throw Error("Missing D1 binding");
   const plan=schedulePlan(scheduledTime);
@@ -760,7 +826,7 @@ async function scheduledCycle(env, scheduledTime) {
   }
   // Lower-priority scouts never block uptime or the normal scheduler heartbeat.
   try{await scheduledInternetScouts(env,scheduledTime);}catch{}
-  await saveStatus(env,"last_cron","cycle:"+nowIso());
+  // Keep low-priority orchestration from blocking the monitoring heartbeat.\n  try{await nanoScheduled(env,scheduledTime);}catch(error){console.warn("Nano workflow:",clampText(error?.message,90));}\n  await saveStatus(env,"last_cron","cycle:"+nowIso());
 }
 function base64UrlBytes(value) {
   if(!/^[A-Za-z0-9_-]+$/.test(value||"")) throw Error("invalid-token-encoding");
@@ -996,6 +1062,7 @@ function headquartersHealth(metadata,at=nowIso()) {
   };
 }
 async function report(env) {
+  const workflowRows=await env.DB.prepare("SELECT * FROM workflow_runs ORDER BY created_at DESC LIMIT 60").all();
   const [incidentRows,incidentEvents]=await Promise.all([
     env.DB.prepare("SELECT * FROM incident_history ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, last_seen DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM incident_events ORDER BY sequence DESC LIMIT 150").all()
@@ -1023,6 +1090,9 @@ async function report(env) {
   const now=nowIso();
   const journal=await decisionJournal(env);
   return {
+    workflows:(workflowRows.results||[]).map(x=>({runId:x.run_id,kind:x.source_kind,sourceId:x.source_id,department:x.department,
+      revision:x.revision,stage:x.stage,reviewState:x.review_state,evidenceState:x.evidence_state,
+      title:x.title,recommendation:x.recommendation,stages:JSON.parse(x.stages_json),observedAt:x.observed_at,createdAt:x.created_at})),
     incidents:(incidentRows.results||[]).map(x=>({id:x.id,title:x.title,category:x.category,severity:x.severity,asset:x.asset,status:x.status,firstSeen:x.first_seen,lastSeen:x.last_seen,resolvedAt:x.resolved_at,description:x.description,recommendation:x.recommendation,evidence:x.evidence,occurrences:x.occurrences,recoveryVerified:false})),
     incidentEvents:(incidentEvents.results||[]).map(x=>({sequence:x.sequence,incidentId:x.incident_id,transition:x.transition,observedAt:x.observed_at,evidence:x.evidence})),
     privateAi:{...privateAiStatus(env),dailyRequestsUsed:quotaUsed.hq_workers_ai_requests||0},
