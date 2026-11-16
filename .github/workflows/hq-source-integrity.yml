@@ -9,6 +9,7 @@ on:
       - 'scripts/test-private-ai.mjs'
       - 'scripts/test-workers-ai.mjs'
       - 'scripts/test-nano-workflows.mjs'
+      - 'scripts/test-nano-learning.mjs'
       - '.github/workflows/hq-source-integrity.yml'
   workflow_dispatch:
 permissions:
@@ -30,6 +31,7 @@ jobs:
           node scripts/test-private-ai.mjs
           node scripts/test-workers-ai.mjs
           node scripts/test-nano-workflows.mjs
+          node scripts/test-nano-learning.mjs
       - name: Record verification scope
         if: always()
         shell: bash
