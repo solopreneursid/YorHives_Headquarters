@@ -4,6 +4,7 @@ on:
     paths:
       - 'src/**'
       - 'scripts/verify-hq.mjs'
+      - 'scripts/test-incidents.mjs'
       - '.github/workflows/hq-source-integrity.yml'
   workflow_dispatch:
 permissions:
@@ -20,6 +21,7 @@ jobs:
           set -euo pipefail
           node --version
           node scripts/verify-hq.mjs
+          node scripts/test-incidents.mjs
       - name: Record verification scope
         if: always()
         shell: bash
@@ -27,7 +29,7 @@ jobs:
           {
             echo '## HQ source integrity'
             echo 'Checks: Worker syntax, embedded dashboard syntax, HQpulse UI,'
-            echo 'incident ledger references, access and read-only guards.'
+            echo 'incident ledger references, access and read-only guards.\n            echo 'Lifecycle: detect, repeat, resolve, reopen and historical import.''
             echo ''
             echo 'This job does not verify authenticated browser flows,'
             echo 'Cloudflare bindings, D1 data, or real incident recovery.'
