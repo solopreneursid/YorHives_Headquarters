@@ -1113,7 +1113,10 @@ function nano10Link(value,id){
  const str=String(value||"");
  if(str.length>350)return null;
  let u;try{u=new URL(str);}catch{return null;}
- if(u.protocol!=="https:"||u.username||u.password||u.port||u.search||u.hash)return null;
+ // The official legacy arXiv Atom feed uses http://arxiv.org/abs IDs.
+ // Never fetch that URL; canonicalize a validated identifier to HTTPS only.
+ if(!["https:","http:"].includes(u.protocol)||u.username||u.password||u.port||u.search||u.hash)return null;
+ if(u.protocol==="http:"&&id!=="arxiv")return null;
  if(id==="arxiv"&&u.hostname==="arxiv.org"&&/^\/abs\/(?:\d{4}\.\d{4,5}|[a-z-]+(?:\.[A-Z]{2})?\/\d{7})(?:v\d{1,3})?$/i.test(u.pathname))
    return "https://arxiv.org"+u.pathname.replace(/v\d{1,3}$/,"");
  if(id==="crossref"&&u.hostname==="doi.org"&&/^\/10\.\d{4,9}\/[A-Za-z0-9._;()/:+-]{2,130}$/.test(u.pathname))
