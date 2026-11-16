@@ -104,6 +104,7 @@ try{
     await test(profile.name+': navigation, back and protected session continuity',async()=>{
       await page.locator('[data-page="discover"]:visible').first().click();
       assert.ok(page.url().endsWith('#discover'));
+      if(profile.isMobile) await page.locator('#more-button').click();
       await page.locator('[data-page="control"]:visible').first().click();
       assert.ok(page.url().endsWith('#control'));
       const back=profile.isMobile?'#mobile-back-button':'#back-button';
