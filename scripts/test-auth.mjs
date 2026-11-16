@@ -1,0 +1,31 @@
+#!/usr/bin/env node
+// Static-source authentication boundary tests. No real user identity or secrets.
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+const source=readFileSync('src/hq-worker.mjs','utf8');
+const start=source.indexOf('function base64UrlBytes(value)');
+const end=source.indexOf('// Structured, evidence-bound daily briefing',start);
+assert.ok(start>=0&&end>start,'Cannot isolate authentic access validator');
+let networkCalls=0;
+const sandbox={fetch:async()=>{networkCalls++;throw Error('No remote network allowed in tests');},Date,atob:globalThis.atob,Uint8Array,TextDecoder,TextEncoder,crypto:globalThis.crypto};
+runInNewContext(source.slice(start,end)+'\nthis.verifyAccess=verifyAccess;',sandbox);
+const validate=sandbox.verifyAccess;
+const env={ACCESS_OWNER_EMAIL:'founder@example.com',ACCESS_AUD:'test-audience-0123456789',ACCESS_TEAM_DOMAIN:'https://test.cloudflareaccess.com'};
+const request={headers:{get:()=>null}};
+const run=(ctx,e=env,req=request)=>validate(req,e,ctx);
+assert.equal(await run({access:{aud:env.ACCESS_AUD,getIdentity:async()=>({email:'FOUNDER@example.com'})}}),true,'Valid platform identity rejected');
+assert.equal(await run({access:{aud:'different',getIdentity:async()=>({email:env.ACCESS_OWNER_EMAIL})}}),false,'Audience mismatch allowed');
+assert.equal(await run({access:{aud:env.ACCESS_AUD,getIdentity:async()=>({email:'attacker@example.com'})}}),false,'Different owner allowed');
+assert.equal(await run({access:{aud:env.ACCESS_AUD,getIdentity:async()=>{throw Error('identity lookup failed')}}}),false,'Identity exception allowed');
+assert.equal(await run({}, {...env,ACCESS_OWNER_EMAIL:''}),false,'Missing founder email allowed');
+assert.equal(await run({}, {...env,ACCESS_AUD:'invalid'}),false,'Missing trusted audience allowed');
+assert.equal(await run({},env,{headers:{get:(key)=>key==='X-Email'?env.ACCESS_OWNER_EMAIL:null}}),false,'Spoofed request header allowed');
+assert.equal(await run({},env,{headers:{get:()=> 'bad.token'}}),false,'Malformed JWT allowed');
+assert.equal(await run({},env,{headers:{get:()=> 'x'.repeat(7000)}}),false,'Oversized JWT allowed');
+assert.equal(networkCalls,0,'Rejected requests should not issue network calls');
+console.log('PASS: real platform-context identity with correct owner/audience');
+console.log('PASS: rejects wrong audience, wrong owner, failed identity lookup');
+console.log('PASS: rejects missing configuration, spoofed headers, malformed/oversized JWT');
+console.log('PASS: no network calls required for rejected requests');
+console.log('NOTE: Synthetic authentication checks; a real founder browser session remains untested.');
