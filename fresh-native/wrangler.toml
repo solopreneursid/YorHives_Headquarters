@@ -1,0 +1,8 @@
+name = "yorphiveshq-native-preview"
+main = "worker.mjs"
+compatibility_date = "2026-11-15"
+workers_dev = true
+
+# Existing live HQ and public website are intentionally untouched.
+# Bindings/access audience are injected from founder Cloudflare account during release.
+# Cron deployment is managed separately to keep this file free of account identifiers.
