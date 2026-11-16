@@ -69,7 +69,7 @@ const report={
       lastChecked:'2026-11-16T15:05:00Z',nextCheckAt:'2026-11-17T15:05:00Z'}],
    entries:[{id:'journal-test-1',title:'Modular AI agents for software verification',
      url:'https://doi.org/10.1234/verified-source',sourceId:'crossref',sourceType:'journal-article',
-     topicId:'ai',publishedAt:'2026-11-10',relevanceRank:47,
+     topicId:'ai',publishedAt:'2026-11-10',publicationAge:'published-within-one-year',relevanceRank:47,
      abstract:'',possibleUse:'Could inform a replaceable AI model, agent, or automation component',
      nextStep:'Review original work and compare independent evidence',
      checks:['Read the original paper','Verify original results'],
@@ -249,6 +249,7 @@ try{
       await panel.getByText('Research journals',{exact:true}).waitFor();
       assert.equal(await panel.locator('.journal-source').count(),2);
       assert.equal(await panel.locator('.journal-paper').count(),1);
+      assert.ok((await panel.innerText()).includes('Published within 1 year'));
       assert.ok((await panel.innerText()).includes('No AI model calls'));
       const paper=panel.locator('details.journal-paper').first();
       assert.equal(await paper.getAttribute('open'),null);
