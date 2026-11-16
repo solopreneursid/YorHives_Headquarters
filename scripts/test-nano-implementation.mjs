@@ -55,11 +55,16 @@ const sandbox={URL,Date,Map,Set,String,Number,JSON,Response,AbortSignal,console,
   assert.equal(opts.headers.authorization,undefined);
   if(url==='https://arxiv.org/abs/2611.18562')
    return new Response(page,{status:200,headers:{'content-type':'text/html; charset=utf-8'}});
+  if(url.startsWith('https://api.github.com/search/repositories?')){
+   assert.ok(url.includes('per_page=4'));
+   return new Response(JSON.stringify({items:[{...repo,description:papers[1].title}]}),
+      {status:200,headers:{'content-type':'application/json'}});
+  }
   if(url==='https://api.github.com/repos/research-team/robot-kit')
    return new Response(JSON.stringify(repo),{status:200,headers:{'content-type':'application/json'}});
   throw Error('Unapproved fetch: '+url);
  }};
-runInNewContext(code+'\nthis.repo=nano12RepoLink;this.links=nano12ExtractRepo;this.fact=nano12RepoFacts;this.page=nano12PageUrl;this.api=nano12ApiUrl;this.scheduled=nano12Scheduled;this.investigate=nano12Investigate;this.report=nano12Report;this.get=nano12Get;',sandbox);
+runInNewContext(code+'\nthis.repo=nano12RepoLink;this.links=nano12ExtractRepo;this.fact=nano12RepoFacts;this.page=nano12PageUrl;this.api=nano12ApiUrl;this.scheduled=nano12Scheduled;this.investigate=nano12Investigate;this.report=nano12Report;this.get=nano12Get;this.searchUrl=nano12SearchUrl;this.search=nano12SearchCandidate;',sandbox);
 const bad=['http://github.com/team/tool','https://github.com.evil.com/team/tool',
  'https://github.com/team/tool/tree/main','https://github.com/team/tool?token=1',
  'https://user:pass@github.com/team/tool','https://github.com/team/repo#token',
@@ -71,6 +76,13 @@ assert.equal(sandbox.links('<div><a href="https://github.com/team/tool">Code</a>
  'https://github.com/team/tool');
 assert.equal(sandbox.links('<a href="https://attacker.example/team/repo">Unsafe</a>'),null);
 assert.equal(sandbox.page(papers[2]),null,'Publisher DOI links must not be crawled');
+const query=sandbox.searchUrl(papers[1].title);
+assert.ok(query.startsWith('https://api.github.com/search/repositories?q=%22Automation'));
+assert.equal(sandbox.search({items:[{...repo,description:'Unrelated robotic task'}]},papers[1].title),null);
+const exact=sandbox.search({items:[{...repo,description:papers[1].title}]},papers[1].title);
+assert.equal(exact.url,'https://github.com/research-team/robot-kit');
+assert.equal(exact.independentlyLicenseReviewed,false);
+
 assert.throws(()=>sandbox.fact({...repo,html_url:'https://github.com/attacker/other'},
  'https://github.com/research-team/robot-kit'),/identity/);
 assert.throws(()=>sandbox.fact({...repo,private:true},
@@ -109,8 +121,25 @@ assert.equal(report.entries[0].repositoryAuthorVerified,false);
 assert.ok(report.scope.includes('not verified'));
 const withheld=sandbox.fact({...repo,license:{spdx_id:'NOASSERTION'}},'https://github.com/research-team/robot-kit');
 assert.equal(withheld.licenseReported,null);
+// A previously checked paper page is eligible for a single title search,
+// without pretending a matching repository is a paper-linked implementation.
+quota=0;
+now='2026-11-16T17:35:00.000Z';
+const past={state:'no-repository-link-observed',attempts:1,repository_url:null,
+ next_check_at:'2026-11-23T17:25:47.000Z'};
+assert.equal(await sandbox.investigate(env,papers[1],past,now),
+ 'repository-metadata-checked:lab-paper');
+const searched=checks.get('lab-paper');
+assert.equal(searched.license_spdx,'Apache-2.0');
+assert.equal(JSON.parse(searched.facts_json).discoveryMethod,'title-matched-github-search');
+assert.ok(JSON.parse(searched.facts_json).metadataSource.includes('NOT linked'));
+assert.equal(JSON.parse(searched.facts_json).independentReplication,false);
+assert.equal(requestCount,3);
+assert.equal(await sandbox.investigate(env,papers[1],searched,now),'not-due');
+
 console.log('PASS: fixed paper and GitHub API targets, no SSRF, credentials or redirects');
 console.log('PASS: observed public code link is not author identity or source-code verification');
 console.log('PASS: GitHub license metadata does not imply legal/license compliance');
 console.log('PASS: two-stage one-fetch-per-Cron checks with 2/day atomic D1 quota');
+console.log('PASS: exact-title GitHub search fallback preserves author/link uncertainty');
 console.log('PASS: no PDF, deployment, code execution, model inference or independent scientific claims');
