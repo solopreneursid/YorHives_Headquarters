@@ -830,6 +830,142 @@ async function nanoScheduled(env,scheduledTime){
 
 
 
+
+/* Phase 7: provider-neutral, self-hostable direct public-source registry.
+ * Hardcoded endpoints, no credentials, paid API, runtime tool, or production action.
+ * Source listing never proves product functionality, customer demand or revenue. */
+const NANO7_REGISTRY=Object.freeze([
+ Object.freeze({id:"dev",name:"DEV Community",category:"Developer problems",kind:"community",
+   endpoint:"https://dev.to/api/articles?tag=ai&per_page=8&top=7",
+   note:"Contributor posts are not proof of demand or technical suitability."}),
+ Object.freeze({id:"hf",name:"Hugging Face",category:"AI model candidates",kind:"model",
+   endpoint:"https://huggingface.co/api/models?sort=trendingScore&direction=-1&limit=8",
+   note:"Model listings are self-reported; open weights do not imply safe licenses."}),
+ Object.freeze({id:"openalex",name:"OpenAlex",category:"Technical research",kind:"paper",
+   endpoint:"https://api.openalex.org/works?search=autonomous%20AI%20agents&per_page=8&select=id,title,publication_date,cited_by_count",
+   note:"Bibliographic metadata does not verify experimental findings."})
+]);
+const NANO7_DAILY_LIMIT=3;
+function nano7Link(raw,id){
+ let u;try{u=new URL(String(raw||""));}catch{return null;}
+ if(u.protocol!=="https:"||u.username||u.password||u.port||u.hash||u.search||u.href.length>350)return null;
+ if(id==="dev"&&u.hostname==="dev.to"&&/^\/[\w-]+\/[\w-]{2,140}\/?$/.test(u.pathname))return u.href;
+ if(id==="hf"&&u.hostname==="huggingface.co"&&/^\/[\w.-]{1,80}\/[\w.-]{1,110}\/?$/.test(u.pathname))return u.href;
+ if(id==="openalex"&&u.hostname==="openalex.org"&&/^\/W\d{1,18}$/.test(u.pathname))return u.href;
+ return null;
+}
+function nano7Normalize(provider,data){
+ const values=provider.id==="openalex"?data?.results:data;
+ if(!Array.isArray(values))throw Error("invalid-provider-shape");
+ const list=[],seen=new Set();
+ for(const x of values.slice(0,12)){
+  if(!x||typeof x!=="object")continue;
+  let title="",url="",summary="",signals={};
+  if(provider.id==="dev"){
+   title=clampText(x.title,150);url=nano7Link(x.url,provider.id);
+   if(!/\b(ai|agent|llm|model|automation|open.source|self.host|workflow|software|developer|business)\b/i.test(title))continue;
+   summary=clampText(x.description,210);
+   signals={reactions:Math.min(1000000,Math.max(0,Number(x.public_reactions_count)||0)),
+     comments:Math.min(1000000,Math.max(0,Number(x.comments_count)||0))};
+  }else if(provider.id==="hf"){
+   const model=String(x.id||x.modelId||"");
+   if(!/^[\w.-]{1,80}\/[\w.-]{1,110}$/.test(model)||x.private||x.gated)continue;
+   title=clampText("Model: "+model,150);url=nano7Link("https://huggingface.co/"+model,provider.id);
+   summary="Model listing only. Licensing, weights, benchmarks and hosting requirements remain unverified.";
+   signals={downloads:Math.min(1000000000,Math.max(0,Number(x.downloads)||0)),likes:Math.min(100000000,Math.max(0,Number(x.likes)||0))};
+  }else if(provider.id==="openalex"){
+   title=clampText(x.title,150);url=nano7Link(x.id,provider.id);
+   if(!/\b(ai|agent|language model|llm|machine learning|autonom|automation|neural|intelligence|robot)\b/i.test(title))continue;
+   summary="Research publication metadata. Findings and applicability require independent verification.";
+   signals={citations:Math.min(100000000,Math.max(0,Number(x.cited_by_count)||0))};
+  }else throw Error("source-not-registered");
+  if(!url||!title||seen.has(url))continue;
+  seen.add(url);
+  list.push({id:fnv("global-v1:"+provider.id+":"+url),sourceId:provider.id,kind:provider.kind,
+    title,url,summary,signals,recordedAt:nowIso()});
+  if(list.length>=2)break;
+ }
+ return list;
+}
+async function nano7Fetch(env,provider){
+ if(!NANO7_REGISTRY.includes(provider))throw Error("unregistered-provider");
+ const day=nowIso().slice(0,10);
+ const ticket=await env.DB.prepare(
+  "INSERT INTO quota(day,kind,used) VALUES(?,'nano_global_fetches',1) "+
+  "ON CONFLICT(day,kind) DO UPDATE SET used=used+1 WHERE used<"+NANO7_DAILY_LIMIT+" RETURNING used"
+ ).bind(day).first();
+ if(!ticket||!(await reserveFetch(env)))throw Error("daily-budget-reached");
+ const r=await fetch(provider.endpoint,{method:"GET",redirect:"manual",cache:"no-store",
+  signal:AbortSignal.timeout(5000),headers:{accept:"application/json","user-agent":"YorpHivesHQ-ReadOnly-Research/1.0"}});
+ if(r.status!==200){await r.body?.cancel();throw Error("source-http-"+r.status);}
+ if(!/\bapplication\/(?:[\w.+-]*\+)?json\b/i.test(r.headers.get("content-type")||"")){
+  await r.body?.cancel();throw Error("source-content-type");
+ }
+ const body=await boundedText(r,64000);
+ if(body===null)throw Error("source-body-too-large");
+ return JSON.parse(body);
+}
+async function nano7Save(env,provider,item){
+ if(item.sourceId!==provider.id||!nano7Link(item.url,provider.id))throw Error("invalid-lead");
+ const stored=await env.DB.prepare(
+  "INSERT INTO nano_source_leads(lead_id,source_id,kind,title,source_url,summary,signals_json,evidence_state,observed_at) "+
+  "SELECT ?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM nano_source_leads)<1000 "+
+  "ON CONFLICT(lead_id) DO NOTHING"
+ ).bind(item.id,provider.id,item.kind,item.title,item.url,item.summary,
+  JSON.stringify(item.signals).slice(0,400),"listing-unverified",item.recordedAt).run();
+ if(stored.meta?.changes!==1)return false;
+ await env.DB.prepare(
+  "INSERT OR IGNORE INTO opportunities(id,title,description,recommendation,source_url,observed_at,score,kind) "+
+  "VALUES(?,?,?,?,?,?,?,?)"
+ ).bind(item.id,item.title,"Public "+provider.name+" listing; adoption, demand and revenue remain unverified.",
+  "Verify the source, applicable license, technical suitability and independently demonstrated customer need.",
+  item.url,item.recordedAt,10,"research-unverified").run();
+ return true;
+}
+async function nano7Scan(env,provider,at=nowIso()){
+ if(!NANO7_REGISTRY.includes(provider))throw Error("unregistered-provider");
+ let state="unavailable",added=0,details="";
+ try{
+  const list=nano7Normalize(provider,await nano7Fetch(env,provider));
+  for(const item of list)if(await nano7Save(env,provider,item))added++;
+  state="listing-recorded";details="candidates:"+list.length;
+ }catch(e){
+  const msg=String(e?.message||"");
+  details=/^source-http-\d{3}$/.test(msg)?msg:/budget/.test(msg)?"budget-reached":"source-unavailable";
+  if(details==="budget-reached")return "budget-reached";
+ }
+ await env.DB.prepare(
+  "INSERT INTO nano_source_scans(source_id,state,detail,added,checked_at,next_check_at) VALUES(?,?,?,?,?,?) "+
+  "ON CONFLICT(source_id) DO UPDATE SET state=excluded.state,detail=excluded.detail,added=excluded.added,"+
+  "checked_at=excluded.checked_at,next_check_at=excluded.next_check_at"
+ ).bind(provider.id,state,details,added,at,new Date(Date.parse(at)+86400000).toISOString()).run();
+ return state+":"+provider.id+":new:"+added;
+}
+async function nano7Scheduled(env,scheduledTime){
+ const now=nowIso(),t=new Date(scheduledTime);
+ const r=await env.DB.prepare("SELECT source_id,next_check_at FROM nano_source_scans LIMIT 10").all();
+ const existing=new Map((r.results||[]).map(x=>[x.source_id,x]));
+ // Bootstrap one previously unseen source per ordinary five-minute Cron event.
+ const initial=NANO7_REGISTRY.find(x=>!existing.has(x.id));
+ if(initial)return nano7Scan(env,initial,now);
+ // Thereafter, one source at 01:25, 09:25 or 17:25 UTC (at most three/day).
+ if(t.getUTCMinutes()!==25||![1,9,17].includes(t.getUTCHours()))return "outside-window";
+ const due=NANO7_REGISTRY.find(x=>Date.parse(existing.get(x.id)?.next_check_at||"")<=Date.parse(now));
+ return due?nano7Scan(env,due,now):"not-due";
+}
+function nano7Report(scans,leads){
+ const scanned=new Map((Array.isArray(scans)?scans:[]).map(x=>[x.source_id,x]));
+ const sources=NANO7_REGISTRY.map(x=>{const r=scanned.get(x.id);return {
+  id:x.id,name:x.name,category:x.category,status:r?.state||"not-attempted",
+  checkedAt:r?.checked_at||null,newCount:Number(r?.added)||0,note:x.note,detail:r?.detail||""};});
+ const entries=(Array.isArray(leads)?leads:[]).slice(0,12).map(x=>({
+  id:x.lead_id,sourceId:x.source_id,kind:x.kind,title:x.title,sourceUrl:x.source_url,
+  summary:x.summary,observedAt:x.observed_at,verifiedDemand:false,verifiedRevenue:false,verifiedFunctionality:false}));
+ return {sources,entries,totalShown:entries.length,active:sources.filter(x=>x.status==="listing-recorded").length,
+  budget:"Maximum three public source requests per day, shared public-fetch limit; no AI calls",
+  scope:"External listings are unverified research signals, not verified markets or product capabilities"};
+}
+
 /* Nano Phase 6 — low-cost, source-specific, bounded public investigations.
  * GitHub and Hacker News FIRST-PARTY API endpoints only. Never fetch supplied URLs,
  * execute source instructions, or interpret existence/engagement as demand or revenue.
@@ -1013,7 +1149,7 @@ function nanoTriageEvaluate(row,at=nowIso()){
   const reasons=[],detail=String(row.source_detail_kind||""),description=clampText(row.description,450);
   const recommendation=clampText(row.recommendation,300),title=clampText(row.title,160);
   let score=row.source_kind==="finding"?32:18;
-  const kindUnverified=/catalog-unverified/i.test(detail);
+  const kindUnverified=/(?:catalog|research)-unverified/i.test(detail);
   const lower=(title+" "+description).toLowerCase();
   const usefulContext=description.length>=65&&!/^(public (product mention|problem discussion)|external research mention)/i.test(description);
   const usefulRecommendation=recommendation.length>=25&&!/(published YorpHives catalog is incomplete|first verify the YorpHives product catalog)/i.test(recommendation);
@@ -1185,6 +1321,10 @@ async function scheduledCycle(env, scheduledTime) {
     const outcome=await nanoInvestigationScheduled(env,scheduledTime);
     if(outcome!=="outside-window")await saveStatus(env,"nano_investigations",outcome);
   }catch(error){try{await saveStatus(env,"nano_investigations","error:"+clampText(error?.message,75));}catch{}}
+  try{
+    const result=await nano7Scheduled(env,scheduledTime);
+    if(result!=="outside-window"&&result!=="not-due")await saveStatus(env,"nano_global_sources",result);
+  }catch(e){try{await saveStatus(env,"nano_global_sources","error:"+clampText(e?.message,70));}catch{}}
   if(plan.products) await checkProducts(env);
   // On a newly initialized HQ database, discover/research immediately rather
   // than waiting up to six hours or one day for the first scheduled window.
@@ -1508,6 +1648,8 @@ async function report(env) {
   const learningRows=await env.DB.prepare("SELECT p.*,m.title FROM nano_playbooks p JOIN nano_memories m ON m.memory_id=p.memory_id ORDER BY p.reviewed_at DESC,p.rowid DESC LIMIT 60").all();
   const triageRows=await env.DB.prepare("SELECT * FROM nano_triage ORDER BY assessed_at DESC,memory_id DESC LIMIT 80").all();
   const investigationRows=await env.DB.prepare("SELECT * FROM nano_investigations ORDER BY checked_at DESC,memory_id DESC LIMIT 40").all();
+  const sourceScanRows=await env.DB.prepare("SELECT * FROM nano_source_scans ORDER BY checked_at DESC LIMIT 10").all();
+  const sourceLeadRows=await env.DB.prepare("SELECT * FROM nano_source_leads ORDER BY observed_at DESC LIMIT 12").all();
   const [incidentRows,incidentEvents]=await Promise.all([
     env.DB.prepare("SELECT * FROM incident_history ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, last_seen DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM incident_events ORDER BY sequence DESC LIMIT 150").all()
@@ -1538,6 +1680,7 @@ async function report(env) {
   return {
     nanoPipeline:{status:metadata.find(x=>x.key==="nano_workflows")?.value||"not-attempted",
       checkedAt:metadata.find(x=>x.key==="nano_workflows")?.checked_at||""},
+    globalSources:{...nano7Report(sourceScanRows.results||[],sourceLeadRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_global_sources")?.value||"not-attempted"},
     investigations:{...nanoInvestigationReport(investigationRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_investigations")?.value||"not-attempted"},
     triage:{...triage,autoAiStatus:metadata.find(x=>x.key==="nano_auto_ai")?.value||"disabled",
       pipelineStatus:metadata.find(x=>x.key==="nano_triage")?.value||"not-attempted"},
