@@ -872,7 +872,8 @@ async function nanoSourceJson(env,target){
     !/^https:\/\/(?:api\.github\.com\/repos\/|hacker-news\.firebaseio\.com\/v0\/item\/)/.test(target.url))
     throw Error("source-target-not-allowlisted");
   if(!(await nanoInvestigationQuota(env)))throw Error("investigation-budget-reached");
-  const response=await fetch(target.url,{method:"GET",redirect:"error",cache:"no-store",
+  // Cloudflare Workers support redirect:manual for fail-closed redirect handling.
+  const response=await fetch(target.url,{method:"GET",redirect:"manual",cache:"no-store",
     signal:AbortSignal.timeout(4000),
     headers:{"user-agent":"YorpHivesHQ-ReadOnly-Research/1.0","accept":"application/json"}});
   if(!response.ok){await response.body?.cancel();throw Error("source-http-"+String(response.status));}
@@ -977,7 +978,12 @@ async function nanoInvestigateOne(env,observedAt=nowIso()){
 }
 async function nanoInvestigationScheduled(env,scheduledTime){
   const stamp=new Date(scheduledTime);
-  if(stamp.getUTCMinutes()%30!==20)return "outside-window"; // Offset from expensive discovery and uptime windows.
+  if(stamp.getUTCMinutes()%30!==20){
+    // Bootstrap a single record on the next five-minute Cron, then use the
+    // staggered half-hour cadence. No extra scheduled Worker is required.
+    const hasAny=await env.DB.prepare("SELECT memory_id FROM nano_investigations LIMIT 1").first();
+    if(hasAny)return "outside-window";
+  }
   return nanoInvestigateOne(env,nowIso());
 }
 function nanoInvestigationReport(rows){
