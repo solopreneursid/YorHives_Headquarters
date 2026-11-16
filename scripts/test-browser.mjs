@@ -118,7 +118,7 @@ try{
     });
     await test(profile.name+': private AI controls fail safely without model server',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
-      await page.getByText('Private AI assessment').waitFor();
+      await page.getByText('AI assessment', {exact:true}).waitFor();
       await page.locator('#ai-department').selectOption('Security & Independent QA');
       await page.locator('#ai-finding').selectOption('finding-1');
       await page.locator('[data-action="ai-analyze"]').click();
