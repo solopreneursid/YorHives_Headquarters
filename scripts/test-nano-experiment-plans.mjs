@@ -116,7 +116,7 @@ const js=JSON.parse(source.slice(start,end))['/dashboard.js'];
 assert.ok(js.includes('function experimentPlansPanel()'));
 assert.ok(js.includes('function exportExperimentPlan(paperId)'));
 assert.ok(js.includes("data-export-experiment="));
-assert.ok(js.includes('experimentPlansPanel()+scienceEvidencePanel()'));
+assert.ok(js.includes('experimentPlansPanel()+experimentEvidencePanel()+scienceEvidencePanel()'));
 assert.ok(js.includes('$'+'{experimentPlansPanel()}'));
 assert.ok(js.includes("format:'yorphives.hq.manual-experiment-plan.v1'"));
 assert.ok(source.includes('experimentPlans:nano17Report('));

@@ -131,7 +131,7 @@ const startBundle=source.indexOf('const PILOT_STATIC_BUNDLE = ')+ 'const PILOT_S
 const endBundle=source.indexOf(';\n',startBundle);
 const ui=JSON.parse(source.slice(startBundle,endBundle))['/dashboard.js'];
 assert.ok(ui.includes('function manifestEvidencePanel()'));
-assert.ok(ui.includes('manifestEvidencePanel()+dependencySignalsPanel()+founderResearchPanel()+experimentPlansPanel()+scienceEvidencePanel()'));
+assert.ok(ui.includes('manifestEvidencePanel()+dependencySignalsPanel()+founderResearchPanel()+experimentPlansPanel()+experimentEvidencePanel()+scienceEvidencePanel()'));
 assert.ok(ui.includes('${manifestEvidencePanel()}'));
 assert.ok(ui.includes('esc(f.sha'));
 assert.ok(source.includes('manifestEvidence:{...nano14Report('));
