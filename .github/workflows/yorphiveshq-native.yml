@@ -1,0 +1,28 @@
+name: YorpHivesHQ Native verification
+on:
+  pull_request:
+    paths:
+      - 'fresh-native/**'
+      - '.github/workflows/yorphiveshq-native.yml'
+  push:
+    branches:
+      - 'feature/yhq-native-*'
+    paths:
+      - 'fresh-native/**'
+      - '.github/workflows/yorphiveshq-native.yml'
+jobs:
+  security-and-foundation:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test free-tier worker rules
+        run: node --test fresh-native/tests/worker.test.mjs
+      - name: Syntax validation
+        run: |
+          node --check fresh-native/worker.mjs
+          node --check fresh-native/app.js
