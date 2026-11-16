@@ -93,6 +93,11 @@ const cron=source.slice(source.indexOf('async function scheduledCycle(env, sched
 assert.ok(cron.includes('await nanoScheduled(env,scheduledTime)'), 'Cron must actually invoke workflows');
 assert.ok(cron.indexOf('await nanoScheduled(env,scheduledTime)')<cron.indexOf('await checkProducts(env)'), 'Workflows run before slower collectors');
 assert.ok(cron.includes('saveStatus(env,"last_cron"'), 'Heartbeat must remain executable');
+assert.ok(cron.includes('await saveStatus(env,"last_cron","started:"'), 'Cron must record its start before slow checks');
+assert.ok(cron.indexOf('await saveStatus(env,"last_cron","started:"')<cron.indexOf('await checkSite(env)'), 'Heartbeat must precede HTTP collectors');
+assert.ok(cron.includes('saveStatus(env,"incident_ledger_error"'), 'Incident errors must not block workflow records');
+assert.ok(cron.includes('saveStatus(env,"site_check_error"'), 'Site check errors must not block workflow records');
+
 assert.ok(!cron.includes('heartbeat.\\n  try'), 'Do not embed literal escaped newlines inside comments');
 assert.ok(!source.slice(start,end).includes('env.AI.run'),'Orchestrator must spend zero inference');
 assert.ok(!source.slice(start,end).includes('fetch('),'Orchestrator must not call external web APIs');
