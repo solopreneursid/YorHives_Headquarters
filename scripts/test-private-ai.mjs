@@ -1,0 +1,48 @@
+#!/usr/bin/env node
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+const src=readFileSync('src/hq-worker.mjs','utf8');
+const a=src.indexOf('const HQ_AI_ROLES='),b=src.indexOf('function json(value,status=200)',a);
+assert.ok(a>=0&&b>a,'Private inference adapter not found');
+let sent=[],attempts=0;
+const sandbox={URL,AbortController,Response,JSON,String,Number,Date,setTimeout,clearTimeout,nowIso:()=>new Date().toISOString(),
+  json:(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json'}}),
+  fetch:async (url,options)=>{attempts++;sent.push({url,options});return new Response(JSON.stringify({choices:[{message:{content:'Evidence limited; founder review required.'}}]}),{status:200,headers:{'content-type':'application/json'}});}};
+runInNewContext(src.slice(a,b)+'\nthis.privateAiConfig=privateAiConfig;this.privateAiStatus=privateAiStatus;this.privateAiAnalyze=privateAiAnalyze;',sandbox);
+const config=sandbox.privateAiConfig,status=sandbox.privateAiStatus,analyze=sandbox.privateAiAnalyze;
+const env={HQ_PRIVATE_AI_URL:'https://founder-model.example.org/v1/chat/completions',HQ_PRIVATE_AI_MODEL:'example-open-weight-model',HQ_PRIVATE_AI_TOKEN:'local-owned-token',DB:{prepare:(sql)=>({bind:(id)=>({first:async()=>id==='finding-1'?{id,title:'Website unreachable',category:'reliability',priority:'high',asset:'https://yorphives.com/',description:'Two HTTP checks failed',recommendation:'Check incident',evidence:'https://yorphives.com/',observed_at:new Date().toISOString()}:null})})}};
+const req=(department,id)=>({headers:{get:()=>null},json:async()=>({department,findingId:id})});
+assert.equal(config({}) ,null);
+assert.equal(status({}).configured,false);
+assert.equal(config({...env,HQ_PRIVATE_AI_URL:'http://founder-model.example.org/v1/chat/completions'}),null,'HTTP should be disabled');
+assert.equal(config({...env,HQ_PRIVATE_AI_URL:'https://localhost/v1/chat/completions'}),null,'localhost cannot be reached from Worker');
+assert.equal(config({...env,HQ_PRIVATE_AI_URL:'https://founder-model.example.org/v1/chat/completions?token=secret'}),null);
+assert.equal(config({...env,HQ_PRIVATE_AI_TOKEN:''}),null);
+let r=await analyze(req('Engineering & Operations','finding-1'),{...env,HQ_PRIVATE_AI_URL:''});assert.equal(r.status,503);
+r=await analyze(req('Unknown Role','finding-1'),env);assert.equal(r.status,400);
+r=await analyze(req('Engineering & Operations','no-record'),env);assert.equal(r.status,404);
+assert.equal(attempts,0,'Blocked requests must not call private model');
+r=await analyze(req('Engineering & Operations','finding-1'),env);assert.equal(r.status,200);
+const result=await r.json();assert.equal(result.status,'unverified-advisory');assert.equal(result.findingId,'finding-1');
+assert.equal(result.analysis,'Evidence limited; founder review required.');
+assert.equal(attempts,1);
+assert.equal(sent[0].url,env.HQ_PRIVATE_AI_URL);
+assert.equal(sent[0].options.method,'POST');
+assert.equal(sent[0].options.redirect,'error');
+assert.equal(sent[0].options.signal instanceof AbortSignal,true);
+const payload=JSON.parse(sent[0].options.body);
+assert.equal(payload.stream,false);
+assert.equal(payload.messages[0].role,'system');
+assert.equal(payload.messages[1].role,'user');
+assert.ok(!payload.tools,'Tools must never be provided');
+assert.ok(payload.messages[1].content.includes('Website unreachable'));
+assert.ok(!sent[0].options.body.includes('local-owned-token'),'Token must not appear in prompt');
+assert.equal(src.includes('if(origin!==host)return json({error:"Same-origin founder request required"},403);'),true,'Missing same-origin protection');
+assert.equal(src.includes('if(!(await verifyAccess(request,env,ctx)))'),true,'Missing founder access check');
+console.log('PASS: unconfigured inference is disabled');
+console.log('PASS: TLS-only endpoint configuration and secrets gating');
+console.log('PASS: invalid department and absent finding blocked');
+console.log('PASS: founder-triggered analysis sends bounded evidence and zero tools');
+console.log('PASS: advisory output and same-origin + founder-only route guards');
+console.log('NOTE: Real self-hosted server is not connected or verified.');
