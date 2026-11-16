@@ -25,7 +25,7 @@ const env={AI:{run:async(model,options)=>{
   throw Error('Unexpected query: '+sql);
 }}};
 const sandbox={URL,AbortController,Response,JSON,String,Number,Date,setTimeout,clearTimeout,
-  nowIso:()=>now,json:(x,status=200)=>new Response(JSON.stringify(x),{status,headers:{'content-type':'application/json'}}),
+  nowIso:()=>now,clampText:(x,n=240)=>String(x||'').replace(/\\s+/g,' ').trim().slice(0,n),json:(x,status=200)=>new Response(JSON.stringify(x),{status,headers:{'content-type':'application/json'}}),
   fetch:async()=>{throw Error('Private model called unexpectedly')}};
 runInNewContext(src.slice(start,end)+'\nthis.status=privateAiStatus;this.analyze=privateAiAnalyze;',sandbox);
 const status=sandbox.status(env);
