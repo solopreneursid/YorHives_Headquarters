@@ -48,3 +48,22 @@ CREATE TABLE IF NOT EXISTS update_candidates (
   repo TEXT PRIMARY KEY, tag TEXT NOT NULL, published_at TEXT,
   url TEXT NOT NULL, detected_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'review'
 );
+
+-- Revenue intelligence: evidence-labelled opportunities, founder-only records, public app monitoring.
+CREATE TABLE IF NOT EXISTS app_inventory (
+ path TEXT PRIMARY KEY, title TEXT NOT NULL, url TEXT NOT NULL,
+ status TEXT NOT NULL DEFAULT 'unchecked' CHECK(status IN ('unchecked','online','error')),
+ http_status INTEGER, checked_at TEXT, first_seen TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_app_checked ON app_inventory(checked_at);
+CREATE TABLE IF NOT EXISTS revenue_ideas (
+ id TEXT PRIMARY KEY, channel TEXT NOT NULL, title TEXT NOT NULL,
+ summary TEXT NOT NULL, next_step TEXT NOT NULL,
+ priority INTEGER NOT NULL, effort TEXT NOT NULL, cost TEXT NOT NULL, risk TEXT NOT NULL,
+ target_path TEXT, target_name TEXT NOT NULL, basis TEXT NOT NULL,
+ first_seen TEXT NOT NULL, last_seen TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS revenue_actions (
+ idea_id TEXT PRIMARY KEY REFERENCES revenue_ideas(id) ON DELETE CASCADE,
+ action TEXT NOT NULL CHECK(action IN ('shortlist','dismiss','plan')), updated_at TEXT NOT NULL
+);

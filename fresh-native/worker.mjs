@@ -9,6 +9,7 @@ const AUDIT_LIMIT=150;
 const SCAN_COOLDOWN_MS=15*60*1000;
 const MAX_SCANS_PER_DAY=8;
 const MAX_AI_CALLS_PER_DAY=3;
+const MAX_SITE_AUDITS_PER_DAY=4;
 const SAFE_HEADERS={'x-content-type-options':'nosniff','referrer-policy':'no-referrer','x-frame-options':'DENY','cache-control':'no-store','cross-origin-resource-policy':'same-origin','permissions-policy':'camera=(), microphone=(), geolocation=()'};
 const JSON_HEADERS={...SAFE_HEADERS,'content-type':'application/json; charset=utf-8'};
 // Compiled at release time. Inline script has a SHA-256 CSP hash; no external JS or CSS.
@@ -24,7 +25,6 @@ const FEEDS=[
  {name:'Hacker News · Launches',url:'https://hn.algolia.com/api/v1/search_by_date?tags=show_hn&hitsPerPage=8',kind:'hn',category:'Apps & Tools'},
  {name:'DEV Community',url:'https://dev.to/api/articles?per_page=8&top=7',kind:'dev',category:'Technology'},
  {name:'Hacker News · Needs',url:'https://hn.algolia.com/api/v1/search_by_date?tags=ask_hn&hitsPerPage=8',kind:'hn',category:'Markets'},
- {name:'Hacker News · Revenue',url:'https://hn.algolia.com/api/v1/search_by_date?query=pricing&tags=story&hitsPerPage=6',kind:'hn',category:'Revenue'},
  {name:'Hacker News · Alternatives',url:'https://hn.algolia.com/api/v1/search_by_date?query=alternatives&tags=story&hitsPerPage=6',kind:'hn',category:'Competitors'}
 ];
 const ALLOWED_PUBLIC=new Set([...FEEDS.map(x=>x.url),...RELEASES.map(x=>x.url)]);
@@ -136,8 +136,87 @@ async function evaluate(env,id){
   return{ok:true,id,...result,model:HQ_MODEL};
  }catch(err){await statePut(env,'ai_failure',{at:now(),kind:'provider-error'}).catch(()=>{});return{error:'AI provider unavailable; monitoring continues',status:503};}
 }
+
+// YorpMind revenue intelligence: site-specific, evidence-labelled hypotheses. Never posts to public site.
+const APP_PREFIXES=['/free-tools/','/tools/','/tool/','/apps/','/app/','/products/'];
+const AUDIT_ENTRYPOINTS=[`${SITE}sitemap.xml`,`${SITE}free-tools/`];
+const REVENUE_PLAYS=[
+ {slug:'ads',channel:'Advertising',title:'AdSense readiness on tool guides',summary:'Consider restrained display ads on helpful, original guide pages; keep tool controls clear.',next_step:'Check traffic, AdSense approval and policy-safe placements before enabling ads.',priority:90,effort:'Low',cost:'No new software; approval and policy checks required.',risk:'Do not place misleading ads near download buttons. Approval and earnings unverified.'},
+ {slug:'sponsor',channel:'Sponsorships',title:'Direct sponsorship of relevant tools',summary:'Offer clearly labelled placements to companies serving the same tool users.',next_step:'Identify a useful tool category and create a one-page sponsor proposal after traffic is measured.',priority:80,effort:'Medium',cost:'No new software; requires outreach.',risk:'No sponsor or rate has been verified. Label sponsored content.'},
+ {slug:'affiliate',channel:'Affiliates',title:'Relevant software comparisons and referrals',summary:'Publish impartial comparisons related to YorpHives tools, with clearly disclosed affiliate links.',next_step:'Identify one relevant program, verify eligibility, commission rules and disclosure requirements.',priority:78,effort:'Medium',cost:'No new infrastructure; program approval required.',risk:'No affiliate partnership, commission or conversion is confirmed.'},
+ {slug:'downloads',channel:'Digital products',title:'Downloadable templates and presets',summary:'Sell optional reusable templates or downloadable workflow packs alongside free tools.',next_step:'Validate demand for one useful pack; preserve the free core tools.',priority:74,effort:'Medium',cost:'Creating files is low-cost; payments may have transaction fees.',risk:'Demand and payment availability are unverified; do not claim revenue.'},
+ {slug:'services',channel:'Services & leads',title:'Custom tool and automation requests',summary:'Offer a clear request form for businesses that need specialised workflows or custom tools.',next_step:'Test interest with an inquiry process; measure qualified requests before any paid offering.',priority:73,effort:'Medium',cost:'Basic inquiry flow can run on existing Workers Free quota.',risk:'Consent, spam protection and lead quality must be validated.'},
+ {slug:'premium',channel:'Premium features',title:'Optional advanced workflows',summary:'Explore paid batch processing, saved presets or business exports only where repeated demand exists.',next_step:'Measure repeated use first; design a free-core, optional-paid proposal.',priority:64,effort:'High',cost:'Payment processing and heavier workloads may incur fees.',risk:'Not suitable for automatic deployment; quota and user demand unverified.'},
+ {slug:'guestpost',channel:'Sponsored content',title:'Sponsored how-to articles',summary:'Consider relevant sponsored tutorials with editorial review and clear paid placement disclosure.',next_step:'Define acceptance criteria and pricing only after measuring readership and quality.',priority:58,effort:'Medium',cost:'No new infrastructure; editorial time required.',risk:'Disclose sponsorships; protect trust and search quality.'},
+ {slug:'support',channel:'Support & donations',title:'Optional visitor support',summary:'Allow appreciative users to support free tools voluntarily without reducing free access.',next_step:'Evaluate an appropriate payment method and transaction fees before launching.',priority:45,effort:'Low',cost:'Payment provider may charge transaction fees.',risk:'No conversion or donation provider is connected.'},
+ {slug:'course',channel:'Courses',title:'Practical tool tutorials or mini-courses',summary:'Package beginner tutorials around the site tools after observing repeated learning needs.',next_step:'Validate a popular question and prepare one free guide before testing a paid tutorial.',priority:40,effort:'High',cost:'Content creation effort; paid video hosting is not required.',risk:'Not yet supported by audience evidence.'},
+ {slug:'merch',channel:'Merchandise',title:'Branded merchandise (low priority)',summary:'Consider only if a loyal audience explicitly requests physical merchandise.',next_step:'Defer until traffic and repeat engagement justify merchandise.',priority:15,effort:'High',cost:'Production, delivery or vendor fees likely.',risk:'Poor initial fit for a free-tools website; third-party fulfilment may add dependencies.'}
+];
+const revId=(slug,path='')=>`rev_${idFor('revenue',`${slug}|${path}`).slice(5)}`;
+function appPath(href,base=SITE){
+ try{const u=new URL(String(href).replace(/&amp;/g,'&'),base);const expected=new URL(SITE);if(u.origin!==expected.origin||u.username||u.password)return null;
+  const path=decodeURI(u.pathname).replace(/\/{2,}/g,'/');if(path.length>160||/[<>"'\\]/.test(path)||!APP_PREFIXES.some(x=>path.startsWith(x)&&path.length>x.length))return null;
+  return path.replace(/\/$/,'')||'/';
+ }catch{return null;}
+}
+function findAppPaths(html,base=SITE){
+ const entries=new Set();const text=String(html||'').slice(0,90000);
+ for(const found of text.matchAll(/<(?:loc|a)\b[^>]*?(?:href\s*=\s*["']([^"']+)["']|>\s*(https:\/\/[^<]+)<\/loc>)/gi)){
+  const path=appPath(found[1]||found[2],base);if(path)entries.add(path);if(entries.size>=40)break;
+ }
+ // Simple <loc>... for conventional XML sitemaps; parser remains deliberately bounded.
+ for(const found of text.matchAll(/<loc>\s*([^<]+)\s*<\/loc>/gi)){
+  const path=appPath(found[1],base);if(path)entries.add(path);if(entries.size>=40)break;
+ }
+ return [...entries];
+}
+function nameFromPath(path){return String(path).split('/').filter(Boolean).at(-1)?.replace(/[-_]+/g,' ').replace(/\b[a-z]/g,x=>x.toUpperCase())||'Tool';}
+async function boundedSiteText(url){
+ if(!AUDIT_ENTRYPOINTS.includes(url))throw Error('site-audit-source-not-allowed');
+ const r=await fetch(url,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(6000),headers:{accept:'application/xml,text/html;q=0.9'}});
+ if(r.status!==200)throw Error(`site-audit-http-${r.status}`);
+ if(Number(r.headers.get('content-length')||0)>90000)throw Error('site-audit-too-large');
+ if(!r.body)return '';
+ const reader=r.body.getReader(),parts=[];let size=0;
+ try{while(true){const {value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>90000){await reader.cancel();throw Error('site-audit-too-large');}parts.push(value);}}finally{reader.releaseLock();}
+ const combined=new Uint8Array(size);let offset=0;for(const x of parts){combined.set(x,offset);offset+=x.byteLength;}return new TextDecoder().decode(combined);
+}
+function monetizationIdeas(apps){
+ const ideas=REVENUE_PLAYS.map(p=>({id:revId(p.slug),channel:p.channel,title:p.title,summary:p.summary,next_step:p.next_step,priority:p.priority,effort:p.effort,cost:p.cost,risk:p.risk,target_path:null,target_name:'YorpHives.com',basis:'Sitewide idea · revenue and traffic not verified'}));
+ const categories=[...new Set(apps.filter(x=>x.status==='online'||x.status==='unchecked').map(x=>{
+  const t=x.path.toLowerCase();return /pdf|document|word|docx/.test(t)?'PDF':/image|photo|resize|crop|jpg|png|webp|compress/.test(t)?'Image':/qr|barcode/.test(t)?'QR':/calc|convert|finance/.test(t)?'Calculator':'Tools';
+ }))];
+ const count=apps.filter(x=>x.status==='online').length;
+ for(const group of categories.slice(0,4)){
+  const app=apps.find(x=>{const p=x.path.toLowerCase();return group==='PDF'?/pdf|document|word|docx/.test(p):group==='Image'?/image|photo|resize|crop|jpg|png|webp|compress/.test(p):group==='QR'?/qr|barcode/.test(p):group==='Calculator'?/calc|convert|finance/.test(p):true;});
+  if(!app)continue;
+  const label=`${group} tool collection`;
+  ideas.push({id:revId('pack-'+group.toLowerCase(),app.path),channel:'Digital products',title:`Optional ${group.toLowerCase()} presets or templates`,summary:`Test downloadable templates or presets related to ${app.title}. Keep the free tool free.`,next_step:`Confirm repeat use of ${app.title}, then test interest in a small downloadable pack.`,priority:app.status==='online'?75:54,effort:'Medium',cost:'Payment processor may charge transaction fees.',risk:'No usage statistics or paying customers connected.',target_path:app.path,target_name:app.title,basis:`Discovered tool route · ${app.status==='online'?'HTTP checked':'page not yet checked'}`});
+ }
+ return ideas.map(x=>({...x,app_count:apps.length,apps_healthy:count}));
+}
+async function buildRevenueIdeas(env){
+ const apps=(await env.DB.prepare('SELECT path,title,status FROM app_inventory ORDER BY checked_at DESC LIMIT 40').all()).results||[];
+ const ideas=monetizationIdeas(apps),stamp=now();
+ for(const row of ideas){await env.DB.prepare('INSERT INTO revenue_ideas(id,channel,title,summary,next_step,priority,effort,cost,risk,target_path,target_name,basis,first_seen,last_seen) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET summary=excluded.summary,next_step=excluded.next_step,priority=excluded.priority,effort=excluded.effort,cost=excluded.cost,risk=excluded.risk,target_name=excluded.target_name,basis=excluded.basis,last_seen=excluded.last_seen').bind(row.id,row.channel,row.title,row.summary,row.next_step,row.priority,row.effort,row.cost,row.risk,row.target_path,row.target_name,row.basis,stamp,stamp).run();}
+ await statePut(env,'revenue_sync',{generatedAt:stamp,count:ideas.length,verifiedRevenue:false,inventoryCount:apps.length});return{count:ideas.length,inventoryCount:apps.length};
+}
+async function auditApps(env){
+ if(!(await reserve(env,'site_audits',MAX_SITE_AUDITS_PER_DAY)))return{skipped:'daily-budget'};
+ const discovered=new Set(),failures=[];
+ for(const url of AUDIT_ENTRYPOINTS){try{for(const p of findAppPaths(await boundedSiteText(url),url))discovered.add(p);}catch(e){failures.push({source:new URL(url).pathname,reason:clean(e.message,70)});}}
+ const stamp=now();for(const path of [...discovered].slice(0,40))await env.DB.prepare("INSERT INTO app_inventory(path,title,url,status,first_seen,checked_at) VALUES(?,?,?,'unchecked',?,NULL) ON CONFLICT(path) DO NOTHING").bind(path,nameFromPath(path),SITE.replace(/\/$/,'')+path,stamp).run();
+ const row=await env.DB.prepare('SELECT count(*) AS count FROM app_inventory').first();const report={checkedAt:stamp,found:discovered.size,tracked:row?.count||0,sourceFailures:failures,scope:'Public links only; tool functions not tested'};
+ await statePut(env,'app_audit',report);await buildRevenueIdeas(env);return report;
+}
+async function monitorApps(env,max=2){
+ const rows=(await env.DB.prepare('SELECT path,url FROM app_inventory ORDER BY (checked_at IS NOT NULL), checked_at ASC LIMIT ?').bind(Math.min(2,Math.max(1,max))).all()).results||[];
+ const results=[];for(const app of rows){let status='error',code=null;try{const r=await fetch(app.url,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(6000)});code=r.status;status=r.status>=200&&r.status<300?'online':'error';await r.body?.cancel();}catch{}await env.DB.prepare('UPDATE app_inventory SET status=?,http_status=?,checked_at=? WHERE path=?').bind(status,code,now(),app.path).run();results.push({path:app.path,status,code});}
+ if(results.length)await statePut(env,'app_monitor',{checkedAt:now(),lastChecked:results.length});return results;
+}
+
 async function bootstrap(env){
- const [site,scan,cron,watchdog,aiOK,aiFailed,updates,rows,saved,decisions,reviews,learning,sources,candidates,scansUsed,aiUsed]=await Promise.all([
+ const [site,scan,cron,watchdog,aiOK,aiFailed,updates,rows,saved,decisions,reviews,learning,sources,candidates,scansUsed,aiUsed,ideas,revDecisions,appInventory,appAudit,revSync,appMonitor,appAuditUsed]=await Promise.all([
   stateGet(env,'site_health'),stateGet(env,'last_scan'),stateGet(env,'last_cron'),stateGet(env,'watchdog'),stateGet(env,'ai_success'),stateGet(env,'ai_failure'),stateGet(env,'last_updates'),
   env.DB.prepare('SELECT id,title,summary,category,source,url,source_date,first_seen,last_seen FROM opportunities ORDER BY last_seen DESC LIMIT 120').all(),
   env.DB.prepare('SELECT opportunity_id FROM saved ORDER BY created_at DESC').all(),
@@ -146,7 +225,11 @@ async function bootstrap(env){
   env.DB.prepare('SELECT source,positive,negative,weight,revision,updated_at FROM learning ORDER BY updated_at DESC').all(),
   env.DB.prepare('SELECT source,successes,failures,last_success,last_failure FROM source_stats ORDER BY source').all(),
   env.DB.prepare('SELECT repo,tag,published_at,url,detected_at,status FROM update_candidates ORDER BY detected_at DESC').all(),
-  quotaUsed(env,'scans'),quotaUsed(env,'ai_calls')]);
+  quotaUsed(env,'scans'),quotaUsed(env,'ai_calls'),
+  env.DB.prepare("SELECT r.*,COALESCE(d.action,'new') AS action,d.updated_at AS decision_at FROM revenue_ideas r LEFT JOIN revenue_actions d ON d.idea_id=r.id ORDER BY CASE d.action WHEN 'plan' THEN 0 WHEN 'shortlist' THEN 1 WHEN 'dismiss' THEN 3 ELSE 2 END, r.priority DESC LIMIT 60").all(),
+  env.DB.prepare('SELECT idea_id,action,updated_at FROM revenue_actions').all(),
+  env.DB.prepare('SELECT path,title,url,status,http_status,checked_at FROM app_inventory ORDER BY path LIMIT 60').all(),
+  stateGet(env,'app_audit'),stateGet(env,'revenue_sync'),stateGet(env,'app_monitor'),quotaUsed(env,'site_audits')]);
  const cronAge=cron?Date.now()-Date.parse(cron.updatedAt):Infinity;
  const mind=env.AI?{state:aiOK?'standby':'ready',detail:aiOK?'AI tested · on demand':'AI bound · not yet tested',model:HQ_MODEL}:{state:'not-connected',detail:'Rules-only mode'};
  return {serverTime:now(),site:site?.value||{state:'unknown'},siteUpdatedAt:site?.updatedAt||null,
@@ -155,14 +238,27 @@ async function bootstrap(env){
   scan:scan?.value||null,scanUpdatedAt:scan?.updatedAt||null,updates:updates?.value||null,
   opportunities:(rows.results||[]).map(x=>({...x,verified:false})),saved:(saved.results||[]).map(x=>x.opportunity_id),decisions:decisions.results||[],
   evaluations:reviews.results||[],learning:learning.results||[],sources:sources.results||[],updateCandidates:candidates.results||[],
-  budget:{target:'₹0 additional',aiEnabled:!!env.AI,aiUsed,aiLimit:MAX_AI_CALLS_PER_DAY,scansUsed,scansLimit:MAX_SCANS_PER_DAY,sourceFetchesPerScan:FEEDS.length},mode:'live-native'};
+  revenueIdeas:ideas.results||[],revenueDecisions:revDecisions.results||[],appInventory:appInventory.results||[],appAudit:appAudit?.value||null,appMonitor:appMonitor?.value||null,revenueSync:revSync?.value||null,
+  budget:{siteAuditsUsed:appAuditUsed,siteAuditsLimit:MAX_SITE_AUDITS_PER_DAY,target:'₹0 additional',aiEnabled:!!env.AI,aiUsed,aiLimit:MAX_AI_CALLS_PER_DAY,scansUsed,scansLimit:MAX_SCANS_PER_DAY,sourceFetchesPerScan:FEEDS.length},mode:'live-native'};
 }
-async function exportData(env){const names=['opportunities','saved','decisions','decision_history','evaluations','learning','source_stats','update_candidates'];const result={schema:'yorphiveshq-native-v2',generatedAt:now()};for(const name of names){const v=await env.DB.prepare(`SELECT * FROM ${name} LIMIT 1500`).all();result[name]=v.results||[];}return new Response(JSON.stringify(result),{headers:{...JSON_HEADERS,'content-disposition':'attachment; filename="YorpHivesHQ-backup.json"'}});}
+async function exportData(env){const names=['opportunities','saved','decisions','decision_history','evaluations','learning','source_stats','update_candidates','revenue_ideas','revenue_actions','app_inventory'];const result={schema:'yorphiveshq-native-v2',generatedAt:now()};for(const name of names){const v=await env.DB.prepare(`SELECT * FROM ${name} LIMIT 1500`).all();result[name]=v.results||[];}return new Response(JSON.stringify(result),{headers:{...JSON_HEADERS,'content-disposition':'attachment; filename="YorpHivesHQ-backup.json"'}});}
 async function api(request,env,url){
  const method=request.method,path=url.pathname;
  if(method==='GET'&&path==='/api/bootstrap')return json(await bootstrap(env));
  if(method==='GET'&&path==='/api/export')return exportData(env);
- if(method==='POST'&&path==='/api/scan'){
+ if(method==='POST'&&path==='/api/revenue/scan'){
+   const report=await auditApps(env);if(report.skipped)return json({error:'Free daily site audit limit reached'},429);
+   const checked=await monitorApps(env);await buildRevenueIdeas(env);return json({ok:true,audit:report,checked});
+  }
+  if(method==='POST'&&path==='/api/revenue/decision'){
+   let body;try{body=await request.json();}catch{return json({error:'Invalid JSON'},400);}
+   if(!/^rev_[0-9a-f]{1,8}$/.test(body?.id)||!['shortlist','dismiss','plan','new'].includes(body?.action))return json({error:'Invalid decision'},400);
+   const existing=await env.DB.prepare('SELECT id FROM revenue_ideas WHERE id=?').bind(body.id).first();if(!existing)return json({error:'Not found'},404);
+   if(body.action==='new')await env.DB.prepare('DELETE FROM revenue_actions WHERE idea_id=?').bind(body.id).run();
+   else await env.DB.prepare('INSERT INTO revenue_actions(idea_id,action,updated_at) VALUES(?,?,?) ON CONFLICT(idea_id) DO UPDATE SET action=excluded.action,updated_at=excluded.updated_at').bind(body.id,body.action,now()).run();
+   return json({ok:true,id:body.id,action:body.action});
+  }
+  if(method==='POST'&&path==='/api/scan'){
   const [site,scan]=await Promise.allSettled([checkSite(env),scanSources(env)]);
   const report=scan.status==='fulfilled'?scan.value:{error:'Scan failed'};
   if(report.reason==='cooldown')return json({error:'Scan available every 15 minutes',nextAt:new Date(Date.parse(report.last)+SCAN_COOLDOWN_MS).toISOString()},429);
@@ -216,6 +312,13 @@ export default {
   await statePut(env,'last_cron',{at:now()}).catch(()=>{});
   const t=new Date(event?.scheduledTime||Date.now());
   // Seed an empty fresh install at its first cron, then use the six-hour schedule.
+  // Every 15 minutes, check a rotating pair of discovered public app pages.
+  await monitorApps(env).catch(()=>{});
+  const lastAudit=await stateGet(env,'app_audit').catch(()=>null);
+  if(!lastAudit||Date.now()-Date.parse(lastAudit.updatedAt)>6*3600*1000){
+   const audit=await auditApps(env).catch(()=>null);
+   if(audit&&!audit.skipped)await monitorApps(env).catch(()=>{});
+  }
   const previousScan=await stateGet(env,'last_scan').catch(()=>null);
   const firstScan=!previousScan;
   const retryUnavailable=previousScan?.value?.status==='unavailable'&&Date.now()-Date.parse(previousScan.updatedAt)>=SCAN_COOLDOWN_MS;
@@ -226,4 +329,4 @@ export default {
   }
  }
 };
-export const internals={classify,normalizeHN,normalizeDev,idFor,safeHttps,clean,updateWeight,parseAi,aiReplyText,publicJson,scanSources,checkSite,checkUpdates,evaluate,bootstrap,reserve,authorized,api,learnFromDecision,exportData};
+export const internals={appPath,findAppPaths,monetizationIdeas,auditApps,monitorApps,buildRevenueIdeas,revId,classify,normalizeHN,normalizeDev,idFor,safeHttps,clean,updateWeight,parseAi,aiReplyText,publicJson,scanSources,checkSite,checkUpdates,evaluate,bootstrap,reserve,authorized,api,learnFromDecision,exportData};

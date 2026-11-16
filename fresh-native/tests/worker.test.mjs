@@ -73,7 +73,7 @@ test('scheduled research persists records and quota prevents repeated scans',asy
   const state=await x.bootstrap(e);
   assert.ok(state.opportunities.length>=2);
   assert.equal(state.budget.scansUsed,1);
-  assert.equal(state.budget.sourceFetchesPerScan,5);
+  assert.equal(state.budget.sourceFetchesPerScan,4);
   assert.ok(state.sources.length>=3);
  }finally{globalThis.fetch=original;}
 });
@@ -132,4 +132,59 @@ test('Cloudflare-compatible manual redirect blocks redirects and allows HTTP 200
   globalThis.fetch=async(_req,opts)=>{assert.equal(opts.redirect,'manual');return new Response('[]',{status:200});};
   assert.deepEqual(await x.publicJson(url),[]);
  }finally{globalThis.fetch=original;}
+});
+
+test('YorpHives site URLs are allowlisted and monetization suggestions stay unverified',()=>{
+ assert.equal(x.appPath('https://yorphives.com/free-tools/image-resizer'),'/free-tools/image-resizer');
+ assert.equal(x.appPath('https://evil.example/free-tools/image-resizer'),null);
+ assert.equal(x.appPath('https://yorphives.com/free-tools/'),null);
+ assert.equal(x.appPath('javascript:alert(1)'),null);
+ const paths=x.findAppPaths('<urlset><url><loc>https://yorphives.com/free-tools/merge-pdf</loc></url><url><loc>https://evil.example/free-tools/nope</loc></url></urlset>');
+ assert.deepEqual(paths,['/free-tools/merge-pdf']);
+ assert.deepEqual(x.findAppPaths('<a href="/free-tools/image-resizer">Image</a><a href="/free-tools/merge-pdf">PDF</a>'), ['/free-tools/image-resizer','/free-tools/merge-pdf']);
+ const ideas=x.monetizationIdeas([{path:'/free-tools/merge-pdf',title:'Merge Pdf',status:'online'}]);
+ assert.ok(ideas.some(v=>v.channel==='Sponsorships'));
+ assert.ok(ideas.some(v=>v.title.includes('pdf presets')));
+ assert.ok(ideas.every(v=>v.basis&&!('revenue' in v)));
+ assert.equal(new Set(ideas.map(v=>v.id)).size, ideas.length);
+});
+
+test('site inventory, app HTTP monitoring and revenue founder decisions persist without AI or site changes',async()=>{
+ const e=env();delete e.AI;
+ const original=globalThis.fetch,calls=[];
+ globalThis.fetch=async(url,opts={})=>{const u=String(url);calls.push({u,method:opts.method||'GET'});
+  if(u.endsWith('sitemap.xml'))return new Response('<urlset><url><loc>https://yorphives.com/free-tools/merge-pdf</loc></url><url><loc>https://yorphives.com/free-tools/image-resizer</loc></url></urlset>',{status:200});
+  if(u.endsWith('/free-tools/'))return new Response('<a href="/free-tools/merge-pdf">Merge PDF</a>',{status:200});
+  if(u.endsWith('/image-resizer'))return new Response('up',{status:200});
+  if(u.endsWith('/merge-pdf'))return new Response('up',{status:200});
+  throw Error('Unexpected URL '+u);
+ };
+ try{
+  const a=await x.auditApps(e);assert.equal(a.found,2);assert.equal(a.tracked,2);
+  const checks=await x.monitorApps(e);assert.equal(checks.length,2);assert.ok(checks.every(v=>v.status==='online'));
+  const again=await x.auditApps(e);assert.equal(again.found,2);
+  let snap=await x.bootstrap(e);assert.equal(snap.appInventory.length,2);
+  assert.ok(snap.revenueIdeas.length>=10);
+  const pdfIdea=snap.revenueIdeas.find(v=>v.title.includes('pdf presets'));assert.ok(pdfIdea);
+  assert.equal(pdfIdea.action,'new');assert.equal(pdfIdea.target_path,'/free-tools/merge-pdf');
+  assert.ok(snap.revenueIdeas.some(v=>v.channel==='Affiliates'));
+  const call=(action)=>x.api(new Request('https://hq.test/api/revenue/decision',{method:'POST',body:JSON.stringify({id:pdfIdea.id,action})}),e,new URL('https://hq.test/api/revenue/decision'));
+  assert.equal((await call('shortlist')).status,200);
+  assert.equal((await call('plan')).status,200);
+  snap=await x.bootstrap(e);assert.equal(snap.revenueIdeas.find(v=>v.id===pdfIdea.id).action,'plan');
+  assert.ok((await x.exportData(e)).headers.get('content-disposition').includes('backup'));
+  assert.ok(calls.every(v=>v.method==='GET'));
+  assert.equal(snap.budget.siteAuditsUsed,2);
+  assert.equal((await call('new')).status,200);
+  snap=await x.bootstrap(e);assert.equal(snap.revenueIdeas.find(v=>v.id===pdfIdea.id).action,'new');
+ }finally{globalThis.fetch=original;}
+});
+
+test('revenue audit quotas are enforced and no arbitrary URL is fetched',async()=>{
+ const e=env();const existing=await x.buildRevenueIdeas(e);assert.ok(existing.count>=8);
+ for(let i=0;i<4;i++)assert.equal(await x.reserve(e,'site_audits',4),true);
+ assert.equal(await x.reserve(e,'site_audits',4),false);
+ assert.equal((await x.auditApps(e)).skipped,'daily-budget');
+ const bad=await x.api(new Request('https://test.example/api/revenue/decision',{method:'POST',body:JSON.stringify({id:'../../thing',action:'plan'})}),e,new URL('https://test.example/api/revenue/decision'));
+ assert.equal(bad.status,400);
 });

@@ -44,4 +44,5 @@ jobs:
           YHQ_REQUIRE_3_BROWSERS: '1'
         run: |
           python fresh-native/tests/ui_test.py
+          python fresh-native/tests/revenue_ui_test.py
           python fresh-native/tests/csp_test.py
