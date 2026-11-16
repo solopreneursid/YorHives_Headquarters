@@ -1406,6 +1406,8 @@ function nano14ParseBlob(payload,file){
    .map(x=>/^([A-Za-z0-9][A-Za-z0-9._-]{0,89})(?:\[|\s|[<>=!~;#]|$)/.exec(x)?.[1]||"")
    .filter(Boolean);
   parser="requirements-name-candidates-only";
+ }else if(file.path==="pyproject.toml"){
+  return {...record,...nano15ParsePyproject(contents)};
  }
  return {...record,manifestParser:parser,
   directNamesObserved:Math.min(new Set(names).size,1000),
@@ -1425,12 +1427,14 @@ async function nano14Investigate(env,row,at=nowIso()){
  const stored=row?.saved_repository_url===repo;
  const catalog=stored?nano14Json(row.catalog_json):[];
  const evidence=stored?nano14Json(row.evidence_json):[];
- if(stored&&row.saved_next&&Date.parse(row.saved_next)>Date.parse(at))
+ const backfill=stored?nano15BackfillFile(catalog,evidence):null;
+ if(stored&&!backfill&&row.saved_next&&Date.parse(row.saved_next)>Date.parse(at))
   return "not-due";
  const eligibleFiles=catalog.filter(f=>f&&NANO14_ALLOW.some(x=>x.name===f.path&&x.kind===f.kind)&&
   /^[a-f0-9]{40}$/.test(String(f.sha||""))&&Number.isSafeInteger(f.size)&&f.size>0&&f.size<=16000);
  const todo=eligibleFiles.find(f=>!evidence.some(e=>e.path===f.path&&e.sha===f.sha));
- const stage=stored&&todo?"blob":"catalog";
+ const selected=todo||backfill;
+ const stage=stored&&selected?"blob":"catalog";
  let newCatalog=catalog,newEvidence=evidence,state="unavailable",errorCode=null;
  try{
   if(stage==="catalog"){
@@ -1438,9 +1442,9 @@ async function nano14Investigate(env,row,at=nowIso()){
    newCatalog=nano14CatalogFiles(result);newEvidence=[];
    state=newCatalog.length?"catalogued":"no-known-root-files";
   }else{
-   const payload=await nano14Get(env,repo,"blob",todo.sha);
-   const parsed=nano14ParseBlob(payload,todo);
-   newEvidence=[...evidence,parsed].slice(0,2);
+   const payload=await nano14Get(env,repo,"blob",selected.sha);
+   const parsed=nano14ParseBlob(payload,selected);
+   newEvidence=[...evidence.filter(e=>e.path!==selected.path),parsed].slice(0,2);
    state=eligibleFiles.every(f=>newEvidence.some(e=>e.path===f.path&&e.sha===f.sha))?
     "complete":"partial";
   }
@@ -1472,7 +1476,8 @@ async function nano14Scheduled(env,scheduledTime){
   "WHERE i.state='repository-metadata-checked' ORDER BY i.checked_at DESC LIMIT 12").all();
  const due=(results.results||[]).filter(x=>nano14Candidate(x)&&
   (x.saved_repository_url!==x.repository_url||!x.saved_next||
-   Date.parse(x.saved_next)<=Date.parse(at)));
+   Date.parse(x.saved_next)<=Date.parse(at)||
+   nano15BackfillFile(x.catalog_json,x.evidence_json)));
  if(!due.length)return "no-due-repositories";
  due.sort((a,b)=>Number(b.saved_state==="catalogued"||b.saved_state==="partial")-
   Number(a.saved_state==="catalogued"||a.saved_state==="partial"));
@@ -1509,6 +1514,94 @@ function nano14Report(checks,manifestRows){
   verifiedLegalClearances:0,automatedExecution:false,
   scope:"SHA-pinned root manifest/license file evidence only; no legal approval, complete dependency inventory, benchmark or execution.",
   budget:"At most 2 public GitHub GETs per UTC day; shared fetch cap; no model calls or extra scheduled triggers."};
+}
+
+/* Nano Phase 15 — deterministic declared-dependency and compute signals.
+ * No arbitrary TOML execution, installations, network calls, legal clearance or
+ * currency/compute estimates; only SHA-pinned Phase 14 root-file evidence.
+ */
+const NANO15_VERSION="dependency-signal-review-v1";
+const NANO15_PARSER="pyproject-declared-subset-v1";
+const NANO15_TAGS=Object.freeze([
+ {tag:"possible-gpu-or-accelerator-stack",regex:/^(?:torch|torchvision|torchaudio|tensorflow|tensorflow-gpu|jax|jaxlib|cupy(?:-.+)?|nvidia-.+|flashinfer(?:-.+)?|flash-attn|flash-linear-attention|triton|xformers|bitsandbytes|vllm|deepspeed)$/},
+ {tag:"robotics-or-simulation",regex:/^(?:mujoco|robosuite|gym|gymnasium|pybullet|lerobot|libero|bddl|isaacgym|isaaclab|ruckig|pyrealsense2|pinocchio|pin)$/},
+ {tag:"training-or-distributed-tools",regex:/^(?:ray|verl|accelerate|transformers|stable-baselines3|lightning|pytorch-lightning)$/}
+]);
+function nano15PkgName(value){
+ const m=/^\s*([A-Za-z0-9][A-Za-z0-9._-]{0,89})(?=\s|$|\[|[!~<>=;@\(])/.exec(String(value||""));
+ return m?m[1].toLowerCase().replace(/[-_.]+/g,"-"):null;
+}
+function nano15StringArray(raw){
+ let depth=0,quote="",word="",escape=false,comment=false,entered=false;
+ const values=[];
+ for(const c of String(raw||"").slice(0,16000)){
+  if(comment){if(c==="\n")comment=false;continue;}
+  if(quote){
+   if(escape){word+=c;escape=false;continue;}
+   if(c==="\\"&&quote==='"'){escape=true;continue;}
+   if(c===quote){if(depth===1&&word.length<=220)values.push(word);word="";quote="";continue;}
+   word+=c;continue;
+  }
+  if(c==="#"){comment=true;continue;}
+  if(c==='"'||c==="'"){quote=c;word="";continue;}
+  if(c==="["){depth++;entered=true;continue;}
+  if(c==="]"){depth--;if(entered&&depth===0)return {complete:true,values:values.slice(0,500)};}
+ }
+ return {complete:false,values:[]};
+}
+function nano15ParsePyproject(contents){
+ // PEP 621 project.dependencies + optional-dependencies, PEP 735 simple
+ // dependency-groups and Poetry main/group dependency tables. Not full TOML.
+ const lines=String(contents||"").slice(0,16000).split(/\r?\n/);
+ const main=new Set(),extra=new Set(),sections=new Set();
+ let section="",pending=null;
+ function include(value,isExtra){
+  const n=nano15PkgName(value);if(n)(isExtra?extra:main).add(n);
+ }
+ function addArray(value,isExtra,label){
+  if(!String(value||"").trim().startsWith("["))return;
+  pending={value:String(value),isExtra,label};
+  const result=nano15StringArray(pending.value);
+  if(result.complete){for(const v of result.values)include(v,isExtra);
+   sections.add(label);pending=null;}
+ }
+ for(const line of lines){
+  if(pending){
+   pending.value+="\n"+line;
+   if(pending.value.length>12000){pending=null;continue;}
+   const result=nano15StringArray(pending.value);
+   if(result.complete){for(const v of result.values)include(v,pending.isExtra);
+    sections.add(pending.label);pending=null;}
+   continue;
+  }
+  const header=/^\s*\[([a-zA-Z0-9_.-]+)\]\s*(?:#.*)?$/.exec(line);
+  if(header){section=header[1];continue;}
+  const kv=/^\s*([a-zA-Z0-9_.-]+)\s*=\s*(.+)$/.exec(line);
+  if(!kv)continue;
+  if(section==="project"&&kv[1]==="dependencies")
+   addArray(kv[2],false,"PEP621 runtime");
+  else if(section==="project.optional-dependencies")
+   addArray(kv[2],true,"PEP621 optional extras");
+  else if(section==="dependency-groups")
+   addArray(kv[2],true,"PEP735 dependency groups (install conditions unknown)");
+  else if(section==="tool.poetry.dependencies"&&kv[1]!=="python"){
+   include(kv[1],false);sections.add("Poetry main table");
+  }else if(/^tool\.poetry\.group\.[A-Za-z0-9_-]+\.dependencies$/.test(section)&&kv[1]!=="python"){
+   include(kv[1],true);sections.add("Poetry group table (install conditions unknown)");
+  }
+ }
+ const all=[...new Set([...main,...extra])].slice(0,1000);
+ return {manifestParser:NANO15_PARSER,declaredSections:[...sections].slice(0,5),
+  directNamesObserved:all.length,runtimeNamesObserved:main.size,
+  optionalOrGroupNamesObserved:extra.size,exampleNames:all.slice(0,8),
+  computeSignals:NANO15_TAGS.filter(x=>all.some(n=>x.regex.test(n))).map(x=>x.tag),
+  notTransitiveInventory:true,parsedStatically:true};
+}
+function nano15BackfillFile(catalog,evidence){
+ const f=nano14Json(catalog).find(x=>x?.path==="pyproject.toml"&&x.kind==="manifest"&&/^[a-f0-9]{40}$/.test(String(x.sha||"")));
+ if(!f)return null;
+ const e=nano14Json(evidence).find(x=>x?.path===f.path&&x.sha===f.sha);
+ return e&&e.manifestParser!==NANO15_PARSER?f:null;
 }
 
 /* Nano Phase 13 — deterministic, read-only feasibility TRIAGE from Phase 12
