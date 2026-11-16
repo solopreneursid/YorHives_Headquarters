@@ -810,8 +810,8 @@ function nanoRecall(rows,department,limit=5){
 async function nanoScheduled(env,scheduledTime){
  if(new Date(scheduledTime).getUTCMinutes()%30!==0)return 0;
  const [findings,opportunities]=await Promise.all([
-  env.DB.prepare("SELECT id,category,priority,title,description,recommendation,evidence,observed_at FROM findings WHERE status='open' ORDER BY observed_at DESC LIMIT 3").all(),
-  env.DB.prepare("SELECT id,kind,title,description,recommendation,source_url,observed_at FROM opportunities ORDER BY observed_at DESC LIMIT 3").all()
+  env.DB.prepare("SELECT f.id,f.category,f.priority,f.title,f.description,f.recommendation,f.evidence,f.observed_at FROM findings f WHERE f.status='open' ORDER BY (SELECT COUNT(*) FROM workflow_runs w WHERE w.source_kind='finding' AND w.source_id=f.id) ASC,f.observed_at DESC LIMIT 3").all(),
+  env.DB.prepare("SELECT o.id,o.kind,o.title,o.description,o.recommendation,o.source_url,o.observed_at FROM opportunities o ORDER BY (SELECT COUNT(*) FROM workflow_runs w WHERE w.source_kind='opportunity' AND w.source_id=o.id) ASC,o.observed_at DESC LIMIT 3").all()
  ]);
  let created=0;
  const items=[...(findings.results||[]).map(x=>["finding",x]),...(opportunities.results||[]).map(x=>["opportunity",x])].slice(0,4);
