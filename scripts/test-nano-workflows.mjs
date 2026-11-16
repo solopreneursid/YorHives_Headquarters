@@ -73,6 +73,7 @@ assert.equal(memories.length,2,'Both scheduled items remembered independently');
 memories.splice(memories.findIndex(x=>x.run_id===plan.run_id),1); // Simulate lost memory after a workflow was recorded.
 assert.equal(await nanoRemember(env,plan,finding),true,'Missing earlier workflow memory repaired');
 assert.equal(await nanoRemember(env,plan,finding),false,'Duplicate memory ignored');
+assert.equal(await nanoRemember(env,changed,{...finding,recommendation:'Founder should double-check this newer evidence'}),true,'Distinct evidence revision is remembered');
 assert.equal(memories.length,3);
 assert.equal(nanoRecall(memories,'Security & Independent QA',5).length,2);
 assert.equal(nanoRecall(memories,'all',5).length,3);
