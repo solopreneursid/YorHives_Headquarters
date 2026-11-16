@@ -62,6 +62,26 @@ const report={
        independentlyVerifiedDemand:false,independentlyVerifiedRevenue:false,founderApproved:false,automatedExecution:false}
      ]},
 
+  scienceReviews:{pipelineStatus:'review-recorded:workflow-resilience',reviewed:2,needsReview:2,watch:0,
+   independentCodeChecks:0,experimentalRuns:0,commercialValidation:0,top:[
+    {paperId:'paper-test-a',title:'Synthetic resilient autonomous laboratory workflows',
+     sourceId:'arxiv',sourceUrl:'https://arxiv.org/abs/2611.18496',category:'workflow-resilience',
+     stage:'review-needed',researchPriority:47,applicationHypothesis:'Potential lessons for HQ incident recovery',
+     possibleExperiment:'Simulate an incident in an isolated local test environment',
+     transferRisk:'Hardware recovery algorithms may not transfer to websites',
+     evidenceScope:'Author-provided abstract excerpt and bibliographic metadata only',
+     authorExcerpts:[{text:'We investigate synthetic failure recovery in controlled laboratories.',verified:false,kind:'author-abstract-excerpt'}],
+     methodMentions:['Author abstract mentions simulation'],implementationStatus:{code:'not-checked'},
+     missingEvidence:['Find a licensed code implementation','Check independent replication'],
+     scientificClaimsReproduced:false,customerDemandVerified:false,revenueVerified:false,
+     founderApproved:false,automatedExecution:false},
+    {paperId:'paper-test-b',title:'Synthetic monitoring and predictive planning',sourceId:'arxiv',
+     sourceUrl:'https://arxiv.org/abs/2611.18501',category:'monitoring-intelligence',
+     stage:'review-needed',researchPriority:45,applicationHypothesis:'Possible HQ monitoring improvement',
+     possibleExperiment:'Compare with a synthetic offline monitoring baseline',transferRisk:'Domain mismatch',
+     evidenceScope:'Bibliographic metadata only',authorExcerpts:[],methodMentions:[],
+     missingEvidence:['Obtain full paper'],scientificClaimsReproduced:false,founderApproved:false,automatedExecution:false}
+    ]},
   researchJournals:{pipelineStatus:'ok:crossref:saved:1',recordCount:1,active:1,sources:[
     {id:'crossref',name:'Crossref',status:'ok',detail:'metadata:1',
       lastChecked:'2026-11-16T15:00:00Z',nextCheckAt:'2026-11-17T15:00:00Z'},
@@ -242,6 +262,29 @@ try{
       assert.equal(await card.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),1);
       await card.locator('.brief-checks').last().locator('summary').click();
       assert.ok((await card.innerText()).includes('Security & Independent QA'));
+    });
+    await test(profile.name+': scientific evidence reviews preserve unknowns',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      await page.getByText('Scientific evidence reviews',{exact:true}).waitFor();
+      const panel=page.locator('.panel').filter({hasText:'Scientific evidence reviews'});
+      assert.equal(await panel.locator('details.science-review-card').count(),2);
+      assert.ok((await panel.innerText()).includes('independently reproduced: 0'));
+      const first=panel.locator('details.science-review-card').first();
+      assert.equal(await first.getAttribute('open'),null);
+      await first.locator('summary').first().click();
+      const content=await first.innerText();
+      assert.ok(content.includes('not been checked'));
+      assert.ok(content.includes('not credibility'));
+      assert.ok(content.includes('Simulate an incident'));
+      assert.ok(content.includes('Hardware recovery algorithms may not transfer'));
+      assert.equal(await first.locator('a[href="https://arxiv.org/abs/2611.18496"]').count(),1);
+      assert.equal(await first.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),1);
+      await first.locator('details.science-evidence-more').first().locator('summary').click();
+      assert.ok((await first.innerText()).includes('We investigate synthetic failure recovery'));
+      await page.locator('[data-page="discover"]:visible').first().click();
+      await page.locator('[data-discover-source="journals"]').click();
+      assert.equal(await page.locator('#page-root .science-review-card').count(),2);
+      assert.ok((await page.locator('#page-root').innerText()).includes('Scientific evidence reviews'));
     });
     await test(profile.name+': dedicated Research journals shows real-source semantics',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
