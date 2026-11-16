@@ -423,7 +423,7 @@ try{
       assert.ok((await panel.innerText()).includes('1 evidence revisions need review'));
       const card=panel.locator('details.implementation-entry').first();
       assert.equal(await card.getAttribute('open'),null);
-      await card.locator('summary').click();
+      await card.locator('summary').first().click();
       const text=await card.innerText();
       assert.ok(text.includes('not license approval'));
       assert.ok(text.includes('previous evidence'));
