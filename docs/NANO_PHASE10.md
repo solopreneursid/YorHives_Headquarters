@@ -10,7 +10,7 @@ Phase 10 creates an **independent academic source budget** and journal feed. It 
 
 ## Sources and permitted use
 
-- **Crossref**: Public REST JSON bibliographic metadata. Reads one **fixed, audited query** each day at most, for artificial intelligence, privacy/cybersecurity, robotics, or software engineering. Stores DOI-linked records and basic publication metadata; Crossref's metadata does not establish reproducibility.
+- **Crossref**: Uses supported `query.bibliographic` with `sort=published&order=desc` to prioritize recent publications (not merely recently collected older records). Public REST JSON bibliographic metadata. Reads one **fixed, audited query** each day at most, for artificial intelligence, privacy/cybersecurity, robotics, or software engineering. Stores DOI-linked records and basic publication metadata; Crossref's metadata does not establish reproducibility.
 - **arXiv**: Legacy public Atom search feed with max_results=5, rotating among cs.AI, cs.CR, cs.RO and cs.SE. arXiv papers are **preprints** and may not be peer-reviewed. The legacy API rate guide requires at least three seconds between legacy API requests across machines; HQ schedules at most one arXiv request daily.
 - **OpenAlex**: Existing global source in cooldown after HTTP 429. Phase 10 does not attempt to circumvent that source's limits and does not automatically obtain keys or buy usage.
 
