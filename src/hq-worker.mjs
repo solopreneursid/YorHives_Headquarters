@@ -1598,9 +1598,9 @@ function nano15ParsePyproject(contents){
   notTransitiveInventory:true,parsedStatically:true};
 }
 function nano15BackfillFile(catalog,evidence){
- const f=nano14Json(catalog).find(x=>x?.path==="pyproject.toml"&&x.kind==="manifest"&&/^[a-f0-9]{40}$/.test(String(x.sha||"")));
+ const f=(Array.isArray(catalog)?catalog:nano14Json(catalog)).find(x=>x?.path==="pyproject.toml"&&x.kind==="manifest"&&/^[a-f0-9]{40}$/.test(String(x.sha||"")));
  if(!f)return null;
- const e=nano14Json(evidence).find(x=>x?.path===f.path&&x.sha===f.sha);
+ const e=(Array.isArray(evidence)?evidence:nano14Json(evidence)).find(x=>x?.path===f.path&&x.sha===f.sha);
  return e&&e.manifestParser!==NANO15_PARSER?f:null;
 }
 
