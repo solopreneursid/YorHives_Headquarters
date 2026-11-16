@@ -67,6 +67,8 @@ const server=http.createServer((req,res)=>{
   res.setHeader('x-test-data','synthetic-no-production');
   if(path==='/api/report') {res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(report));return;}
   if(path.startsWith('/api/')) {res.writeHead(503,{'content-type':'application/json'});res.end(JSON.stringify({error:'Test server: external lookups disabled'}));return;}
+  const pageLink=/^\/(home|discover|team|decisions|growth|control)\/?$/.exec(path);
+  if(pageLink){res.writeHead(302,{location:'/#'+pageLink[1]});res.end();return;}
   const file=path==='/'?'/index.html':path;
   if(!(file in bundle)){res.writeHead(404);res.end('Not found');return;}
   const raw=bundle[file];
@@ -86,6 +88,12 @@ try{
     const page=await browser.newPage({viewport:profile.viewport,isMobile:profile.isMobile,hasTouch:profile.isMobile});
     const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
+    await test(profile.name+': direct AI Employees link survives source query',async()=>{
+      await page.goto(origin+'/team?utm_source=chatgpt.com',{waitUntil:'domcontentloaded'});
+      await page.getByText('Learning playbooks',{exact:true}).waitFor();
+      assert.ok(page.url().endsWith('/#team'),'Deep link must load the actual team page');
+      assert.ok((await page.locator('#page-root').innerText()).includes('Shared memory'));
+    });
     await test(profile.name+': homepage and live mock report',async()=>{
       await page.goto(origin+'/#home',{waitUntil:'domcontentloaded'});
       await page.locator('#page-root').getByText('HQpulse').first().waitFor();
