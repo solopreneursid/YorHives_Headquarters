@@ -29,7 +29,7 @@ let paidFetchCount=0,investigationDaily=0;
 const fetchStub=async (url,options)=>{
   calls.push({url,options});
   assert.equal(options.method,'GET');
-  assert.equal(options.redirect,'error');
+  assert.equal(options.redirect,'manual');
   assert.ok(!('authorization' in options.headers));
   if(url==='https://hacker-news.firebaseio.com/v0/item/123.json'){
     return new Response(JSON.stringify({id:123,type:'story',title:'Show HN: AI skill collection',
@@ -46,6 +46,8 @@ const fetchStub=async (url,options)=>{
   throw Error('Forbidden external URL '+url);
 };
 const env={DB:{prepare(sql){
+  if(sql.startsWith('SELECT memory_id FROM nano_investigations LIMIT 1'))
+    return {first:async()=>investigations[0]||null};
   if(sql.startsWith('SELECT m.memory_id,m.run_id,m.source_id')){
     return {bind:stamp=>({first:async()=>candidates.find(x=>{
       const old=investigations.find(r=>r.memory_id===x.memory_id);
@@ -86,9 +88,10 @@ for(const bad of [
 }
 assert.equal(sandbox.target(candidates[0].source_url).kind,'hn');
 assert.equal(sandbox.target(candidates[1].source_url).url,'https://api.github.com/repos/acme/freedom-tools');
+// A brand-new installation bootstraps on the next five-minute Cron.
+assert.equal(await sandbox.run(env,'2026-11-16T00:15:00Z'),'cross-platform-metadata-confirmed');
+assert.equal(calls.length,2);
 assert.equal(await sandbox.run(env,'2026-11-16T00:15:00Z'),'outside-window');
-assert.equal(calls.length,0);
-assert.equal(await sandbox.run(env,'2026-11-16T00:20:00Z'),'cross-platform-metadata-confirmed');
 assert.equal(investigations[0].state,'cross-platform-metadata-confirmed');
 assert.equal(JSON.parse(investigations[0].facts_json).length,2);
 assert.equal(calls.length,2);
@@ -118,5 +121,5 @@ console.log('PASS: source allowlist rejects redirect-like, nested, localhost, us
 console.log('PASS: only fixed HN/GitHub first-party APIs contacted via GET/no redirects');
 console.log('PASS: two-platform metadata corroboration, never customer demand or functionality');
 console.log('PASS: unsupported source creates a record without a single outbound request');
-console.log('PASS: 30-minute offset scheduler, due-record dedupe, max four requests/day design');
+console.log('PASS: next-Cron bootstrap, half-hour offset scheduler, due-record dedupe, max four requests/day design');
 console.log('PASS: departmental checklist and strict founder-only advisory outcomes');
