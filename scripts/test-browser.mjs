@@ -92,6 +92,23 @@ const report={
       bytes:120,manifestParser:'package-json-names-only',directNamesObserved:2,exampleNames:['react','zod']},
       {path:'LICENSE',kind:'license',sha:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
        bytes:800,licenseFileObserved:true}]}]},
+  founderResearchReviews:{available:true,candidates:1,reviewRecords:1,currentlyReviewed:0,
+    needingRefresh:1,automatedExecution:false,commercialClearance:false,
+    scope:'Founder planning records only. No code execution, deployments, license clearance or paid spend.',
+    note:'Changing selected manifest SHA marks older reviews stale.',entries:[
+      {paperId:'robot-paper',title:'Robot-use agents from simulation',
+       paperUrl:'https://arxiv.org/abs/2611.18562',repositoryUrl:'https://github.com/research-team/robot-kit',
+       manifestSha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+       manifestStatus:'Some declared names extracted from one root manifest',
+       provenance:'Title-search candidate; repository/paper link unconfirmed',
+       hardware:'Possible specialized-compute signal, not a requirement',
+       licenseStatus:'Legal rights and dependency terms unverified',
+       revision:1,latest:{version:1,disposition:'needs-evidence',licenseConcern:'unreviewed',
+        technicalConcern:'unknown',maxBudgetInr:0,maxRuntimeMinutes:0,
+        reason:'The repository authors are not verified.',nextStep:'Confirm research provenance.',
+        evidenceCurrent:false,canExecute:false,licenseCleared:false,spendingAuthorized:false},
+       history:[{version:1,disposition:'needs-evidence',
+        reason:'The repository authors are not verified.',evidenceCurrent:false}]}]},
   dependencySignals:{eligible:1,partiallyParsed:1,computeSignalsObserved:1,legallyApproved:0,
     hardwareBenchmarked:0,automatedExecution:false,
     scope:'Partial declared names; no legal or cost verification.',
@@ -397,6 +414,49 @@ try{
       await page.locator('[data-page="discover"]:visible').first().click();
       await page.locator('[data-discover-source="journals"]').click();
       assert.equal(await page.locator('.panel').filter({hasText:'Phase 15 · Dependency & compute signals'})
+       .locator('details.implementation-entry').count(),1);
+    });
+    await test(profile.name+': Phase 16 owner decisions are private planning only',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      const panel=page.locator('.panel').filter({hasText:'Phase 16 · Founder research decisions'});
+      await panel.getByText('Phase 16 · Founder research decisions',{exact:true}).waitFor();
+      assert.ok((await panel.innerText()).includes('1 evidence revisions need review'));
+      const card=panel.locator('details.implementation-entry').first();
+      assert.equal(await card.getAttribute('open'),null);
+      await card.locator('summary').first().click();
+      const text=await card.innerText();
+      assert.ok(text.includes('not license approval'));
+      assert.ok(text.includes('previous evidence'));
+      assert.ok(text.includes('revision 1'));
+      assert.ok(text.includes('max proposed ₹0'));
+      const formMore=card.locator('details.triage-backlog').first();
+      assert.equal(await formMore.getAttribute('open'),null);
+      await formMore.locator('summary').click();
+      const form=card.locator('form.research-review-form');
+      await form.locator('select[name="disposition"]').selectOption('plan-isolated-test');
+      await form.locator('select[name="licenseConcern"]').selectOption('manual-legal-review');
+      await form.locator('select[name="technicalConcern"]').selectOption('needs-validation');
+      await form.locator('input[name="maxBudgetInr"]').fill('0');
+      await form.locator('input[name="maxRuntimeMinutes"]').fill('5');
+      await form.locator('textarea[name="reason"]').fill('Only a future isolated test could validate the observed hardware signals.');
+      await form.locator('textarea[name="nextStep"]').fill('Check license and independent evidence before any manual test request.');
+      const [request]=await Promise.all([
+       page.waitForRequest(r=>r.url().endsWith('/api/research/review')&&r.method()==='POST'),
+       form.locator('button[type="submit"]').click()
+      ]);
+      assert.equal(request.headers()['x-hq-founder-action'],'research-review-v1');
+      const body=request.postDataJSON();
+      assert.equal(body.paperId,'robot-paper');
+      assert.equal(body.expectedVersion,1);
+      assert.equal(body.expectedManifestSha,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+      assert.equal(body.disposition,'plan-isolated-test');
+      assert.equal(body.maxBudgetInr,0);
+      assert.equal(body.maxRuntimeMinutes,5);
+      await form.locator('.research-review-error').getByText('Test server: external lookups disabled').waitFor();
+      assert.equal(await card.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),2);
+      await page.locator('[data-page="discover"]:visible').first().click();
+      await page.locator('[data-discover-source="journals"]').click();
+      assert.equal(await page.locator('.panel').filter({hasText:'Phase 16 · Founder research decisions'})
        .locator('details.implementation-entry').count(),1);
     });
     await test(profile.name+': scientific evidence reviews preserve unknowns',async()=>{

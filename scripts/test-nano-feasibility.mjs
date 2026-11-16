@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 const source=readFileSync('src/hq-worker.mjs','utf8');
 const start=source.indexOf('/* Nano Phase 13 — deterministic');
-const end=source.indexOf('/* Nano Phase 11 — scientific',start);
+const end=source.indexOf('/* Nano Phase 16 — founder-initiated',start);
 assert.ok(start>0&&end>start,'Phase 13 must be in current Worker source');
 const code=source.slice(start,end);
 for(const forbidden of ['fetch(','.run()', '.batch(','.exec(', 'env.AI', 'deploy(', 'POST', 'PUT ', 'DELETE ']){
@@ -73,7 +73,7 @@ const ui=bundle['/dashboard.js'];
 assert.ok(ui.includes('function feasibilityPanel()'));
 assert.equal((ui.match(/\$\{feasibilityPanel\(\)\}/g)||[]).length,1,
  'AI Employees must show Phase 13 review');
-assert.ok(ui.includes('implementationEvidencePanel()+feasibilityPanel()+manifestEvidencePanel()+dependencySignalsPanel()+scienceEvidencePanel()'),
+assert.ok(ui.includes('implementationEvidencePanel()+feasibilityPanel()+manifestEvidencePanel()+dependencySignalsPanel()+founderResearchPanel()+scienceEvidencePanel()'),
  'Research journals must show Phase 13 review');
 assert.ok(ui.includes('Provisional research triage'));
 assert.ok(ui.includes('esc(e.licenseDisposition'));
