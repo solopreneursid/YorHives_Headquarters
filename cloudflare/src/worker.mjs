@@ -1229,14 +1229,16 @@ async function loadStoredDiscovery(env,channel){
       .bind("public_scouts_"+channel).first();
     if(!row)return null;
     const data=JSON.parse(row.value);
-    if(data?.source!=="hacker-news-public"||!Array.isArray(data.items)||data.channel!==channel)return null;
+    if(!["hacker-news-public","public-research"].includes(data?.source)||!Array.isArray(data.items)||data.channel!==channel)return null;
     return {data,at:Date.parse(row.checked_at)||0};
   }catch{return null;}
 }
 async function persistDiscovery(env,channel,data){
   if(!env?.DB)return;
   // Existing status table; no schema migrations or third-party storage.
-  try{await saveStatus(env,"public_scouts_"+channel,JSON.stringify(data));}
+  try{await env.DB.prepare("INSERT INTO status(key,value,checked_at) VALUES(?,?,?) "+
+    "ON CONFLICT(key) DO UPDATE SET value=excluded.value,checked_at=excluded.checked_at")
+    .bind("public_scouts_"+channel,JSON.stringify(data),nowIso()).run();}
   catch(e){console.warn("Public discovery cache unavailable");}
 }
 async function getDiscoveryResult(channel,env,{force=false}={}){
@@ -1253,7 +1255,7 @@ async function getDiscoveryResult(channel,env,{force=false}={}){
   hnFeedLastFetch.set(channel,now);
   try{
     const scan=await collectSource(channel);
-    const payload={source:"hacker-news-public",channel,checkedAt:new Date(now).toISOString(),items:scan.items,
+    const payload={source:"public-research",channel,checkedAt:new Date(now).toISOString(),items:scan.items,
       origin:scan.origin,incomplete:scan.partial,cached:false,stale:false,
       scouts:DISCOVERY_ROLES.map(x=>x.name),
       note:"Six rule-based research roles; no running LLM. Public listings only. No verified demand, cost or reuse rights."};

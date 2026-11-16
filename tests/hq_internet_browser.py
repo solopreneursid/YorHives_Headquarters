@@ -20,11 +20,11 @@ def item(id,title,cat,score=2):
       "source":"Hacker News","sourceUrl":"https://news.ycombinator.com/item?id="+str(id),
       "url":"https://example.com/project-"+str(id),"score":score,"commentCount":3,"price":"Unknown",
       "postedAt":"2026-11-15T14:00:00Z","verified":False}
-LAUNCHES={"source":"hacker-news-public","channel":"launches","checkedAt":"2026-11-15T20:00:00Z","incomplete":False,
+LAUNCHES={"source":"public-research","channel":"launches","checkedAt":"2026-11-15T20:00:00Z","incomplete":False,
    "items":[item(201,"PDF image editor","apps",3),item(202,"Self-hosted agent framework","technology",8),
             item(203,"Jobs for teachers","markets",5),item(204,"Alternative to a CRM","competitors",2),
             item(205,"Invoice subscription billing","revenue",15),item(206,"Universal design builder","apps",10)]}
-SIGNALS={"source":"hacker-news-public","channel":"signals","checkedAt":"2026-11-15T21:00:00Z","incomplete":False,
+SIGNALS={"source":"public-research","channel":"signals","checkedAt":"2026-11-15T21:00:00Z","incomplete":False,
    "items":[item(207,"New customer demand","markets",12),item(208,"Monetization strategy","revenue",9)]}
 
 with sync_playwright() as pw:
@@ -92,7 +92,7 @@ with sync_playwright() as pw:
             page.locator(".lead-body").first.click()
             assert page.locator("#detail-drawer").is_visible()
             detail=page.locator("#detail-drawer").inner_text()
-            for phrase in ("Why consider it?","Potential next move","Cost or pricing","not a validated"):
+            for phrase in ("Why investigate?","Next action","Analysis method","Unverified"):
                 assert phrase in detail,(engine.name,width,phrase,detail)
             assert page.locator('#detail-drawer a[href="https://news.ycombinator.com/item?id=205"]').count()==1
             page.keyboard.press("Escape")

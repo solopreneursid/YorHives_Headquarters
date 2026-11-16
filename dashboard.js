@@ -200,11 +200,11 @@
       state.webSort==='score'?(a,b)=>(b.score||0)-(a.score||0):
       (a,b)=>sortDate(b.postedAt)-sortDate(a.postedAt));
     const refs=worldSources(),snap=state.webCache[state.webChannel],searched=Boolean(snap);
-    const tiles=filtered.map(x=>`<article class="lead-card"><div class="lead-top">${badge(x.category==='apps'?'Apps & tools':CATEGORIES.find(c=>c[0]===x.category)?.[1]||'Research')}<button class="save-btn ${state.webSaved.has(x.id)?'is-saved':''}" type="button" data-web-save="${esc(x.id)}" aria-pressed="${state.webSaved.has(x.id)}" aria-label="${state.webSaved.has(x.id)?'Remove saved opportunity':'Save opportunity'}">${state.webSaved.has(x.id)?'★':'☆'}</button></div><button class="lead-body" type="button" data-detail="web" data-id="${esc(x.id)}"><strong>${esc(cut(x.title,110))}</strong><small>${esc(x.description)}</small><span class="lead-meta">Show HN · ${date(x.postedAt)} · ${num(x.score)} points</span><span class="lead-footer">Research ${icon('arrow')}</span></button></article>`).join('');
+    const tiles=filtered.map(x=>`<article class="lead-card"><div class="lead-top">${badge(x.category==='apps'?'Apps & tools':CATEGORIES.find(c=>c[0]===x.category)?.[1]||'Research')}<button class="save-btn ${state.webSaved.has(x.id)?'is-saved':''}" type="button" data-web-save="${esc(x.id)}" aria-pressed="${state.webSaved.has(x.id)}" aria-label="${state.webSaved.has(x.id)?'Remove saved opportunity':'Save opportunity'}">${state.webSaved.has(x.id)?'★':'☆'}</button></div><button class="lead-body" type="button" data-detail="web" data-id="${esc(x.id)}"><strong>${esc(cut(x.title,110))}</strong><small>${esc(x.description)}</small><span class="lead-meta">${esc(x.source)} · ${date(x.postedAt)} · ${num(x.score)} signals</span><span class="lead-footer">Research ${icon('arrow')}</span></button></article>`).join('');
     const sourcesMarkup=refs.map(x=>`<a class="discover-source-card" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" aria-label="Browse ${esc(x.name)} in a new tab"><strong>${esc(x.name)}</strong><small>${esc(x.description)}</small><span>Browse source ${icon('external')}</span></a>`).join('');
     const notice=state.webError?`<strong class="discover-error">${esc(state.webError)}</strong>`:
       state.webLoading?'Checking public launch signals…':
-      searched?`${filtered.length} signals · checked ${time(snap.checkedAt)}${snap.incomplete?' · Partial':''}`:
+      searched?`${filtered.length} signals · ${esc(snap.origin||'Public sources')} · checked ${time(snap.checkedAt)}${snap.stale?' · Last saved results (offline)':''}${snap.incomplete?' · Partial':''}`:
       'Public research leads · no verified demand or profit';
     const empty=state.webLoading?blank('Loading public launches'):
       state.webSavedOnly?blank('No saved matches'):
@@ -214,7 +214,7 @@
       discoverSourceTabs()+
       `<div class="discover-world-tools"><div class="filter-scroller compact-tabs" role="group" aria-label="Opportunity category">${CATEGORIES.map(([id,label])=>tab(label,id,state.webCategory,'web-filter')).join('')}</div><div class="discover-channel" role="group" aria-label="Public signal channel">${tab('Launches','launches',state.webChannel,'web-channel')}${tab('Market signals','signals',state.webChannel,'web-channel')}</div></div>`+
       `<div class="discover-world-search"><label class="inline-search">${icon('search')}<input id="web-query" type="search" placeholder="Filter loaded discoveries" value="${esc(state.webQuery)}" aria-label="Filter loaded discoveries" /></label><select class="select" id="web-sort" aria-label="Sort external opportunities"><option value="newest" ${state.webSort==='newest'?'selected':''}>Newest</option><option value="score" ${state.webSort==='score'?'selected':''}>Points</option><option value="name" ${state.webSort==='name'?'selected':''}>A–Z</option></select>${button('web-saved',state.webSavedOnly?'★ Saved':'☆ Saved','check',state.webSavedOnly?'button-active':'button-subtle')}${button('web-export','Export saved','upload','button-subtle',state.webSaved.size?'':'disabled title="Save a signal first"')}</div>`+
-      `<div class="discover-live-status" role="status" aria-live="polite">${notice}</div><div class="lead-grid scroll-grid" role="region" tabindex="0" aria-label="Internet opportunity signals">${tiles||empty}</div>`+
+      `<div class="discover-live-status" role="status" aria-live="polite">${notice}</div><div class="lead-grid scroll-grid" role="region" tabindex="0" aria-label="Internet opportunity signals">${tiles||(refs.length?sourcesMarkup:empty)}</div>`+
       `<div class="discover-sources-header"><h2>Explore more sources</h2><small>Directories open in a new tab · no automatic scraping</small></div><div class="discover-source-grid">${sourcesMarkup||blank('No sources match')}</div>`+
       `<div class="page-footnote">Categories are title-based hints, not verified market research. Use Details to assess sources, cost and licensing.</div>`;
   }
@@ -225,20 +225,22 @@
     state.webLoading=true;state.webError='';
     if(state.page==='discover'&&state.discoverSource==='explore')render();
     try{
-      const reply=await fetch('/api/discover/feed?channel='+encodeURIComponent(channel),{
+      const reply=await fetch('/api/discover/feed?channel='+encodeURIComponent(channel)+(force?'&refresh=1':''),{
         credentials:'same-origin',headers:{accept:'application/json'},cache:'no-store'});
       const data=await reply.json().catch(()=>({}));
       if(!reply.ok)throw Error(data.error||'Research source unavailable');
-      if(data.source!=='hacker-news-public'||!Array.isArray(data.items)||data.channel!==channel)throw Error('Unexpected research source response');
-      const items=data.items.slice(0,12).filter(x=>typeof x.id==='string'&&/^hn-[0-9]{1,14}$/.test(x.id)).map(x=>({
+      if(!['public-research','hacker-news-public'].includes(data.source)||!Array.isArray(data.items)||data.channel!==channel)throw Error('Unexpected research source response');
+      const items=data.items.slice(0,12).filter(x=>typeof x.id==='string'&&/^(hn|devto)-[0-9]{1,14}$/.test(x.id)).map(x=>({
         id:x.id,title:String(x.title||'Untitled').slice(0,160),description:String(x.description||'Public submission').slice(0,240),
         category:CATEGORIES.some(c=>c[0]===x.category)?x.category:'apps',
-        source:'Hacker News',sourceUrl:'https://news.ycombinator.com/item?id='+x.id.slice(3),
-        url:link(x.url)||'https://news.ycombinator.com/item?id='+x.id.slice(3),postedAt:String(x.postedAt||''),
+        source:x.source==='DEV Community'?'DEV Community':'Hacker News',
+        sourceUrl:x.id.startsWith('hn-')?'https://news.ycombinator.com/item?id='+x.id.slice(3):link(x.sourceUrl)||'https://dev.to/',
+        url:link(x.url)||link(x.sourceUrl)||'https://news.ycombinator.com/',
+        postedAt:String(x.postedAt||''),
         score:Number.isInteger(x.score)?x.score:0,commentCount:Number.isInteger(x.commentCount)?x.commentCount:0,
-        price:'Unknown',evidence:'Public submission · category inferred',verified:false
+        price:'Unknown',evidence:String(x.evidence||'Public listing · category inferred'),verified:false,review:x.review&&typeof x.review==='object'?x.review:null
       }));
-      state.webCache[channel]={checkedAt:String(data.checkedAt||''),incomplete:data.incomplete===true,items};
+      state.webCache[channel]={checkedAt:String(data.checkedAt||''),incomplete:data.incomplete===true,origin:String(data.origin||'Public source'),stale:data.stale===true,items};
       notify('Research signals refreshed');
     }catch(err){state.webError=String(err.message||'Source unavailable').slice(0,180);notify('Source unavailable');}
     finally{state.webLoading=false;if(state.page==='discover'&&state.discoverSource==='explore')render();}
@@ -316,7 +318,7 @@
     const fields=kind==='department'?[['Responsibility',x.job],['Independent review',x.review],['Routed records',`${assignmentFor(x.name).length} (not proof of AI work)`],['AI inference',state.data.operating?.aiStatus||'Not connected']]:
       kind==='decision'?[['Status',STATE_LABELS[x.state]||x.state],['Date',time(x.created_at)],['Reason',x.note],['Feedback',x.feedback],['Success condition',x.success_condition],['Measured outcome',x.outcome]]:
        kind==='github'?[['Summary',x.description],['License',x.license||'Unverified'],['GitHub stars',String(x.stars??0)+' · popularity signal only'],['Primary language',x.language],['Updated',time(x.updatedAt)],['Review','Candidate only. Verify license, safety and suitability before reuse.']]:
-       kind==='web'?[['What is it?',x.title],['Why consider it?','A public product or idea to investigate, not a validated opportunity.'],['Potential next move','Read the original → assess customer need → check business model and legal reuse → founder review.'],['Cost or pricing','Not verified'],['Evidence','Public Hacker News submission'],['Category','Inferred from title — verify manually'],['Observed',time(x.postedAt)],['Discussion',String(x.commentCount??0)+' comments (not demand proof)']]:
+       kind==='web'?[['What is it?',x.title],['Research scout',x.review?.scout||'Rule-based research'],['Why investigate?',x.review?.why||'Public listing for further investigation — not a validated product.'],['Next action',x.review?.next||'Read source, verify demand and legal reuse, founder review.'],['Analysis method','Free keyword rules · local AI model not connected'],['Price','Unknown · verify with owner'],['License','Unverified · do not copy without checking'],['Evidence',x.evidence||'Public listing only'],['Category','Title-based hint · verify manually'],['Published',time(x.postedAt)],['Discussion',String(x.commentCount??0)+' comments (not demand proof)']]:
       [['Summary',target.description||target.evidenceSummary||target.summary||discussion],['Recommendation',target.recommendation],['Priority',target.priority],['Evidence',x.contract?.classification||'Unverified'],['Confidence',target.confidence||target.discoveryConfidence],['Observed',time(target.observedAt||target._date||target.occurredAt)],['Source status',state.source==='live'?'Live report':'Not live-verified']];
     const urls=sources(target,actualKind);let extras='';
     if(kind==='department'){

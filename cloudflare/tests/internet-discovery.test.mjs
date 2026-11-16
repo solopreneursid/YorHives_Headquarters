@@ -16,6 +16,8 @@ test("Title categories remain heuristic; every item remains unverified",()=>{
   assert.equal(x.sourceUrl,"https://news.ycombinator.com/item?id=123");
   assert.equal(x.price,"Unknown");
   assert.equal(x.verified,false);
+  assert.equal(x.review.rulesOnly,true);
+  assert.equal(x.review.aiInference,false);
   assert.equal(x.category,"apps");
   assert.equal(normalizeHackerNewsItem({id:234,title:"Show HN: test",deleted:true}),null);
   assert.equal(normalizeHackerNewsItem({id:1,title:"Bad URL",url:"javascript:alert(1)"}).url,
@@ -50,12 +52,12 @@ test("Public HN feed is bounded, source-linked, cached, and never writes data",a
     const reply=await handler.fetch(request,env,ctx);
     assert.equal(reply.status,200);
     const body=await reply.json();
-    assert.equal(body.source,"hacker-news-public");
+    assert.equal(body.source,"public-research");
     assert.equal(body.items.length,2);
     assert.equal(body.items[0].category,"revenue");
     assert.equal(body.items[1].category,"technology");
     assert.equal(body.items[1].sourceUrl,"https://news.ycombinator.com/item?id=102");
-    assert.match(body.note,/unverified/i);
+    assert.match(body.note,/no verified demand/i);
     assert.equal((await (await discoverInternetFeed(request)).json()).cached,true);
     assert.deepEqual(requests,["/v0/showstories.json","/v0/item/101.json","/v0/item/102.json","/v0/item/103.json"]);
   }finally{globalThis.fetch=original}
