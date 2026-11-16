@@ -1139,7 +1139,7 @@ async function nano12FetchBudget(env){
  return Boolean(token)&&await reserveFetch(env);
 }
 function nano12SearchUrl(title){
- const clean=String(title||"").replace(/[^A-Za-z0-9 ]/g," ").replace(/\s+/g," ").trim().slice(0,140);
+ const clean=String(title||"").replace(/[^A-Za-z0-9 ]/g," ").replace(/\s+/g," ").trim().slice(0,105);
  if(clean.length<15)return null;
  return "https://api.github.com/search/repositories?q="+encodeURIComponent('"'+clean+'" in:description')+"&per_page=4";
 }
@@ -1232,9 +1232,9 @@ async function nano12Investigate(env,paper,existing,at=nowIso()){
   }
  }catch(e){
   if(String(e?.message)==="implementation-daily-budget")return "budget-reached";
-  state=stage==="repo"?"repository-unavailable":"page-unavailable";
+  state=stage==="repo"?"repository-unavailable":stage==="search"?"no-repository-link-observed":"page-unavailable";
   facts={error:/^source-http-\d{3}$/.test(String(e?.message))?e.message:"fetch-or-parse-unavailable",
-    verified:false};
+    paperPageChecked:stage==="search",githubSearchUnavailable:stage==="search",verified:false};
  }
  const next=nano12NextCheck(state,attempts,at);
  const r=await env.DB.prepare(
