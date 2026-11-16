@@ -11,12 +11,12 @@ Private, single-founder, mobile-first control center with the original supplied 
 - Cloudflare Workers AI (`@cf/ibm-granite/granite-4.0-h-micro`) only when needed. Reviews are preliminary, capped at **3 calls/account/day by HQ** and 220 output tokens per request; failure degrades to rules-only. Cloudflare Free total neuron allocation is shared with any other applications.
 - Deterministic self-evolution: uses founder approve/reject feedback to adjust source priorities after at least three judgments; D1 versioned weights, no model fine-tuning.
 - Weekly allowlisted GitHub releases checks suggest software improvements, never install or deploy them.
-- Independent Watchdog Worker reads the HQ cron heartbeat from shared D1 and checks YorpHives.com. It does not verify full HQ application functionality nor survive a Cloudflare-wide outage.
+- Independent Watchdog Worker reads the HQ cron heartbeat from shared D1, checks YorpHives.com, and checks whether anonymous access to HQ is blocked. It does not verify founder login or full HQ functionality and cannot survive a Cloudflare-wide outage.
 - Founder-only JSON export of D1 records; no GitHub writer, infrastructure mutation, paid providers, arbitrary web fetch or shell tools in HQ agent runtime.
 
 ## Free quotas and scheduling
 
-- HQ cron every 15 minutes: site availability + heartbeat; research every six hours; optional AI once daily for the latest unreviewed lead; allowed GitHub release checks every Monday 01:00 UTC.
+- HQ cron every 15 minutes: site availability + heartbeat; first-run research then every six hours; optional AI once daily for the latest unreviewed lead; allowed GitHub release checks every Monday 01:00 UTC.
 - Research: max 8 scans per UTC day, 5 public HTTP GETs per scan, 15-minute cooldown.
 - Workers AI: max 3 HQ calls per UTC day; keep within Cloudflare Free account-wide allocation. Free-tier limits/change remain Cloudflare's responsibility. No guaranteed zero future cost or third-party availability.
 - Watchdog cron every 30 minutes. State is recorded in D1 and visible in Control.

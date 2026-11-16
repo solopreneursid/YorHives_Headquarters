@@ -83,7 +83,16 @@ with sync_playwright() as p:
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),(browser_type.name,width,section,'overflow')
    page.locator('#export-data').wait_for()
    assert not errors,(browser_type.name,width,errors)
-   page.evaluate("location.hash='#/home'");page.wait_for_timeout(100);page.evaluate("document.querySelector('#toast').classList.remove('show')");page.wait_for_timeout(400)
+   # Back must return to the previous HQ page, not leave the application.
+   page.evaluate("location.hash='#/home'")
+   page.wait_for_timeout(75)
+   page.evaluate("location.hash='#/discover'")
+   page.get_by_role('heading',name='Discover').wait_for()
+   page.go_back()
+   page.get_by_role('heading',name='Home').wait_for()
+   assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'),(browser_type.name,width,'history overflow')
+   page.evaluate("document.querySelector('#toast').classList.remove('show')")
+   page.wait_for_timeout(400)
    if width==390 and browser_type.name=='chromium':
     page.screenshot(path=str(ROOT/'preview-mobile.png'),full_page=True)
    if width==1440 and browser_type.name=='chromium':

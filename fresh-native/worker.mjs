@@ -215,7 +215,9 @@ export default {
   await checkSite(env).catch(()=>{});
   await statePut(env,'last_cron',{at:now()}).catch(()=>{});
   const t=new Date(event?.scheduledTime||Date.now());
-  if(t.getUTCHours()%6===0&&t.getUTCMinutes()<15)await scanSources(env).catch(()=>{});
+  // Seed an empty fresh install at its first cron, then use the six-hour schedule.
+  const firstScan=!(await stateGet(env,'last_scan').catch(()=>null));
+  if(firstScan||(t.getUTCHours()%6===0&&t.getUTCMinutes()<15))await scanSources(env).catch(()=>{});
   if(t.getUTCDay()===1&&t.getUTCHours()===1&&t.getUTCMinutes()<15)await checkUpdates(env).catch(()=>{});
   if(t.getUTCHours()===8&&t.getUTCMinutes()<15&&env.AI){
    try{const x=await env.DB.prepare('SELECT o.id FROM opportunities o LEFT JOIN evaluations e ON e.opportunity_id=o.id WHERE e.opportunity_id IS NULL ORDER BY o.last_seen DESC LIMIT 1').first();if(x)await evaluate(env,x.id);}catch{}

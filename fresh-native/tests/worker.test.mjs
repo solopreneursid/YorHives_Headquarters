@@ -101,3 +101,22 @@ test('Watchtower records HTTP check but does not mutate production',async()=>{
  globalThis.fetch=async()=>new Response('ok',{status:200});
  try{const r=await x.checkSite(e);assert.equal(r.state,'online');assert.equal(r.code,200);assert.equal((await x.bootstrap(e)).site.state,'online');}finally{globalThis.fetch=original;}
 });
+test('fresh-install cron seeds research before six-hour schedule without spending extra calls',async()=>{
+ const e=env(),before=globalThis.fetch;
+ globalThis.fetch=async(url)=>String(url).includes('dev.to')
+   ?new Response(JSON.stringify([devArticle]),{status:200})
+   :String(url).startsWith('https://yorphives.com')
+   ?new Response('site ok',{status:200})
+   :new Response(JSON.stringify({hits:[sampleHN]}),{status:200});
+ try{
+  await worker.scheduled({scheduledTime:Date.parse('2026-11-16T01:30:00Z')},e);
+  let data=await x.bootstrap(e);
+  assert.ok(data.opportunities.length>0);
+  assert.equal(data.scan.status,'ok');
+  assert.equal(data.budget.scansUsed,1);
+  assert.equal(data.hq.state,'online');
+  await worker.scheduled({scheduledTime:Date.parse('2026-11-16T01:45:00Z')},e);
+  data=await x.bootstrap(e);
+  assert.equal(data.budget.scansUsed,1);
+ }finally{globalThis.fetch=before;}
+});
