@@ -1734,6 +1734,120 @@ function nano13Report(rows){
   nextStep:"Founder-reviewed repository file inspection and isolated test planning; no automatic code execution."};
 }
 
+/* Nano Phase 17 — bounded research experiment planning. All advisory.
+ * Plans compile existing Phase 12–16 facts, contain no executable steps,
+ * cannot grant license clearance, and never authorize or run an experiment.
+ * No D1 writes, third-party requests, paid models, new jobs or credentials.
+ */
+const NANO17_VERSION="source-grounded-manual-experiment-plan-v1";
+function nano17Report(checks,manifestRows,reviewRows){
+ const founder=nano16Report(checks,manifestRows,reviewRows,false);
+ const reviewed=new Map(founder.entries.map(x=>[x.paperId,x]));
+ const manifestLookup=new Map((Array.isArray(manifestRows)?manifestRows:[]).map(x=>[x.paper_id,x]));
+ const entries=(Array.isArray(checks)?checks:[]).slice(0,40).map(row=>{
+  const assessment=nano15Assess(row,manifestLookup.get(row.paper_id));
+  if(!assessment)return null;
+  const decision=reviewed.get(assessment.paperId)?.latest||null;
+  const current=decision?.evidenceCurrent===true;
+  const planningOnly=current&&decision.disposition==="plan-isolated-test";
+  const budget=planningOnly&&Number.isInteger(decision.maxBudgetInr)?
+   Math.max(0,Math.min(5000,decision.maxBudgetInr)):0;
+  const runtime=planningOnly&&Number.isInteger(decision.maxRuntimeMinutes)?
+   Math.max(0,Math.min(120,decision.maxRuntimeMinutes)):0;
+  const status=!decision?"research-first":
+   !current?"review-stale":
+   decision.disposition==="defer"?"deferred-by-founder":
+   planningOnly?"manual-preflight-pending":
+   "awaiting-founder-test-plan";
+  const manifest=Boolean(assessment.manifestSha&&/^[a-f0-9]{40}$/.test(assessment.manifestSha));
+  const license=assessment.licenseFileObserved===true;
+  const signals=(Array.isArray(assessment.computeSignals)?assessment.computeSignals:[]).slice(0,3);
+  const declared=Math.max(0,Number(assessment.declaredNameCount)||0);
+  const checksToComplete=[
+   {key:"authorship",name:"Research-to-code identity",status:"unverified",
+    evidence:"Title/metadata matches do not prove that the paper authors maintain this repository.",
+    proof:"Paper author's official repository link or independently verified maintainer correspondence."},
+   {key:"source",name:"Pinned source snapshot",status:manifest?"root-manifest-observed":"unverified",
+    evidence:manifest?"SHA-pinned root manifest observed: "+assessment.manifestSha:
+      "No SHA-pinned root manifest has been inspected.",
+    proof:"Review a specific, complete commit, its tree, lockfiles and corresponding root manifest; preserve hashes."},
+   {key:"dependencies",name:"Dependency and supply-chain audit",status:"unverified",
+    evidence:declared?declared+" declared direct-name candidates from one manifest; no transitive closure.":
+     "No complete dependency inventory; zero observed names does NOT imply zero dependencies.",
+    proof:"Version-pinned direct/transitive inventory, advisories, install scripts and platform selectors reviewed offline."},
+   {key:"licenses",name:"Full software and asset rights",status:"unverified",
+    evidence:license?"Root LICENSE file observed but contents/rights are NOT cleared.":
+     "No qualifying root LICENSE file has been confirmed.",
+    proof:"Human review of root notices, dependencies, copyright, data/weights terms and intended commercial use."},
+   {key:"data",name:"Models, datasets and privacy",status:"unverified",
+    evidence:"Training data, model weights, output rights and processing of user data have not been audited.",
+    proof:"Separate written data/weight permissions and a privacy-minimizing, synthetic-first input plan."},
+   {key:"isolation",name:"Isolated reproducible environment",status:"unverified",
+    evidence:"HQ has not provisioned, tested or approved a code-execution sandbox.",
+    proof:"Founder-approved isolated machine/container, no secrets, outbound network denied by default, kill switch and rollback."},
+   {key:"hardware",name:"Hardware feasibility",status:"unverified",
+    evidence:signals.length?"Unverified library indicators: "+signals.join(", ")+".":
+     "No verified CPU, RAM, GPU/VRAM, storage or network requirements.",
+    proof:"Version-pinned, measured CPU/RAM/VRAM/storage/network usage for a minimal controlled test."},
+   {key:"cost",name:"Cost and resource accounting",status:"unverified",
+    evidence:"No observed infrastructure pricing or runtime usage; planned cap is not a quote or authorization.",
+    proof:"Actual measured hardware-minutes and currency cost, stop conditions and source of billing evidence."},
+   {key:"acceptance",name:"Independent outcome criteria",status:"unverified",
+    evidence:"Paper replication, independent correctness and commercial value are not established.",
+    proof:"Repeatable acceptance tests, baseline, failure cases and source-linked logs signed off by the founder."},
+   {key:"permission",name:"Explicit founder execution authorization",status:"unverified",
+    evidence:"A founder review or downloaded plan is not authority to execute, install, spend or deploy.",
+    proof:"Separate human authorization after the other gates are evidenced; action outside read-only HQ."}
+  ];
+  const stages=[
+   {order:1,name:"Verify identity and scope",owner:"Founder/manual reviewer",
+    work:"Confirm author-to-repository link, exact commit, goal and minimal test scope.",
+    output:"Evidence links, commit hash and clear scope exclusions."},
+   {order:2,name:"License, dependency and privacy audit",owner:"Founder/manual reviewer",
+    work:"Review rights for code, dependencies, model weights and datasets; inventory transitive versions.",
+    output:"Signed manual audit record or explicit blocker; no automatic clearance."},
+   {order:3,name:"Design isolated test",owner:"Founder/manual reviewer",
+    work:"Plan secrets-free sandbox, egress controls, limits and a no-cost-first synthetic data fixture.",
+    output:"Proposed resource ceilings, stop conditions, rollback and test protocol."},
+   {order:4,name:"External execution decision",owner:"Founder only, outside HQ",
+    work:"Obtain separate execution approval if all preflight gates are evidenced; do not run from HQ.",
+    output:"A separate founder-authorized execution decision, or defer."},
+   {order:5,name:"Measure and review results",owner:"Independent manual QA",
+    work:"If independently authorized and run elsewhere, record measured resource use, failures, costs and comparison to baseline.",
+    output:"Traceable test logs, actual costs, repeatability findings and founder conclusion."}
+  ];
+  return {paperId:assessment.paperId,title:assessment.title,
+   paperUrl:assessment.paperUrl,repositoryUrl:assessment.repositoryUrl,
+   manifestSha:manifest?assessment.manifestSha:"",sourceDescription:assessment.relationship,
+   sourceStatus:assessment.manifestStatus,
+   founderReviewRevision:decision?.version||0,
+   founderReviewDisposition:current?decision.disposition:null,
+   founderReviewCurrent:current,planStatus:status,
+   declaredNameCount:declared,licenseFileObserved:license,computeSignals:signals,
+   proposedCaps:{inr:budget,runtimeMinutes:runtime,spentInr:0,
+    capRecorded:planningOnly,notSpendingAuthorization:true,
+    estimate:"No measured cost or quote; caps are planning bounds only."},
+   preflightGates:checksToComplete,preflightVerified:0,
+   gatesTotal:checksToComplete.length,stages,
+   stopConditions:[
+    "Stop if any license, dataset/weight, dependency or ownership permission remains unclear.",
+    "Stop on attempted network egress, access to credentials, or unexpected file/system mutation.",
+    "Stop before exceeding any separately approved runtime, hardware or spending ceiling.",
+    "Stop if safety controls, measurement logging, reproducibility or rollback cannot be verified."
+   ],
+   independentSuccess:"Repeatable, source-linked baseline improvement with independently checked correctness and measured total resources.",
+   outcome:"Not executed; no reproducibility result, legal clearance, hardware benchmark or revenue validation.",
+   readiness:"NOT approved to execute",automatedExecution:false,commercialReuseApproved:false,
+   measuredCost:false,founderExecutionAuthorized:false,version:NANO17_VERSION};
+ }).filter(Boolean);
+ return {entries:entries.slice(0,10),eligible:entries.length,
+  preflightReady:0,automaticallyRun:0,commerciallyApproved:0,
+  plansWithCurrentFounderIntent:entries.filter(x=>x.founderReviewCurrent&&
+   x.founderReviewDisposition==="plan-isolated-test").length,
+  scope:"Evidence-linked MANUAL experiment design. All execution/legal/hardware gates remain unverified.",
+  cost:"Zero additional HTTP calls, D1 writes, AI models, Cron schedules or subscriptions in Phase 17."};
+}
+
 /* Nano Phase 16 — founder-initiated, append-only research reviews.
  * Human notes are advisory planning history, not a legally approved
  * implementation or permission for agents to fetch code, run it or spend.
@@ -3175,6 +3289,7 @@ async function report(env) {
       checkedAt:metadata.find(x=>x.key==="nano_workflows")?.checked_at||""},
     dependencySignals:nano15Report(implementationRows.results||[],manifestRows.results||[]),
     founderResearchReviews:nano16Report(implementationRows.results||[],manifestRows.results||[],researchReviewRows.results||[],env.HQ_DECISIONS_ENABLED==="true"),
+    experimentPlans:nano17Report(implementationRows.results||[],manifestRows.results||[],researchReviewRows.results||[]),
     manifestEvidence:{...nano14Report(implementationRows.results||[],manifestRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_manifest_evidence")?.value||"not-attempted"},
     feasibilityReviews:nano13Report(implementationRows.results||[]),
     implementationEvidence:{...nano12Report(implementationRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_implementation_evidence")?.value||"not-attempted"},
