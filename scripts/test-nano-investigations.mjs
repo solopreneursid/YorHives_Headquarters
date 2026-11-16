@@ -73,7 +73,7 @@ const sandbox={URL,URLSearchParams,AbortSignal,Date,JSON,Number,String,Map,conso
   nowIso:()=>now,fnv:hash,clampText:(x,n=240)=>String(x||'').replace(/\s+/g,' ').trim().slice(0,n),
   boundedText:async(response,max)=>{const t=await response.text();return t.length>max?null:t;},
   reserveFetch:async()=>{paidFetchCount++;return true;},fetch:fetchStub};
-runInNewContext(code+'\nthis.target=nanoInvestigationTarget;this.investigate=nanoInvestigateOne;this.run=nanoInvestigationScheduled;this.report=nanoInvestigationReport;',sandbox);
+runInNewContext(code+'\nthis.target=nanoInvestigationTarget;this.investigate=nanoInvestigateOne;this.run=nanoInvestigationScheduled;this.report=nanoInvestigationReport;this.sourceJson=nanoSourceJson;',sandbox);
 
 for(const bad of [
   'http://github.com/acme/example','https://evil.example/acme/example',
@@ -111,8 +111,8 @@ assert.ok(!('executor' in view.entries[0]));
 const remote={...env,DB:{prepare:sql=>sql.startsWith("INSERT INTO quota")?{
   bind:()=>({first:async()=>null})}:env.DB.prepare(sql)}};
 const t=sandbox.target('https://github.com/acme/freedom-tools');
-await assert.rejects(()=>sandbox.nanoSourceJson?.(remote,t),/./).catch(()=>{});
-// Instead explicitly check the allowlisted fetch cannot be called without quota.
+await assert.rejects(()=>sandbox.sourceJson(remote,t),/investigation-budget-reached/);
+assert.equal(calls.length,3,'Exhausted quota must never fetch another URL');
 assert.equal(investigations.every(x=>!x.facts_json.includes('token')),true);
 console.log('PASS: source allowlist rejects redirect-like, nested, localhost, username, extra path URLs');
 console.log('PASS: only fixed HN/GitHub first-party APIs contacted via GET/no redirects');
