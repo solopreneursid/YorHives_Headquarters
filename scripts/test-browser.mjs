@@ -1,0 +1,125 @@
+#!/usr/bin/env node
+/**
+ * Isolated browser tests for the actual embedded HQ UI.
+ * No Cloudflare credentials, production DB, or external network.
+ */
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import http from 'node:http';
+import {chromium} from 'playwright';
+
+function bundleFromSource() {
+  const source=readFileSync('src/hq-worker.mjs','utf8');
+  const marker='const PILOT_STATIC_BUNDLE = ';
+  const start=source.indexOf(marker);
+  assert.ok(start>=0);
+  const first=source.indexOf('{',start+marker.length);
+  let depth=0,quote=false,esc=false,last=-1;
+  for(let i=first;i<source.length;i++){
+    const c=source[i];
+    if(quote){if(esc)esc=false;else if(c==='\\')esc=true;else if(c==='"')quote=false;}
+    else if(c==='"')quote=true;
+    else if(c==='{')depth++;
+    else if(c==='}'&&--depth===0){last=i+1;break;}
+  }
+  assert.ok(last>first);
+  return JSON.parse(source.slice(first,last));
+}
+const bundle=bundleFromSource();
+const report={
+  schemaVersion:'yorphives.hq-intelligence.v1',
+  generatedAt:'2026-11-16T10:00:00Z',
+  assets:[{id:'site',name:'YorpHives.com',kind:'website',status:'healthy'}],
+  products:[],
+  findings:[{id:'finding-1',title:'Synthetic homepage outage',category:'reliability',priority:'high',asset:'https://yorphives.com',description:'Mock-only finding',recommendation:'Check uptime independently',observedAt:'2026-11-16T10:00:00Z',evidence:['https://yorphives.com/']}],
+  incidents:[
+    {id:'inc-1',title:'Synthetic incident — OPEN',category:'reliability',severity:'high',asset:'https://yorphives.com',status:'open',firstSeen:'2026-11-16T09:50:00Z',lastSeen:'2026-11-16T10:00:00Z',resolvedAt:null,description:'Test-only record',recommendation:'Review external evidence',evidence:'https://yorphives.com/',occurrences:1,recoveryVerified:false},
+    {id:'inc-2',title:'Synthetic incident — RECOVERED',category:'reliability',severity:'medium',asset:'https://yorphives.com',status:'resolved',firstSeen:'2026-11-16T08:00:00Z',lastSeen:'2026-11-16T09:00:00Z',resolvedAt:'2026-11-16T09:00:00Z',description:'Test-only resolved record',recommendation:'Independently verify recovery',evidence:'https://yorphives.com/',occurrences:2,recoveryVerified:false}
+  ],
+  incidentEvents:[
+    {sequence:3,incidentId:'inc-1',transition:'detected',observedAt:'2026-11-16T10:00:00Z',evidence:'https://yorphives.com/'},
+    {sequence:2,incidentId:'inc-2',transition:'resolved',observedAt:'2026-11-16T09:00:00Z',evidence:'https://yorphives.com/'},
+    {sequence:1,incidentId:'inc-2',transition:'detected',observedAt:'2026-11-16T08:00:00Z',evidence:'https://yorphives.com/'}
+  ],
+  opportunities:[{id:'opp-1',title:'Synthetic research result',category:'product',description:'Test-only',observedAt:'2026-11-16T09:00:00Z'}],
+  activity:[{id:'activity-1',title:'Scheduler checked',summary:'Test-only',occurredAt:'2026-11-16T09:30:00Z'}],
+  changes:[],
+  operating:{pending:1,queue:[],threads:[],aiStatus:'Not connected'},
+  decisionJournal:{available:false,events:[]},
+  hqHealth:{status:'responding',api:'responding',database:'responding',collector:'current',lastCollectorCheck:'2026-11-16T09:30:00Z'}
+};
+const mime=(pathname)=>pathname.endsWith('.js')?'application/javascript':pathname.endsWith('.css')?'text/css':pathname.endsWith('.html')?'text/html':pathname.endsWith('.webp')?'image/webp':'text/plain';
+const server=http.createServer((req,res)=>{
+  const path=new URL(req.url,'http://localhost').pathname;
+  res.setHeader('cache-control','no-store');
+  res.setHeader('x-test-data','synthetic-no-production');
+  if(path==='/api/report') {res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(report));return;}
+  if(path.startsWith('/api/')) {res.writeHead(503,{'content-type':'application/json'});res.end(JSON.stringify({error:'Test server: external lookups disabled'}));return;}
+  const file=path==='/'?'/index.html':path;
+  if(!(file in bundle)){res.writeHead(404);res.end('Not found');return;}
+  const raw=bundle[file];
+  if(file.endsWith('.webp')) {res.writeHead(200,{'content-type':mime(file)});res.end(Buffer.from(raw,'base64'));return;}
+  res.writeHead(200,{'content-type':mime(file)});res.end(raw);
+});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const origin='http://127.0.0.1:'+server.address().port;
+let browser,failures=0;
+async function test(name,callback){
+  try{await callback();console.log('PASS: '+name);}
+  catch(e){failures++;console.error('FAIL: '+name+' — '+String(e.stack||e));}
+}
+try{
+  browser=await chromium.launch({headless:true});
+  for(const profile of [{name:'desktop',viewport:{width:1366,height:850},isMobile:false},{name:'mobile',viewport:{width:390,height:844},isMobile:true}]){
+    const page=await browser.newPage({viewport:profile.viewport,isMobile:profile.isMobile,hasTouch:profile.isMobile});
+    const errors=[];
+    page.on('pageerror',e=>errors.push(e.message));
+    await test(profile.name+': homepage and live mock report',async()=>{
+      await page.goto(origin+'/#home',{waitUntil:'domcontentloaded'});
+      await page.locator('#page-root').getByText('HQpulse').first().waitFor();
+      await page.locator('.incident-item').first().waitFor();
+      assert.equal(await page.locator('.incident-item').count(),2);
+      assert.ok((await page.locator('#page-root').innerText()).includes('Synthetic incident'));
+    });
+    await test(profile.name+': incident details and recovery evidence',async()=>{
+      const incident=page.locator('.incident-item').nth(1);
+      await incident.locator('summary').click();
+      assert.equal(await incident.getAttribute('open'),'');
+      const txt=await incident.innerText();
+      assert.ok(txt.includes('Independent recovery verification'));
+      assert.ok(txt.includes('Not completed'));
+      assert.ok(txt.includes('resolved'));
+    });
+    await test(profile.name+': HQpulse search and filters',async()=>{
+      await page.locator('#pulse-query').fill('Synthetic homepage outage');
+      await page.locator('.pulse-row').first().waitFor();
+      assert.equal(await page.locator('.pulse-row').count(),1);
+      await page.locator('#pulse-query').fill('Nothing matches this test');
+      assert.equal(await page.locator('.pulse-row').count(),0);
+      await page.locator('#pulse-query').fill('');
+      const alerts=page.locator('[data-pulse-filter="alerts"]');
+      await alerts.first().click();
+      assert.equal(await page.locator('.pulse-row').count(),1);
+    });
+    await test(profile.name+': navigation, back and protected session continuity',async()=>{
+      await page.locator('[data-page="discover"]:visible').first().click();
+      assert.ok(page.url().endsWith('#discover'));
+      await page.locator('[data-page="control"]:visible').first().click();
+      assert.ok(page.url().endsWith('#control'));
+      const back=profile.isMobile?'#mobile-back-button':'#back-button';
+      await page.locator(back).click();
+      assert.ok(page.url().endsWith('#discover'),'Back should return to Discover');
+      assert.equal(await page.evaluate(()=>document.cookie),'');
+      await page.locator('[data-page="home"]:visible').first().click();
+      assert.ok(page.url().endsWith('#home'));
+    });
+    await test(profile.name+': no horizontal overflow at viewport width',async()=>{
+      const dims=await page.evaluate(()=>({screen:document.documentElement.clientWidth,content:document.documentElement.scrollWidth}));
+      assert.ok(dims.content<=dims.screen+2,JSON.stringify(dims));
+    });
+    await test(profile.name+': no frontend exceptions',async()=>{assert.deepEqual(errors,[]);});
+    await page.close();
+  }
+}finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
+if(failures)process.exitCode=1;
+else console.log('PASS: isolated browser suite completed; real founder authentication NOT tested');
