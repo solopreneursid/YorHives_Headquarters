@@ -888,6 +888,58 @@ async function scheduledCycle(env, scheduledTime) {
   try{await scheduledInternetScouts(env,scheduledTime);}catch{}
   await saveStatus(env,"last_cron","cycle:"+nowIso());
 }
+
+/* Phase 4: founder-reviewed, append-only guidance. Usefulness is never evidence verification. */
+function nanoLearningView(rows){
+  const history=(Array.isArray(rows)?rows:[]).slice(0,60).map(x=>({
+    entryId:x.entry_id,memoryId:x.memory_id,department:x.department,title:x.title||"",
+    version:Number(x.version)||1,outcome:x.outcome,guidance:x.guidance,reason:x.reason,
+    evidenceUrl:x.evidence_url,sourceEvidenceState:x.source_evidence_state,
+    reviewedAt:x.reviewed_at,rank:x.outcome==="useful"?1:x.outcome==="not-useful"?-1:0,verified:false
+  }));
+  const latest=new Map();
+  for(const e of history)if(!latest.has(e.memoryId))latest.set(e.memoryId,e);
+  const entries=[...latest.values()].sort((a,b)=>b.rank-a.rank||b.reviewedAt.localeCompare(a.reviewedAt));
+  return {entries,history,reviewedSources:entries.length,
+    scope:"Founder-reported usefulness; not independent validation",autonomousActions:false};
+}
+async function saveNanoLearning(request,env){
+  if(env.HQ_DECISIONS_ENABLED!=="true"||!env.DB)return json({error:"Founder review unavailable"},503);
+  const url=new URL(request.url);
+  if(request.headers.get("origin")!==url.origin||
+     request.headers.get("x-hq-founder-action")!=="learning-v1"||
+     request.headers.get("content-type")?.split(";")[0]!=="application/json")
+    return json({error:"Same-origin founder request required"},403);
+  let input;try{
+    const body=await boundedText(request,2048);if(body===null)return json({error:"Request too large"},413);
+    input=JSON.parse(body);
+  }catch{return json({error:"Invalid JSON"},400);}
+  const memoryId=String(input?.memoryId||""),outcome=String(input?.outcome||"");
+  const guidance=typeof input?.guidance==="string"?input.guidance.trim():"";
+  const reason=typeof input?.reason==="string"?input.reason.trim():"";
+  if(!/^memory-(?:finding|opportunity)-[0-9a-f]{1,8}$/.test(memoryId)||
+    !["useful","not-useful","needs-evidence"].includes(outcome)||
+    guidance.length<12||guidance.length>400||reason.length<10||reason.length>400)
+    return json({error:"Choose a memory, outcome, guidance (12–400 chars) and reason (10–400 chars)"},400);
+  let evidenceUrl="";
+  if(input.evidenceUrl){
+    try{const u=new URL(input.evidenceUrl);
+      if(u.protocol!=="https:"||u.username||u.password||u.href.length>400)
+        return json({error:"Evidence URL must use HTTPS"},400);
+      evidenceUrl=u.href;
+    }catch{return json({error:"Invalid HTTPS evidence URL"},400);}
+  }
+  const memory=await env.DB.prepare("SELECT memory_id FROM nano_memories WHERE memory_id=? LIMIT 1").bind(memoryId).first();
+  if(!memory)return json({error:"Memory not found"},404);
+  const id=crypto.randomUUID(),stamp=nowIso();
+  const sql="INSERT INTO nano_playbooks(entry_id,memory_id,department,version,outcome,guidance,reason,evidence_url,source_evidence_state,reviewed_at) "+
+   "SELECT ?,m.memory_id,m.department,COALESCE((SELECT MAX(version) FROM nano_playbooks WHERE memory_id=m.memory_id),0)+1,?,?,?,?,m.evidence_state,? "+
+   "FROM nano_memories m WHERE m.memory_id=? AND (SELECT COUNT(*) FROM nano_playbooks)<1000";
+  const saved=await env.DB.prepare(sql).bind(id,outcome,guidance,reason,evidenceUrl,stamp,memoryId).run();
+  if(saved.meta?.changes!==1)return json({error:"Review limit reached or concurrent revision; refresh"},409);
+  return json({saved:true,memoryId,entryId:id,evidenceVerified:false,executionTriggered:false},201);
+}
+
 function base64UrlBytes(value) {
   if(!/^[A-Za-z0-9_-]+$/.test(value||"")) throw Error("invalid-token-encoding");
   const binary=atob(value.replace(/-/g,"+").replace(/_/g,"/").padEnd(Math.ceil(value.length/4)*4,"="));
@@ -1124,6 +1176,7 @@ function headquartersHealth(metadata,at=nowIso()) {
 async function report(env) {
   const workflowRows=await env.DB.prepare("SELECT * FROM workflow_runs ORDER BY created_at DESC LIMIT 60").all();
   const memoryRows=await env.DB.prepare("SELECT * FROM nano_memories ORDER BY recorded_at DESC LIMIT 60").all();
+  const learningRows=await env.DB.prepare("SELECT p.*,m.title FROM nano_playbooks p JOIN nano_memories m ON m.memory_id=p.memory_id ORDER BY p.reviewed_at DESC,p.rowid DESC LIMIT 60").all();
   const [incidentRows,incidentEvents]=await Promise.all([
     env.DB.prepare("SELECT * FROM incident_history ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, last_seen DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM incident_events ORDER BY sequence DESC LIMIT 150").all()
@@ -1153,6 +1206,7 @@ async function report(env) {
   return {
     nanoPipeline:{status:metadata.find(x=>x.key==="nano_workflows")?.value||"not-attempted",
       checkedAt:metadata.find(x=>x.key==="nano_workflows")?.checked_at||""},
+    learning:nanoLearningView(learningRows.results||[]),
     memory:{entries:nanoRecall(memoryRows.results||[],"all",40),
       totalShown:Math.min(40,(memoryRows.results||[]).length),
       scope:"Stored HQ evidence and existing recommendations only; not AI-generated learning",
@@ -1550,7 +1604,8 @@ export default {
     const route=new URL(request.url).pathname;
     const decisionWrite=route==="/api/decisions"&&request.method==="POST";
     const privateAiWrite=route==="/api/ai/analyze"&&request.method==="POST";
-    if(!decisionWrite&&!privateAiWrite&&!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
+    const learningWrite=route==="/api/learning/review"&&request.method==="POST";
+    if(!decisionWrite&&!privateAiWrite&&!learningWrite&&!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
     if(!(await verifyAccess(request,env,ctx))) return new Response("Private Headquarters access not configured or unauthorized",{status:403,headers:{"cache-control":"no-store","x-content-type-options":"nosniff"}});
     if(privateAiWrite){
       const origin=request.headers.get("origin");
@@ -1558,6 +1613,7 @@ export default {
       if(origin!==host)return json({error:"Same-origin founder request required"},403);
       return privateAiAnalyze(request,env);
     }
+    if(learningWrite){try{return await saveNanoLearning(request,env);}catch{return json({error:"Founder feedback not saved"},503);}}
     if(route==="/api/ai/status"&&request.method==="GET")return json(privateAiStatus(env));
     if(decisionWrite) {
       try{return await saveDecision(request,env);}catch{return json({error:"Decision could not be saved; refresh before retrying"},503);}
