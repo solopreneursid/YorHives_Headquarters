@@ -43,3 +43,22 @@ There are indexes for recent retrieval and department-oriented retrieval. A maxi
 - `scripts/test-workers-ai.mjs` checks the two-memory bounded prompt context, no tools, model selection, and the daily free safety limit.
 - `scripts/test-browser.mjs` renders memory records on desktop/mobile and tests disclosure and navigation.
 - These suites do not establish that the live scheduled collector created real memory entries. Verify the production D1 row counts and latest Cron heartbeat separately after deployment.
+
+## Recovery incident: empty workflow and memory panels (16 November 2026)
+
+**Observed:** The founder's AI Employees screenshot showed zero workflow runs and zero memories despite 10 research opportunities in D1.
+
+**Root cause:** An earlier source edit accidentally inserted literal `\\n` text inside a `//` comment in `scheduledCycle`. It turned the Nano invocation and the final `last_cron` heartbeat into comment text. Both stopped executing, although the Worker still passed JavaScript syntax checks. This was a runtime/logic regression, not a missing database table.
+
+**Repair and prevention:**
+- Restored executable Nano Cron invocation and last-cycle heartbeat.
+- Moved deterministic workflows ahead of expensive research collectors.
+- Added a first-run bootstrap at the next five-minute Cron when no workflow exists.
+- Added `nano_workflows` status for success/failure and displayed it in the Workflow pipeline UI.
+- Recorded `last_cron` at the start of scheduled execution; isolated site and incident-ledger errors from Nano processing.
+- Added tests that specifically detect the literal-backslash-newline comment regression, check Cron call ordering, and verify the bootstrap and heartbeat.
+- Created a one-time backfill **from the 10 existing D1 opportunities**, using the actual `nanoPlan` and `nanoMemoryFromPlan` source logic with parameterized D1 writes. No synthetic incidents, invented evidence, external inference, or production website edits.
+- Verified 10 workflow runs and 10 uniquely-linked memory rows. All 10 remain labeled `source-recorded-unverified` and require founder review.
+- No Cloudflare Workers AI calls were consumed by the backfill.
+
+**Verification boundary:** Database materialization and deployed-source parity are verified. Cron health requires at least one fresh post-release scheduled-cycle heartbeat; do not infer it from old timestamps.
