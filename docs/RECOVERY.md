@@ -25,10 +25,19 @@ Status: 2026-11-16. This is an operational guide, **not** proof that a full rest
 - The existing D1 binding is named `DB`.
 - Incident records persist in `incident_history`, transitions in `incident_events`.
 - Do not delete or overwrite those tables when changing the frontend.
-- Cloudflare D1 Time Travel bookmark retrieval was available when checked on 2026-11-16, but **a restoration has not been executed or tested**.
+- Cloudflare D1 Time Travel bookmark retrieval was verified on 2026-11-16. An **isolated, disposable database** restoration was also tested successfully on 2026-11-16; **production restoration has not been tested**.
 - Restore only on founder authorization, ideally against a separate recovery database first.
 - Never put a production database export in this public repository.
 - Time Travel is not a substitute for an independent, access-controlled export kept under founder control.
+
+## Verified isolated recovery drill (2026-11-16)
+
+- Created a temporary independent D1 database with one test row.
+- Retrieved a Time Travel bookmark when the row contained `before-change`.
+- Updated that row to `after-change` and verified the changed value.
+- Restored the temporary database to the bookmark and confirmed the row returned to `before-change`.
+- Deleted the test database; the three existing databases were preserved.
+- This establishes a functioning D1 Time Travel operation on a disposable database, **not** recovery of the HQ production database, its bindings, or its permissions.
 
 ## Recovery sequence
 
@@ -52,5 +61,5 @@ Status: 2026-11-16. This is an operational guide, **not** proof that a full rest
 - Authenticate in a browser, navigate all pages and check that browser Back never signs out unexpectedly.
 - Confirm `/api/report` with a valid founder session returns current D1 evidence.
 - Run a controlled incident detection/recovery test in staging; confirm history is not erased.
-- Execute an isolated D1 recovery test before claiming backup/restore readiness.
+- Complete an end-to-end isolated HQ environment restoration, including real table schema, bindings, and application authentication, before claiming full disaster-recovery readiness.
 - Verify notifications actually reach the founder when the independent monitor fails.
