@@ -59,7 +59,7 @@ const sandbox={URL,Date,Map,Set,String,Number,JSON,AbortSignal,Response,console,
   if(url.includes('export.arxiv.org'))return new Response(atom,{status:200,headers:{'content-type':'application/atom+xml; charset=utf-8'}});
   throw Error('Forbidden endpoint '+url);
  }};
-runInNewContext(code+'\nthis.sources=NANO10_SOURCES;this.topics=NANO10_TOPICS;this.link=nano10Link;this.atom=nano10ExtractAtom;this.crossref=nano10ExtractCrossref;this.fetchSource=nano10Fetch;this.schedule=nano10Scheduled;this.scan=nano10Scan;this.report=nano10Report;this.url=nano10Url;',sandbox);
+runInNewContext(code+'\nthis.sources=NANO10_SOURCES;this.topics=NANO10_TOPICS;this.link=nano10Link;this.atom=nano10ExtractAtom;this.crossref=nano10ExtractCrossref;this.fetchSource=nano10Fetch;this.schedule=nano10Scheduled;this.scan=nano10Scan;this.report=nano10Report;this.url=nano10Url;this.age=nano10PublicationAge;',sandbox);
 assert.equal(sandbox.sources.length,2);
 for(const topic of sandbox.topics){assert.ok(topic.crossref.includes('query.bibliographic='));assert.ok(topic.crossref.includes('sort=published&order=desc'));assert.ok(!topic.crossref.includes('query.title='));}
 assert.equal(sandbox.topics.length,4);
@@ -85,6 +85,12 @@ assert.equal(view.sources.length,2);assert.equal(view.active,2);assert.equal(vie
 assert.equal(view.entries.every(x=>x.claimsReproduced===false&&x.customerDemandVerified===false&&x.licenseVerified===false),true);
 assert.equal(view.entries.every(x=>x.founderApproved===false),true);
 assert.equal(view.entries.every(x=>x.relevanceRank<=55),true);
+assert.equal(sandbox.age('2026-11-10',at),'published-within-one-year');
+assert.equal(sandbox.age('2021-01-01',at),'older-publication');
+assert.equal(sandbox.age('unknown',at),'publication-date-unverified');
+const archived=sandbox.report([], [{paper_id:'historical',source_id:'crossref',topic_id:'ai',title:'Historical article',source_url:'https://doi.org/10.1234/historical',source_type:'journal-article',abstract_text:'',published_at:'2021-01-01',assessment_json:'{}',last_seen:at}]);
+assert.equal(archived.entries[0].publicationAge,'older-publication');
+
 const failures=new Map(),fdb={prepare(sql){
  if(sql.startsWith('SELECT state,detail,next_check_at'))return {bind:()=>({first:async()=>failures.get('crossref')||null})};
  if(sql.startsWith('INSERT INTO quota'))return {bind:()=>({first:async()=>({used:1})})};
