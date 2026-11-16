@@ -728,6 +728,8 @@ async function scheduledCycle(env, scheduledTime) {
   // Cloudflare is free only while account remains on Free; this worker has
   // no paid API, AI binding, browser use, writable GitHub credential or deployment tool.
   if(plan.uptime) await checkSite(env);
+  // Persist incident evidence before potentially slow research collectors.
+  await syncIncidentHistory(env);
   if(plan.products) await checkProducts(env);
   // On a newly initialized HQ database, discover/research immediately rather
   // than waiting up to six hours or one day for the first scheduled window.
@@ -756,7 +758,6 @@ async function scheduledCycle(env, scheduledTime) {
     await env.DB.prepare("DELETE FROM security_watch WHERE observed_at < ?")
       .bind(new Date(Date.now()-120*86400000).toISOString()).run();
   }
-  await syncIncidentHistory(env);
   // Lower-priority scouts never block uptime or the normal scheduler heartbeat.
   try{await scheduledInternetScouts(env,scheduledTime);}catch{}
   await saveStatus(env,"last_cron","cycle:"+nowIso());
