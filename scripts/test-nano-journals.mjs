@@ -61,6 +61,7 @@ const sandbox={URL,Date,Map,Set,String,Number,JSON,AbortSignal,Response,console,
  }};
 runInNewContext(code+'\nthis.sources=NANO10_SOURCES;this.topics=NANO10_TOPICS;this.link=nano10Link;this.atom=nano10ExtractAtom;this.crossref=nano10ExtractCrossref;this.fetchSource=nano10Fetch;this.schedule=nano10Scheduled;this.scan=nano10Scan;this.report=nano10Report;this.url=nano10Url;',sandbox);
 assert.equal(sandbox.sources.length,2);
+for(const topic of sandbox.topics){assert.ok(topic.crossref.includes('query.bibliographic='));assert.ok(topic.crossref.includes('sort=published&order=desc'));assert.ok(!topic.crossref.includes('query.title='));}
 assert.equal(sandbox.topics.length,4);
 assert.equal(sandbox.link('http://arxiv.org/abs/2605.12345v2','arxiv'),'https://arxiv.org/abs/2605.12345');
 assert.equal(sandbox.link('https://evil.example/abs/2605.12345','arxiv'),null);

@@ -845,7 +845,7 @@ const NANO7_REGISTRY=Object.freeze([
    endpoint:"https://api.openalex.org/works?search=autonomous%20AI%20agents&per_page=8&select=id,title,publication_date,cited_by_count",
    note:"Bibliographic metadata does not verify experimental findings."}),
  Object.freeze({id:"crossref",name:"Crossref",category:"Alternative scholarly metadata",kind:"paper",
-   endpoint:"https://api.crossref.org/works?query.title=autonomous%20AI%20agents&rows=8&select=DOI,title,URL,is-referenced-by-count",
+   endpoint:"https://api.crossref.org/works?query.bibliographic=autonomous%20AI%20agents&sort=published&order=desc&rows=8&select=DOI,title,URL,is-referenced-by-count",
    note:"Public publisher DOI metadata; neither research findings nor demand are independently confirmed."})
 ]);
 const NANO7_DAILY_LIMIT=3;
@@ -1082,16 +1082,16 @@ const NANO10_VERSION="journal-v1";
 const NANO10_TOPICS=Object.freeze([
   Object.freeze({id:"ai",label:"AI & autonomous agents",
     arxiv:"https://export.arxiv.org/api/query?search_query=cat%3Acs.AI&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
-    crossref:"https://api.crossref.org/works?query.title=artificial%20intelligence%20agents&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"}),
+    crossref:"https://api.crossref.org/works?query.bibliographic=artificial%20intelligence%20agents&sort=published&order=desc&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"}),
   Object.freeze({id:"security",label:"Cybersecurity & privacy",
     arxiv:"https://export.arxiv.org/api/query?search_query=cat%3Acs.CR&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
-    crossref:"https://api.crossref.org/works?query.title=cybersecurity%20privacy&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"}),
+    crossref:"https://api.crossref.org/works?query.bibliographic=cybersecurity%20privacy&sort=published&order=desc&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"}),
   Object.freeze({id:"robotics",label:"Robotics & intelligent systems",
     arxiv:"https://export.arxiv.org/api/query?search_query=cat%3Acs.RO&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
-    crossref:"https://api.crossref.org/works?query.title=robotics%20autonomous%20systems&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"}),
+    crossref:"https://api.crossref.org/works?query.bibliographic=robotics%20autonomous%20systems&sort=published&order=desc&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"}),
   Object.freeze({id:"systems",label:"Software engineering & infrastructure",
     arxiv:"https://export.arxiv.org/api/query?search_query=cat%3Acs.SE&start=0&max_results=5&sortBy=submittedDate&sortOrder=descending",
-    crossref:"https://api.crossref.org/works?query.title=software%20engineering%20automation&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"})
+    crossref:"https://api.crossref.org/works?query.bibliographic=software%20engineering%20automation&sort=published&order=desc&rows=6&select=DOI,title,published,URL,type,is-referenced-by-count"})
 ]);
 const NANO10_SOURCES=Object.freeze([
  Object.freeze({id:"crossref",name:"Crossref",format:"json",host:"api.crossref.org"}),

@@ -24,7 +24,7 @@ const endpoints={
  'https://dev.to/api/articles?tag=ai&per_page=8&top=7':'dev',
  'https://huggingface.co/api/models?sort=trendingScore&direction=-1&limit=8':'hf',
  'https://api.openalex.org/works?search=autonomous%20AI%20agents&per_page=8&select=id,title,publication_date,cited_by_count':'openalex',
- 'https://api.crossref.org/works?query.title=autonomous%20AI%20agents&rows=8&select=DOI,title,URL,is-referenced-by-count':'crossref'
+ 'https://api.crossref.org/works?query.bibliographic=autonomous%20AI%20agents&sort=published&order=desc&rows=8&select=DOI,title,URL,is-referenced-by-count':'crossref'
 };
 const fetch=async(url,options)=>{
  const id=endpoints[url];assert.ok(id,'Unregistered endpoint fetched: '+url);
