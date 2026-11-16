@@ -11,6 +11,15 @@ Status: 2026-11-16. This is an operational guide, **not** proof that a full rest
 - The snapshot includes an embedded static asset fallback; if a future Worker uses an external assets binding, preserve those assets separately.
 - This is **not automated synchronization** between the deployment and GitHub: repeat the source snapshot following each authorized deploy.
 
+## Browser and incident investigation testing (2026-11-16)
+
+- Isolated Chromium suite: `scripts/test-browser.mjs` and `.github/workflows/hq-browser-integration.yml`.
+- Verified desktop (1366 × 850) and mobile (390 × 844) using mock `/api/report` data.
+- Tests cover HQpulse search/filtering, incident disclosure, investigation checklist, responsive width, navigation, browser Back, and JavaScript exceptions.
+- Latest browser run: GitHub Actions #43834399985 — passed.
+- The synthetic mock is **not** an authenticated founder session and does not demonstrate live access to production D1.
+- HQpulse investigation checklist is advisory only; independent validation and founder review remain mandatory.
+
 ## External health monitoring
 
 - Workflow: `.github/workflows/independent-health.yml`.
