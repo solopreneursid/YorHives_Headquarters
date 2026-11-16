@@ -73,7 +73,7 @@ const ui=bundle['/dashboard.js'];
 assert.ok(ui.includes('function feasibilityPanel()'));
 assert.equal((ui.match(/\$\{feasibilityPanel\(\)\}/g)||[]).length,1,
  'AI Employees must show Phase 13 review');
-assert.ok(ui.includes('implementationEvidencePanel()+feasibilityPanel()+manifestEvidencePanel()+dependencySignalsPanel()+founderResearchPanel()+experimentPlansPanel()+scienceEvidencePanel()'),
+assert.ok(ui.includes('implementationEvidencePanel()+feasibilityPanel()+manifestEvidencePanel()+dependencySignalsPanel()+founderResearchPanel()+experimentPlansPanel()+experimentEvidencePanel()+scienceEvidencePanel()'),
  'Research journals must show Phase 13 review');
 assert.ok(ui.includes('Provisional research triage'));
 assert.ok(ui.includes('esc(e.licenseDisposition'));
