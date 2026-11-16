@@ -47,6 +47,12 @@ test('auth fails closed for anonymous and malformed token on all routes',async()
  const r=await worker.fetch(new Request('https://test.example/',{headers:{'Cf-Access-Jwt-Assertion':'x.y.z'}}),{ACCESS_AUD:'aud',ACCESS_TEAM_DOMAIN:'team.cloudflareaccess.com',ACCESS_OWNER_EMAIL:'test@example.com'});
  assert.equal(r.status,403);
 });
+test('Granite model chat.completion response is extracted from choices',()=>{
+ const output={choices:[{message:{role:'assistant',content:'{\"reason\":\"Useful\",\"risk\":\"Unknown\",\"nextStep\":\"Verify\",\"fitScore\":4}'}}]};
+ assert.equal(x.parseAi(x.aiReplyText(output)).fitScore,4);
+ assert.equal(x.aiReplyText({response:'Plain response'}),'Plain response');
+ assert.equal(x.aiReplyText({choices:[]}), '');
+});
 test('AI output is bounded, learning needs feedback, and memory weights stay bounded',()=>{
  const r=x.parseAi('{"reason":"A reason","risk":"A risk","nextStep":"Verify","fitScore":7}');
  assert.equal(r.fitScore,5);
@@ -73,7 +79,7 @@ test('scheduled research persists records and quota prevents repeated scans',asy
 });
 test('AI review is saved, repeated requests do not spend quota, and decisions evolve weights',async()=>{
  const e=env();let invocations=0;
- e.AI.run=async()=>{invocations++;return{response:JSON.stringify({reason:'Explore customer need',risk:'No verified demand',nextStep:'Interview users',fitScore:4})};};
+ e.AI.run=async()=>{invocations++;return{choices:[{message:{content:JSON.stringify({reason:'Explore customer need',risk:'No verified demand',nextStep:'Interview users',fitScore:4})}}]};};
  const stamp=new Date().toISOString();
  await e.DB.prepare('INSERT INTO opportunities(id,title,summary,category,source,url,first_seen,last_seen) VALUES(?,?,?,?,?,?,?,?)').bind('lead_ab1234','Open-source tool','Public link','Apps & Tools','Hacker News','https://example.org',stamp,stamp).run();
  const result=await x.evaluate(e,'lead_ab1234');assert.equal(result.ok,true);
