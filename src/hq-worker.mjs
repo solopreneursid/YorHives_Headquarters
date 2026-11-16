@@ -1211,10 +1211,10 @@ async function nano12Investigate(env,paper,existing,at=nowIso()){
 async function nano12Scheduled(env,scheduledTime){
  const clock=new Date(scheduledTime),at=nowIso();
  const counts=await env.DB.prepare("SELECT COUNT(*) n FROM nano_implementation_checks").first();
- // One per existing 5-minute tick during first two bootstrap scans; thereafter
- // only the UTC 04:20 and 16:20 slots, with a max 2/day atomic fetch quota.
- if(Number(counts?.n||0)>=2&&!(clock.getUTCMinutes()===20&&[4,16].includes(clock.getUTCHours())))
-  return "outside-window";
+ // One initial paper check may bootstrap outside the normal windows.
+ // A link discovered on that paper can be checked on a later 5-min tick.
+ // Once the first repository-metadata check or separate paper record exists,
+ // only the two daily windows can collect further evidence.
  const all=await env.DB.prepare(
   "SELECT p.paper_id,p.source_id,p.source_url,p.title,p.published_at,"+
   "r.research_priority,c.state,c.repository_url,c.attempts,c.next_check_at "+
@@ -1226,6 +1226,10 @@ async function nano12Scheduled(env,scheduledTime){
  eligible.sort((a,b)=>Number(b.state==="repository-link-observed")-Number(a.state==="repository-link-observed")||
   Number(b.research_priority||0)-Number(a.research_priority||0));
  if(!eligible.length)return "no-due-papers";
+ const inWindow=clock.getUTCMinutes()===20&&[4,16].includes(clock.getUTCHours());
+ const bootstrap=Number(counts?.n||0)===0 ||
+  (Number(counts?.n||0)===1&&eligible[0].state==="repository-link-observed");
+ if(!bootstrap&&!inWindow)return "outside-window";
  return nano12Investigate(env,eligible[0],eligible[0],at);
 }
 function nano12Report(checks){
