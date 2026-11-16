@@ -7,7 +7,7 @@ Private, single-founder, mobile-first control center with the original supplied 
 - Six responsive pages: Home, Discover, AI Team, Decisions, Growth, Control; back/forward via hash routing.
 - Cloudflare Access founder-only application and independent Worker JWT RS256 enforcement on every data and HTML route.
 - Cloudflare D1 persistent opportunities, saved leads, founder decisions, decision history, AI reviews, source performance, quota, and learning weights.
-- Five bounded, attributed public research feeds using allowlisted HTTPS GET requests (HN Show/Ask/Pricing/Alternatives, DEV Community). Category assignment is heuristic. All discoveries stay **unverified leads**.
+- Five bounded, attributed public research feeds using allowlisted HTTPS GET requests with Cloudflare-compatible manual redirect rejection (HN Show/Ask/Pricing/Alternatives, DEV Community). Category assignment is heuristic. All discoveries stay **unverified leads**.
 - Cloudflare Workers AI (`@cf/ibm-granite/granite-4.0-h-micro`) only when needed. Reviews are preliminary, capped at **3 calls/account/day by HQ** and 220 output tokens per request; failure degrades to rules-only. Cloudflare Free total neuron allocation is shared with any other applications.
 - Deterministic self-evolution: uses founder approve/reject feedback to adjust source priorities after at least three judgments; D1 versioned weights, no model fine-tuning.
 - Weekly allowlisted GitHub releases checks suggest software improvements, never install or deploy them.
@@ -16,7 +16,7 @@ Private, single-founder, mobile-first control center with the original supplied 
 
 ## Free quotas and scheduling
 
-- HQ cron every 15 minutes: site availability + heartbeat; first-run research then every six hours; optional AI once daily for the latest unreviewed lead; allowed GitHub release checks every Monday 01:00 UTC.
+- HQ cron every 15 minutes: site availability + heartbeat; first-run research, bounded failure retries, then every six hours; optional AI once daily for the latest unreviewed lead; allowed GitHub release checks every Monday 01:00 UTC.
 - Research: max 8 scans per UTC day, 5 public HTTP GETs per scan, 15-minute cooldown.
 - Workers AI: max 3 HQ calls per UTC day; keep within Cloudflare Free account-wide allocation. Free-tier limits/change remain Cloudflare's responsibility. No guaranteed zero future cost or third-party availability.
 - Watchdog cron every 30 minutes. State is recorded in D1 and visible in Control.

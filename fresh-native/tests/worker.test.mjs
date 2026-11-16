@@ -120,3 +120,16 @@ test('fresh-install cron seeds research before six-hour schedule without spendin
   assert.equal(data.budget.scansUsed,1);
  }finally{globalThis.fetch=before;}
 });
+
+test('Cloudflare-compatible manual redirect blocks redirects and allows HTTP 200 JSON',async()=>{
+ const url='https://dev.to/api/articles?per_page=8&top=7',original=globalThis.fetch;
+ const calls=[];
+ globalThis.fetch=async(request,opts)=>{calls.push({request,opts});if(opts.redirect!=='manual')throw Error('redirect mode unsupported');return new Response('redirect',{status:302,headers:{location:'https://bad.example/'}});};
+ try{
+  await assert.rejects(x.publicJson(url),/source-http-302/);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].opts.redirect,'manual');
+  globalThis.fetch=async(_req,opts)=>{assert.equal(opts.redirect,'manual');return new Response('[]',{status:200});};
+  assert.deepEqual(await x.publicJson(url),[]);
+ }finally{globalThis.fetch=original;}
+});

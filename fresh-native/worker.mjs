@@ -71,7 +71,7 @@ function normalizeHN(hit,feed=FEEDS[0]){
  return {id:idFor('Hacker News',link),title,summary:feed.category==='Markets'?'Public question. Customer demand is not established.':feed.category==='Revenue'?'Public pricing discussion. Revenue is unverified.':feed.category==='Competitors'?'Public alternative discussion. Verify features and licensing.':'Public launch or discussion. Validate demand and licensing.',category,source:feed.name,url:link,sourceDate:hit.created_at||null,verified:false};
 }
 function normalizeDev(hit){const title=clean(hit.title,180),link=safeHttps(hit.url);if(!title||!link)return null;return{id:idFor('DEV Community',link),title,summary:clean(hit.description,220)||'Technical article. Verify relevance.',category:classify(title),source:'DEV Community',url:link,sourceDate:hit.published_at||null,verified:false};}
-async function publicJson(url){if(!ALLOWED_PUBLIC.has(url))throw Error('source-not-allowlisted');const r=await fetch(url,{method:'GET',redirect:'error',signal:AbortSignal.timeout(6000),headers:{accept:'application/json','user-agent':'YorpHivesHQ-ReadOnly/2.0'}});if(!r.ok)throw Error(`source-http-${r.status}`);const len=Number(r.headers.get('content-length')||0);if(len>140000)throw Error('source-too-large');const text=await r.text();if(text.length>140000)throw Error('source-too-large');return JSON.parse(text);}
+async function publicJson(url){if(!ALLOWED_PUBLIC.has(url))throw Error('source-not-allowlisted');const r=await fetch(url,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(6000),headers:{accept:'application/json','user-agent':'YorpHivesHQ-ReadOnly/2.0'}});if(!r.ok)throw Error(`source-http-${r.status}`);const len=Number(r.headers.get('content-length')||0);if(len>140000)throw Error('source-too-large');const text=await r.text();if(text.length>140000)throw Error('source-too-large');return JSON.parse(text);}
 async function sourceStat(env,source,ok){await env.DB.prepare(`INSERT INTO source_stats(source,successes,failures,last_success,last_failure) VALUES(?,?,?,?,?) ON CONFLICT(source) DO UPDATE SET successes=successes+excluded.successes,failures=failures+excluded.failures,last_success=CASE WHEN excluded.last_success IS NOT NULL THEN excluded.last_success ELSE last_success END,last_failure=CASE WHEN excluded.last_failure IS NOT NULL THEN excluded.last_failure ELSE last_failure END`).bind(source,ok?1:0,ok?0:1,ok?now():null,ok?null:now()).run();}
 async function scanSources(env){
  const last=await stateGet(env,'last_scan');if(last&&Date.now()-Date.parse(last.updatedAt)<SCAN_COOLDOWN_MS)return {skipped:true,reason:'cooldown',last:last.updatedAt};
@@ -216,12 +216,14 @@ export default {
   await statePut(env,'last_cron',{at:now()}).catch(()=>{});
   const t=new Date(event?.scheduledTime||Date.now());
   // Seed an empty fresh install at its first cron, then use the six-hour schedule.
-  const firstScan=!(await stateGet(env,'last_scan').catch(()=>null));
-  if(firstScan||(t.getUTCHours()%6===0&&t.getUTCMinutes()<15))await scanSources(env).catch(()=>{});
+  const previousScan=await stateGet(env,'last_scan').catch(()=>null);
+  const firstScan=!previousScan;
+  const retryUnavailable=previousScan?.value?.status==='unavailable'&&Date.now()-Date.parse(previousScan.updatedAt)>=SCAN_COOLDOWN_MS;
+  if(firstScan||retryUnavailable||(t.getUTCHours()%6===0&&t.getUTCMinutes()<15))await scanSources(env).catch(()=>{});
   if(t.getUTCDay()===1&&t.getUTCHours()===1&&t.getUTCMinutes()<15)await checkUpdates(env).catch(()=>{});
   if(t.getUTCHours()===8&&t.getUTCMinutes()<15&&env.AI){
    try{const x=await env.DB.prepare('SELECT o.id FROM opportunities o LEFT JOIN evaluations e ON e.opportunity_id=o.id WHERE e.opportunity_id IS NULL ORDER BY o.last_seen DESC LIMIT 1').first();if(x)await evaluate(env,x.id);}catch{}
   }
  }
 };
-export const internals={classify,normalizeHN,normalizeDev,idFor,safeHttps,clean,updateWeight,parseAi,aiReplyText,scanSources,checkSite,checkUpdates,evaluate,bootstrap,reserve,authorized,api,learnFromDecision,exportData};
+export const internals={classify,normalizeHN,normalizeDev,idFor,safeHttps,clean,updateWeight,parseAi,aiReplyText,publicJson,scanSources,checkSite,checkUpdates,evaluate,bootstrap,reserve,authorized,api,learnFromDecision,exportData};
