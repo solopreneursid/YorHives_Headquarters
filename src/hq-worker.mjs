@@ -831,11 +831,22 @@ async function nanoScheduled(env,scheduledTime){
 async function scheduledCycle(env, scheduledTime) {
   if(!env.DB) throw Error("Missing D1 binding");
   const plan=schedulePlan(scheduledTime);
-  // Cloudflare is free only while account remains on Free; this worker has
-  // no paid API, AI binding, browser use, writable GitHub credential or deployment tool.
-  if(plan.uptime) await checkSite(env);
-  // Persist incident evidence before potentially slow research collectors.
-  await syncIncidentHistory(env);
+  // Cloudflare Free has shared quotas. No autonomous execution or paid inference.
+  // Record scheduler entry before any HTTP collectors can delay or fail.
+  await saveStatus(env,"last_cron","started:"+nowIso());
+  if(plan.uptime){
+   try{await checkSite(env);}catch(error){
+    const detail=clampText(error?.message||"site-check-failed",90);
+    console.warn("HQ site check:",detail);
+    try{await saveStatus(env,"site_check_error",detail);}catch{}
+   }
+  }
+  // An incident-ledger failure must never suppress research orchestration.
+  try{await syncIncidentHistory(env);}catch(error){
+   const detail=clampText(error?.message||"incident-ledger-failed",90);
+   console.warn("HQ incident ledger:",detail);
+   try{await saveStatus(env,"incident_ledger_error",detail);}catch{}
+  }
   // Small read-only workflow ledger runs BEFORE expensive discovery/scouts.
   try{
    const created=await nanoScheduled(env,scheduledTime);
