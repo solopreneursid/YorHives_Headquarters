@@ -38,6 +38,11 @@ const report={
   ],
   memory:{entries:[{memoryId:'memory-finding-abc',runId:'finding-abc',kind:'finding',department:'Security & Independent QA',title:'Synthetic shared memory evidence',evidenceState:'source-recorded-unverified',sourceUrl:'https://yorphives.com/',recommendation:'Founder check source',reviewState:'founder-review',observedAt:'2026-11-16T10:00:00Z',recordedAt:'2026-11-16T10:00:00Z'}]},
   nanoPipeline:{status:'created:2',checkedAt:'2026-11-16T10:00:00Z'},
+  triage:{reviewCount:1,researchFirst:1,screened:2,pipelineStatus:'updated:2',autoAiStatus:'disabled',
+    ready:[{memoryId:'memory-finding-abc',sourceKind:'finding',sourceId:'finding-1',department:'Engineering & Operations',
+      title:'Synthetic homepage outage',score:95,state:'review-now',action:'Founder: verify failure independently',
+      evidenceState:'source-recorded-unverified',verified:false}]},
+
   workflows:[{runId:'finding-abc',kind:'finding',sourceId:'finding-1',department:'Security & Independent QA',revision:1,
     stage:'founder_review',reviewState:'founder-review',evidenceState:'source-recorded-unverified',
     title:'Synthetic orchestrated investigation',recommendation:'Founder to review source',
@@ -135,6 +140,23 @@ try{
       assert.equal(await page.evaluate(()=>document.cookie),'');
       await page.locator('[data-page="home"]:visible').first().click();
       assert.ok(page.url().endsWith('#home'));
+    });
+    await test(profile.name+': automatic triage shows only source-backed priority',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      await page.getByText('Priority shortlist',{exact:true}).waitFor();
+      const panel=page.locator('.panel').filter({hasText:'Priority shortlist'});
+      assert.equal(await panel.locator('.triage-card').count(),1);
+      assert.ok((await panel.innerText()).includes('Synthetic homepage outage'));
+      assert.ok((await panel.innerText()).includes('need independent evidence'));
+      await page.locator('[data-page="decisions"]:visible').first().click();
+      assert.equal(await page.locator('.triage-card').count(),1);
+      const backlog=page.locator('.triage-backlog').first();
+      assert.ok(await backlog.count()>=1);
+      assert.equal(await backlog.getAttribute('open'),null,'Backlog is collapsed by default');
+      const learningPage=page.locator('[data-page="team"]:visible').first();
+      await learningPage.click();
+      const optional=page.locator('.panel').filter({hasText:'Learning playbooks'}).locator('details.triage-backlog');
+      assert.equal(await optional.getAttribute('open'),null,'Long feedback form starts collapsed');
     });
     await test(profile.name+': Nano workflow pipeline and evidence review',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
