@@ -49,6 +49,9 @@ const env={DB:{prepare(sql){
         return {meta:{changes:1}};
       }
     };
+  },first:async()=>{
+    if(sql==='SELECT run_id FROM workflow_runs LIMIT 1')return records[0]||null;
+    throw Error('Unexpected unbound first query: '+sql);
   },all:async()=>{
     if(sql.includes('FROM findings'))return {results:[finding]};
     if(sql.includes('FROM opportunities'))return {results:[opportunity]};
@@ -80,6 +83,17 @@ assert.equal(nanoRecall(memories,'all',5).length,3);
 assert.ok(nanoRecall(memories,'all',5).every(x=>x.evidenceState==='source-recorded-unverified'));
 assert.equal(await nanoScheduled(env,'2026-11-16T13:00:00Z'),0);
 assert.equal(records.length,3);
+// An empty ledger must bootstrap at the next five-minute Cron, even off the half-hour.
+records.length=0;memories.length=0;
+assert.equal(await nanoScheduled(env,'2026-11-16T13:15:00Z'),2,'First Cron bootstraps existing observations');
+assert.equal(records.length,2);
+assert.equal(memories.length,2);
+assert.equal(await nanoScheduled(env,'2026-11-16T13:20:00Z'),0,'Off-window repeat does nothing after bootstrap');
+const cron=source.slice(source.indexOf('async function scheduledCycle(env, scheduledTime)'),source.indexOf('function base64UrlBytes('));
+assert.ok(cron.includes('await nanoScheduled(env,scheduledTime)'), 'Cron must actually invoke workflows');
+assert.ok(cron.indexOf('await nanoScheduled(env,scheduledTime)')<cron.indexOf('await checkProducts(env)'), 'Workflows run before slower collectors');
+assert.ok(cron.includes('saveStatus(env,"last_cron"'), 'Heartbeat must remain executable');
+assert.ok(!cron.includes('heartbeat.\\n  try'), 'Do not embed literal escaped newlines inside comments');
 assert.ok(!source.slice(start,end).includes('env.AI.run'),'Orchestrator must spend zero inference');
 assert.ok(!source.slice(start,end).includes('fetch('),'Orchestrator must not call external web APIs');
 assert.ok(!source.slice(start,end).includes('deploy'),'Orchestrator must not deploy');
@@ -88,6 +102,7 @@ console.log('PASS: routing across security, market and engineering departments')
 console.log('PASS: evidence source recorded, explicitly not independently verified');
 console.log('PASS: founder review stage and missing-evidence gate');
 console.log('PASS: immutable prior revision, idempotent unchanged polling');
-console.log('PASS: schedule every 30 min, no AI inference or external tools');
+console.log('PASS: 30-minute schedule and first-run bootstrap at next Cron');
+console.log('PASS: Cron invocation and heartbeat are executable, never commented out');
 console.log('PASS: shared memory idempotency, repair, provenance and departmental recall');
 console.log('PASS: all tests use synthetic observations and fake D1');
