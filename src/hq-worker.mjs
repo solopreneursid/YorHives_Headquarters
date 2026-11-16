@@ -1357,7 +1357,12 @@ export default {
     const privateAiWrite=route==="/api/ai/analyze"&&request.method==="POST";
     if(!decisionWrite&&!privateAiWrite&&!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
     if(!(await verifyAccess(request,env,ctx))) return new Response("Private Headquarters access not configured or unauthorized",{status:403,headers:{"cache-control":"no-store","x-content-type-options":"nosniff"}});
-    if(privateAiWrite)return privateAiAnalyze(request,env);
+    if(privateAiWrite){
+      const origin=request.headers.get("origin");
+      const host=new URL(request.url).origin;
+      if(origin!==host)return json({error:"Same-origin founder request required"},403);
+      return privateAiAnalyze(request,env);
+    }
     if(route==="/api/ai/status"&&request.method==="GET")return json(privateAiStatus(env));
     if(decisionWrite) {
       try{return await saveDecision(request,env);}catch{return json({error:"Decision could not be saved; refresh before retrying"},503);}
