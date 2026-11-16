@@ -829,6 +829,174 @@ async function nanoScheduled(env,scheduledTime){
 }
 
 
+
+/* Nano Phase 6 — low-cost, source-specific, bounded public investigations.
+ * GitHub and Hacker News FIRST-PARTY API endpoints only. Never fetch supplied URLs,
+ * execute source instructions, or interpret existence/engagement as demand or revenue.
+ * Zero LLM inference, zero credentials, no source mutation.
+ */
+const NANO_INVESTIGATION_VERSION="v1";
+const NANO_INVESTIGATION_DAY_LIMIT=4;
+function nanoInvestigationTarget(raw){
+  let u;try{u=new URL(String(raw||""));}catch{return null;}
+  if(u.protocol!=="https:"||u.username||u.password||u.port)return null;
+  if(u.hostname==="github.com"&&!u.search&&!u.hash){
+    const match=/^\/([a-zA-Z0-9][a-zA-Z0-9-]{0,38})\/([a-zA-Z0-9_.-]{1,100})\/?$/.exec(u.pathname);
+    if(match&&!match[2].endsWith(".git"))return {kind:"github",url:"https://api.github.com/repos/"+match[1]+"/"+match[2],canonical:"https://github.com/"+match[1]+"/"+match[2]};
+  }
+  if(u.hostname==="news.ycombinator.com"&&u.pathname==="/item"&&!u.hash){
+    const qs=new URLSearchParams(u.search);
+    if(qs.size!==1||!/^\d{1,12}$/.test(qs.get("id")||""))return null;
+    const id=Number(qs.get("id"));
+    if(Number.isSafeInteger(id)&&id>0)return {kind:"hn",url:"https://hacker-news.firebaseio.com/v0/item/"+id+".json",canonical:"https://news.ycombinator.com/item?id="+id,id};
+  }
+  return null;
+}
+function nanoGithubProject(raw){
+  const target=nanoInvestigationTarget(raw);
+  return target?.kind==="github"?target:null;
+}
+async function nanoInvestigationQuota(env){
+  // One external request consumes BOTH the shared public-fetch allowance and
+  // a separate tiny investigation quota. Atomic D1 protection for concurrency.
+  const today=nowIso().slice(0,10);
+  const r=await env.DB.prepare(
+    "INSERT INTO quota(day,kind,used) VALUES(?,'nano_investigation_fetches',1) "+
+    "ON CONFLICT(day,kind) DO UPDATE SET used=used+1 WHERE used<"+NANO_INVESTIGATION_DAY_LIMIT+
+    " RETURNING used").bind(today).first();
+  if(!r)return false;
+  return reserveFetch(env);
+}
+async function nanoSourceJson(env,target){
+  if(!target||!["hn","github"].includes(target.kind)||
+    !/^https:\/\/(?:api\.github\.com\/repos\/|hacker-news\.firebaseio\.com\/v0\/item\/)/.test(target.url))
+    throw Error("source-target-not-allowlisted");
+  if(!(await nanoInvestigationQuota(env)))throw Error("investigation-budget-reached");
+  const response=await fetch(target.url,{method:"GET",redirect:"error",cache:"no-store",
+    signal:AbortSignal.timeout(4000),
+    headers:{"user-agent":"YorpHivesHQ-ReadOnly-Research/1.0","accept":"application/json"}});
+  if(!response.ok){await response.body?.cancel();throw Error("source-http-"+String(response.status));}
+  if(!/\bapplication\/(?:[a-z.+-]*\+)?json\b/i.test(response.headers.get("content-type")||"")){
+    await response.body?.cancel();throw Error("source-content-type");
+  }
+  const text=await boundedText(response,45000);
+  if(text===null)throw Error("source-body-too-large");
+  return JSON.parse(text);
+}
+function nanoGithubMetadata(payload){
+  if(!payload||typeof payload!=="object"||payload.archived===true||payload.disabled===true||
+    !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(String(payload.html_url||"")))return null;
+  return {provider:"GitHub",url:clampText(payload.html_url,250),
+    project:clampText(payload.full_name,160),
+    description:clampText(payload.description,220),
+    stars:Math.max(0,Math.min(10000000,Number(payload.stargazers_count)||0)),
+    forks:Math.max(0,Math.min(10000000,Number(payload.forks_count)||0)),
+    updatedAt:clampText(payload.pushed_at,35),
+    license:clampText(payload.license?.spdx_id,40)||"Unknown",
+    notes:"Repository metadata only; not proof of licensing suitability, functionality, adoption, customer demand or revenue."};
+}
+function nanoHNMetadata(payload,expectedId){
+  if(!payload||payload.deleted||payload.dead||Number(payload.id)!==expectedId||
+    !["story","job"].includes(String(payload.type||"")))return null;
+  return {provider:"Hacker News",url:"https://news.ycombinator.com/item?id="+expectedId,
+    title:clampText(payload.title,180),points:Math.max(0,Math.min(10000000,Number(payload.score)||0)),
+    comments:Math.max(0,Math.min(10000000,Number(payload.descendants)||0)),
+    postedAt:Number.isFinite(payload.time)&&payload.time>0?new Date(payload.time*1000).toISOString():"",
+    notes:"Public discussion metadata only; votes/comments are NOT validated customer demand, product success or revenue."};
+}
+function nanoInvestigationChecklist(title,metadata){
+  const t=String(title||"").toLowerCase(),tags=[];
+  if(/\b(agent|llm|ai|model|workflow|automation|coding)\b/i.test(t)){
+    tags.push({department:"Research & Innovation",question:"Is the technology open-weight or licensed for self-hosting, and can HQ swap it safely?"});
+    tags.push({department:"Engineering & Operations",question:"Can it integrate with YorpHives without vendor lock-in or production write permissions?"});
+  }else if(/\b(game|rts|browser|wasm|web)\b/i.test(t)){
+    tags.push({department:"Product & Growth",question:"Does this solve a problem for YorpHives visitors or only demonstrate a technology?"});
+  }else{
+    tags.push({department:"Global Market Intelligence",question:"Which independently evidenced customer problem and geography does this address?"});
+  }
+  tags.push({department:"Revenue & Business",question:"Is there independently verified willingness to pay, or only a public mention?"});
+  tags.push({department:"Security & Independent QA",question:"Verify licensing, terms, dependencies and privacy before any reuse."});
+  return tags.slice(0,4);
+}
+async function nanoInvestigateOne(env,observedAt=nowIso()){
+  const candidate=await env.DB.prepare(
+    "SELECT m.memory_id,m.run_id,m.source_id,m.source_kind,m.department,m.title,m.source_url,"+
+    "i.checked_at old_checked,i.source_fingerprint old_fp "+
+    "FROM nano_memories m LEFT JOIN nano_investigations i ON i.memory_id=m.memory_id "+
+    "WHERE m.source_kind='opportunity' AND (i.memory_id IS NULL OR i.next_check_at<=?) "+
+    "ORDER BY CASE WHEN i.memory_id IS NULL THEN 0 ELSE 1 END,m.recorded_at DESC LIMIT 1"
+  ).bind(observedAt).first();
+  if(!candidate)return "nothing-due";
+  const fingerprint=fnv(JSON.stringify([NANO_INVESTIGATION_VERSION,candidate.run_id,candidate.source_url]));
+  const target=nanoInvestigationTarget(candidate.source_url);
+  let state="unsupported-source",facts=[],primary=null,secondary=null,error="";
+  if(target){
+    try{
+      const result=await nanoSourceJson(env,target);
+      if(target.kind==="github"){
+        const metadata=nanoGithubMetadata(result);
+        if(!metadata||metadata.url.replace(/\/$/,"").toLowerCase()!==target.canonical.toLowerCase())throw Error("github-metadata-mismatch");
+        primary=metadata;facts=[metadata];state="primary-metadata-confirmed";
+      }else{
+        const metadata=nanoHNMetadata(result,target.id);
+        if(!metadata)throw Error("hn-metadata-mismatch");
+        primary=metadata;facts=[metadata];state="primary-metadata-confirmed";
+        // Only GitHub repositories are eligible for a second independent platform.
+        const extra=nanoGithubProject(result.url);
+        if(extra){
+          try{
+            const repo=nanoGithubMetadata(await nanoSourceJson(env,extra));
+            if(repo&&repo.url.replace(/\/$/,"").toLowerCase()===extra.canonical.toLowerCase()){
+              secondary=repo;facts.push(repo);state="cross-platform-metadata-confirmed";
+            }
+          }catch{error="secondary-metadata-not-available";}
+        }
+      }
+    }catch(e){
+      // Strictly no retry inside the same Cron. Preserve previous evidence.
+      const msg=String(e?.message||"source-unavailable");
+      if(/budget/.test(msg))return "budget-exhausted";
+      error=/^source-http-\d{3}$/.test(msg)?msg:"source-unavailable";
+      state="source-unavailable";
+    }
+  }
+  const next=new Date(Date.parse(observedAt)+(state==="source-unavailable"?86400000:3*86400000)).toISOString();
+  const checklist=nanoInvestigationChecklist(candidate.title,facts);
+  const params=[candidate.memory_id,candidate.source_id,candidate.title,candidate.department,
+    state,primary?.url||target?.canonical||"",secondary?.url||"",
+    JSON.stringify(facts).slice(0,3200),JSON.stringify(checklist).slice(0,1800),error,
+    fingerprint,observedAt,next];
+  const sql="INSERT INTO nano_investigations(memory_id,source_id,title,department,state,primary_url,secondary_url,facts_json,checklist_json,error_code,source_fingerprint,checked_at,next_check_at) "+
+    "SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM nano_memories WHERE memory_id=?) "+
+    "AND (SELECT COUNT(*) FROM nano_investigations)<1000 "+
+    "ON CONFLICT(memory_id) DO UPDATE SET state=excluded.state,primary_url=excluded.primary_url,secondary_url=excluded.secondary_url,"+
+    "facts_json=excluded.facts_json,checklist_json=excluded.checklist_json,error_code=excluded.error_code,"+
+    "source_fingerprint=excluded.source_fingerprint,checked_at=excluded.checked_at,next_check_at=excluded.next_check_at";
+  const saved=await env.DB.prepare(sql).bind(...params,candidate.memory_id).run();
+  return saved.meta?.changes===1?state:"not-recorded";
+}
+async function nanoInvestigationScheduled(env,scheduledTime){
+  const stamp=new Date(scheduledTime);
+  if(stamp.getUTCMinutes()%30!==0)return "outside-window";
+  return nanoInvestigateOne(env,nowIso());
+}
+function nanoInvestigationReport(rows){
+  const all=(Array.isArray(rows)?rows:[]).slice(0,40).map(r=>{
+    let facts=[],checklist=[];
+    try{const f=JSON.parse(r.facts_json||"[]");if(Array.isArray(f))facts=f.slice(0,2);}catch{}
+    try{const c=JSON.parse(r.checklist_json||"[]");if(Array.isArray(c))checklist=c.slice(0,4);}catch{}
+    return {memoryId:r.memory_id,title:r.title,department:r.department,
+      state:r.state,primaryUrl:r.primary_url||"",secondaryUrl:r.secondary_url||"",
+      facts,checklist,checkedAt:r.checked_at,nextCheckAt:r.next_check_at,
+      demandVerified:false,revenueVerified:false,productFunctionalityVerified:false,
+      scope:"Platform metadata only; no business demand or independent functional tests"};
+  });
+  return {entries:all,checked:all.length,crossPlatform:all.filter(x=>x.state==="cross-platform-metadata-confirmed").length,
+    confirmed:all.filter(x=>/metadata-confirmed$/.test(x.state)).length,
+    pending:all.filter(x=>!(/metadata-confirmed$/.test(x.state))).length,
+    sourceScope:"First-party Hacker News and GitHub metadata. No arbitrary URLs, AI model, or product execution."};
+}
+
 /* Nano Phase 5 — automated, deterministic triage.
  * Scores measure internal review priority, never evidence truth or customer demand.
  * Every record is a revision-linked HQ observation; no new web requests or site writes.
@@ -1006,6 +1174,11 @@ async function scheduledCycle(env, scheduledTime) {
     const state=await nanoAutoAiOnce(env,scheduledTime);
     if(state!=="outside-window"&&state!=="disabled")await saveStatus(env,"nano_auto_ai",state);
   }catch(error){try{await saveStatus(env,"nano_auto_ai","error:"+clampText(error?.message,70));}catch{}}
+  // Phase 6: one bounded public-source investigation every half-hour; no model calls.
+  try{
+    const outcome=await nanoInvestigationScheduled(env,scheduledTime);
+    if(outcome!=="outside-window")await saveStatus(env,"nano_investigations",outcome);
+  }catch(error){try{await saveStatus(env,"nano_investigations","error:"+clampText(error?.message,75));}catch{}}
   if(plan.products) await checkProducts(env);
   // On a newly initialized HQ database, discover/research immediately rather
   // than waiting up to six hours or one day for the first scheduled window.
@@ -1328,6 +1501,7 @@ async function report(env) {
   const memoryRows=await env.DB.prepare("SELECT * FROM nano_memories ORDER BY recorded_at DESC LIMIT 60").all();
   const learningRows=await env.DB.prepare("SELECT p.*,m.title FROM nano_playbooks p JOIN nano_memories m ON m.memory_id=p.memory_id ORDER BY p.reviewed_at DESC,p.rowid DESC LIMIT 60").all();
   const triageRows=await env.DB.prepare("SELECT * FROM nano_triage ORDER BY assessed_at DESC,memory_id DESC LIMIT 80").all();
+  const investigationRows=await env.DB.prepare("SELECT * FROM nano_investigations ORDER BY checked_at DESC,memory_id DESC LIMIT 40").all();
   const [incidentRows,incidentEvents]=await Promise.all([
     env.DB.prepare("SELECT * FROM incident_history ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, last_seen DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM incident_events ORDER BY sequence DESC LIMIT 150").all()
@@ -1358,6 +1532,7 @@ async function report(env) {
   return {
     nanoPipeline:{status:metadata.find(x=>x.key==="nano_workflows")?.value||"not-attempted",
       checkedAt:metadata.find(x=>x.key==="nano_workflows")?.checked_at||""},
+    investigations:{...nanoInvestigationReport(investigationRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_investigations")?.value||"not-attempted"},
     triage:{...triage,autoAiStatus:metadata.find(x=>x.key==="nano_auto_ai")?.value||"disabled",
       pipelineStatus:metadata.find(x=>x.key==="nano_triage")?.value||"not-attempted"},
     learning:nanoLearningView(learningRows.results||[]),
