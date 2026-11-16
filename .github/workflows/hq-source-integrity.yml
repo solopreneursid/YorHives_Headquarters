@@ -6,6 +6,7 @@ on:
       - 'scripts/verify-hq.mjs'
       - 'scripts/test-incidents.mjs'
       - 'scripts/test-auth.mjs'
+      - 'scripts/test-private-ai.mjs'
       - '.github/workflows/hq-source-integrity.yml'
   workflow_dispatch:
 permissions:
@@ -24,6 +25,7 @@ jobs:
           node scripts/verify-hq.mjs
           node scripts/test-incidents.mjs
           node scripts/test-auth.mjs
+          node scripts/test-private-ai.mjs
       - name: Record verification scope
         if: always()
         shell: bash
