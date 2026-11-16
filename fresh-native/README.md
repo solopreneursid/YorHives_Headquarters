@@ -1,39 +1,50 @@
-# YorpHivesHQ — Native Fresh Build (Phase 1)
+# YorpHivesHQ — Native Cloudflare HQ (v2)
 
-Private, single-founder mobile-first command center. Original supplied Y emblem preserved. Completely independent implementation under `fresh-native/` in the existing GitHub repository; no legacy HQ code or data reused.
+Private, single-founder, mobile-first control center with the original supplied YorpHives emblem. New implementation under `fresh-native/` in the existing repository; legacy application and public website are untouched.
 
-## Scope implemented
+## What works
 
-- Six pages: Home, Discover, AI Team, Decisions, Growth, Control.
-- Responsive navigation: four bottom tabs + More on mobile, six-link desktop sidebar.
-- Authenticated Cloudflare Worker, fail-closed Access JWT verification (issuer, audience, email, signature).
-- Separate Cloudflare D1 database for health status, research leads, bookmarks, and founder decisions.
-- Bounded public GET source adapters: HN Algolia, DEV Community. Results are **unverified leads**, not AI findings.
-- Site availability check (HTTP status), cron heartbeat, manual scan cooldown, and decision audit state.
-- Founder decisions record approval/rejection/snooze only: no code changes, site mutations, deployment, or purchases.
-- YorpMind AI, growth metrics, learning and upgrade engine are visibly **not connected/planned**.
+- Six responsive pages: Home, Discover, AI Team, Decisions, Growth, Control; back/forward via hash routing.
+- Cloudflare Access founder-only application and independent Worker JWT RS256 enforcement on every data and HTML route.
+- Cloudflare D1 persistent opportunities, saved leads, founder decisions, decision history, AI reviews, source performance, quota, and learning weights.
+- Five bounded, attributed public research feeds using allowlisted HTTPS GET requests (HN Show/Ask/Pricing/Alternatives, DEV Community). Category assignment is heuristic. All discoveries stay **unverified leads**.
+- Cloudflare Workers AI (`@cf/ibm-granite/granite-4.0-h-micro`) only when needed. Reviews are preliminary, capped at **3 calls/account/day by HQ** and 220 output tokens per request; failure degrades to rules-only. Cloudflare Free total neuron allocation is shared with any other applications.
+- Deterministic self-evolution: uses founder approve/reject feedback to adjust source priorities after at least three judgments; D1 versioned weights, no model fine-tuning.
+- Weekly allowlisted GitHub releases checks suggest software improvements, never install or deploy them.
+- Independent Watchdog Worker reads the HQ cron heartbeat from shared D1 and checks YorpHives.com. It does not verify full HQ application functionality nor survive a Cloudflare-wide outage.
+- Founder-only JSON export of D1 records; no GitHub writer, infrastructure mutation, paid providers, arbitrary web fetch or shell tools in HQ agent runtime.
 
-## Architecture and limits
+## Free quotas and scheduling
 
-Cloudflare Free only, no local always-on model, no Docker, no paid APIs. One Worker + one D1 database + one Access app. Two public source GET requests per scan; 15-minute scan cooldown, recurring site checks every 15 minutes and research checks every 6 hours. CPU/network/data usage must be monitored; free tiers can change.
+- HQ cron every 15 minutes: site availability + heartbeat; research every six hours; optional AI once daily for the latest unreviewed lead; allowed GitHub release checks every Monday 01:00 UTC.
+- Research: max 8 scans per UTC day, 5 public HTTP GETs per scan, 15-minute cooldown.
+- Workers AI: max 3 HQ calls per UTC day; keep within Cloudflare Free account-wide allocation. Free-tier limits/change remain Cloudflare's responsibility. No guaranteed zero future cost or third-party availability.
+- Watchdog cron every 30 minutes. State is recorded in D1 and visible in Control.
 
-## Security
+## Source building and security
 
-All routes, including `/`, require authenticated Cloudflare Access JWT belonging to founder. Access application must protect the Worker itself; Worker validates RS256 signature in defense in depth. POST requires same-origin `Origin`. No agent is granted GitHub write/deploy credentials. Output is escaped, source URLs must be HTTPS. Non-public account data never appears in public GitHub source files.
+`node build.mjs` checks that `index.html` contains the exact `app.js` script, verifies the original brand logo, and builds `dist/worker.mjs` with an inline-script SHA-256 CSP. The HTML asset is private; both HTML and API require an Access JWT signed by the configured team, audience and founder email. Non-GET API requests require same-origin Origin header.
 
-## Testing
+Do not grant the deployed Worker GitHub, deployment or billing credentials. Founder decisions are **records only**; approvals cannot trigger deployments. Developers may use GitHub/Cloudflare tools separately under founder direction.
 
-```
-node --test tests/worker.test.mjs
+## Tests
+
+```sh
+node --test tests/*.test.mjs
+node build.mjs
+node --check dist/worker.mjs
 python tests/ui_test.py
 ```
 
-Browser test uses mocked API and system Chromium across 320/390/768/1024/1440 px. These tests **do not** verify real Cloudflare authentication or external source connectivity, which require signed-in smoke tests.
+GitHub Actions additionally tests Chromium, Firefox and WebKit at 320/390/768/1024/1440 px. Local browser tests use simulated API responses and **do not** prove real logged-in Access, Workers AI availability, real external-source retrieval, or scheduled tasks.
 
 ## Release and rollback
 
-`worker.mjs` has a `__PAGE_HTML_BUILD_REPLACEMENT__` string replaced with JSON-stringified `index.html` at publish time. Bind D1 named `DB`, Access `ACCESS_AUD`, `ACCESS_TEAM_DOMAIN`, `ACCESS_OWNER_EMAIL`. Deploy as separate script `yorphiveshq-native-preview`. Never touch `yorphives-hq-free-pilot` or `yorphives.com` during preview. Record version/deployment ID for rollback.
+Deploy a Worker version with the compiled `dist/worker.mjs` and separate D1 binding, Access audience/issuer, and optional AI binding. Deploy the watchdog as a second isolated Worker with D1 only. Do not redirect, merge or delete the legacy HQ until live signed-in, real-source, D1 and cron checks succeed. Cloudflare script version IDs are retained for rollback.
 
-## Next
+## Remaining production gate
 
-Verify signed-in Access flow, public source scans, D1 persistence, quota tracking, independent watchdog. Integrate optional budgeted Workers AI only after a working free-tier usage controller is proved. Founder approves any future cutover.
+- Authenticate as founder, verify live `/api/bootstrap`, save/decision persistence, JSON export, and AI review output.
+- Confirm scheduled production D1 heartbeats, independent watchdog, and successful public-source results.
+- Audit mobile behaviour with actual user session; review Cloudflare account usage/billing plan; confirm Free status and AI quota.
+- Keep old HQ preserved until explicit release decision.
