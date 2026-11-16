@@ -38,6 +38,14 @@ const report={
   ],
   memory:{entries:[{memoryId:'memory-finding-abc',runId:'finding-abc',kind:'finding',department:'Security & Independent QA',title:'Synthetic shared memory evidence',evidenceState:'source-recorded-unverified',sourceUrl:'https://yorphives.com/',recommendation:'Founder check source',reviewState:'founder-review',observedAt:'2026-11-16T10:00:00Z',recordedAt:'2026-11-16T10:00:00Z'}]},
   nanoPipeline:{status:'created:2',checkedAt:'2026-11-16T10:00:00Z'},
+  globalSources:{pipelineStatus:'listing-recorded:dev:new:1',active:3,sources:[
+    {id:'dev',name:'DEV Community',category:'Developer problems',status:'listing-recorded',newCount:1,note:'Contributor posts only'},
+    {id:'hf',name:'Hugging Face',category:'AI models',status:'listing-recorded',newCount:1,note:'Licenses unverified'},
+    {id:'openalex',name:'OpenAlex',category:'Research',status:'listing-recorded',newCount:1,note:'Bibliographic evidence only'}
+   ],entries:[{id:'global-synthetic',sourceId:'dev',kind:'community',title:'Synthetic open-source AI agent workflow',
+     sourceUrl:'https://dev.to/author/agent-workflow',summary:'Unverified public discussion',
+     observedAt:'2026-11-16T10:00:00Z',verifiedDemand:false,verifiedRevenue:false}]},
+
 
   investigations:{checked:2,crossPlatform:1,confirmed:2,pending:0,pipelineStatus:'cross-platform-metadata-confirmed',
     entries:[{memoryId:'memory-opportunity-mock',title:'Synthetic AI developer project',
@@ -172,6 +180,21 @@ try{
       await learningPage.click();
       const optional=page.locator('.panel').filter({hasText:'Learning playbooks'}).locator('details.triage-backlog');
       assert.equal(await optional.getAttribute('open'),null,'Long feedback form starts collapsed');
+    });
+    await test(profile.name+': modular global sources and unverified candidate list',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      await page.getByText('Global intelligence sources',{exact:true}).waitFor();
+      const panel=page.locator('.panel').filter({hasText:'Global intelligence sources'});
+      assert.equal(await panel.locator('.source-card').count(),3);
+      const text=await panel.innerText();
+      assert.ok(text.includes('DEV Community')&&text.includes('Hugging Face')&&text.includes('OpenAlex'));
+      const backlog=panel.locator('details.source-backlog');
+      assert.equal(await backlog.getAttribute('open'),null);
+      await backlog.locator('summary').click();
+      const a=backlog.locator('a[href="https://dev.to/author/agent-workflow"]');
+      assert.equal(await a.count(),1);
+      assert.equal(await a.getAttribute('rel'),'noopener noreferrer');
+      assert.ok((await backlog.innerText()).includes('listing-unverified'));
     });
     await test(profile.name+': investigation evidence and department questions',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
