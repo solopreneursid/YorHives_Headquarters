@@ -54,6 +54,13 @@ assert.ok(fb.detail.startsWith('rate-limited:429:attempt-'));
 assert.ok(sandbox.backoff('rate-limited:429:attempt-3','',429,now).seconds>fb.seconds,'Exponential retries');
 assert.ok(sandbox.backoff('rate-limited:429:attempt-3','',503,now).detail==='source-http-503');
 
+const ranked=sandbox.normalize(sandbox.reg[0],[
+ {title:'Congrats to the Open-Source AI Challenge Winners!',url:'https://dev.to/author/winners',description:'Awards'},
+ {title:'Weekly AI Roundup',url:'https://dev.to/author/roundup',description:'Digest'},
+ {title:'How to automate customer support workflows',url:'https://dev.to/author/customer-workflows',description:'Specific implementation problem'}]);
+assert.equal(ranked.length,2);
+assert.equal(ranked[0].title,'How to automate customer support workflows',
+ 'Returned public listing should prioritize meaningful problems before publicity');
 const pub=sandbox.reg[0];
 await sandbox.save({DB:db},pub,{id:'filtered-1',sourceId:'dev',kind:'community',
  title:'Congrats to the Open-Source AI Challenge Winners!',url:'https://dev.to/author/winners-story',
