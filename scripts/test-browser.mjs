@@ -199,7 +199,7 @@ try{
       assert.equal(await panel.locator('.source-card .source-limited').count(),1);
       assert.equal(await panel.locator('.source-low-value').count(),0,'Quality details must remain in collapsed backlog');
       assert.ok(text.includes('cross-source topic overlap'));
-      const backlog=panel.locator('details.source-backlog');
+      const backlog=panel.locator('details.source-backlog').last();
       assert.equal(await backlog.getAttribute('open'),null);
       await backlog.locator('summary').click();
       const a=backlog.locator('a[href="https://dev.to/author/agent-workflow"]');
