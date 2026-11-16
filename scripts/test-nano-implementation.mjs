@@ -13,7 +13,7 @@ const code=source.slice(linkStart,linkEnd)+'\n'+source.slice(start,end);
 assert.ok(!code.includes('env.AI.run')&&!code.includes('deploy('));
 assert.ok(source.includes('await nano12Scheduled(env,scheduledTime)'));
 assert.ok(source.includes('implementationEvidence:{...nano12Report('));
-const now='2026-11-16T17:20:00.000Z';
+let now='2026-11-16T17:20:00.000Z';
 let requestCount=0,quota=0,publicBudget=0;
 const checks=new Map(),requests=[];
 const papers=[
@@ -84,6 +84,7 @@ const env={DB:db};
 assert.equal(await sandbox.scheduled(env,'2026-11-16T17:20:00Z'),'repository-link-observed:robot-paper');
 assert.equal(requestCount,1);assert.equal(checks.get('robot-paper').repository_url,
  'https://github.com/research-team/robot-kit');
+now='2026-11-16T17:25:00.000Z';
 assert.equal(await sandbox.scheduled(env,'2026-11-16T17:25:00Z'),'repository-metadata-checked:robot-paper');
 assert.equal(requestCount,2);
 const check=checks.get('robot-paper');
