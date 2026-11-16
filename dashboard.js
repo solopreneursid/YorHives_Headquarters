@@ -11,6 +11,19 @@
     {name:'Revenue & Business',short:'RB',job:'Revenue & monetization',review:'Security & Independent QA'},
     {name:'Security & Independent QA',short:'QA',job:'Security & independent review',review:'Founder'}
   ];
+
+  // Public research directories. Links only: no scraping, paid API or implied affiliation.
+  const INTERNET_SOURCES=[
+    {name:"BetaList",url:"https://betalist.com/",description:"Early-stage products and launch ideas.",categories:["apps","technology","competitors","markets"]},
+    {name:"TrustMRR",url:"https://trustmrr.com/",description:"Public business listings and reported revenue signals.",categories:["revenue","markets","competitors"]},
+    {name:"Microlaunch",url:"https://microlaunch.net/",description:"Indie products, launches and deals.",categories:["apps","markets","revenue","competitors"]},
+    {name:"Uneed",url:"https://www.uneed.best/",description:"New tools, makers and product launches.",categories:["apps","technology","markets","competitors"]},
+    {name:"ARRFounder",url:"https://arrfounder.com/",description:"Founder and revenue leaderboards.",categories:["revenue","markets","competitors"]},
+    {name:"Product Hunt",url:"https://www.producthunt.com/",description:"Daily products and emerging categories.",categories:["apps","technology","competitors","markets"]},
+    {name:"Hacker News",url:"https://news.ycombinator.com/show",description:"Builder launches and technical discussions.",categories:["apps","technology","markets","revenue"]},
+    {name:"AlternativeTo",url:"https://alternativeto.net/",description:"Software alternatives and competing solutions.",categories:["competitors","apps","technology"]}
+  ];
+
   const CATEGORIES = [['all','All'],['apps','Apps & tools'],['technology','Technology'],['markets','Markets'],['competitors','Competitors'],['revenue','Revenue']];
   const TRANSITIONS = {proposed:['accepted','rejected','snoozed'],accepted:['implemented','rejected','snoozed'],implemented:['verified','accepted'],verified:['proposed'],rejected:['proposed'],snoozed:['proposed']};
   const STATE_LABELS = {proposed:'Proposed',accepted:'Accepted',implemented:'Implemented',verified:'Outcome recorded',rejected:'Rejected',snoozed:'Paused'};
@@ -20,11 +33,12 @@
   const state = {
     page: PAGES[location.hash.slice(1)] ? location.hash.slice(1) : 'home', data:EMPTY(), source:'preview',
     navHistory:[], homeFilter:'all', pulseQuery:'', discoverFilter:'all', discoverQuery:'', discoverSort:'newest', savedOnly:false,
-    discoverSource:'hq', githubQuery:'', githubResults:[], githubLoading:false, githubSearched:false, githubError:'', githubSearchedQuery:'', githubTotal:0, githubIncomplete:false, githubSort:'stars',githubFilter:'all',githubSavedOnly:false,
+    discoverSource:'explore', githubQuery:'', githubResults:[], githubLoading:false, githubSearched:false, githubError:'', githubSearchedQuery:'', githubTotal:0, githubIncomplete:false, githubSort:'stars',githubFilter:'all',githubSavedOnly:false,
     productFilter:'all', productQuery:'', decisionFilter:'all', busy:false, detail:null,
     compact:store.get('compact',false) === true, alerts:store.get('alerts',false) === true,
     saved:new Set(sessionSaved()), pulse:[], searchQuery:'', saving:false,
-    githubSaved:new Map((()=>{try{const x=JSON.parse(sessionStorage.getItem('yh:github-saved')||'[]');return Array.isArray(x)?x.filter(t=>Array.isArray(t)&&typeof t[0]==='string'&&t[1]&&typeof t[1]==='object').slice(0,60):[];}catch{return [];}})())
+    githubSaved:new Map((()=>{try{const x=JSON.parse(sessionStorage.getItem('yh:github-saved')||'[]');return Array.isArray(x)?x.filter(t=>Array.isArray(t)&&typeof t[0]==='string'&&t[1]&&typeof t[1]==='object').slice(0,60):[];}catch{return [];}})()),
+    webChannel:'launches',webCategory:'all',webQuery:'',webSort:'newest',webSavedOnly:false,webCache:{},webStarted:{},webLoading:false,webError:'',webSaved:new Map((()=>{try{const x=JSON.parse(sessionStorage.getItem('yh:web-saved')||'[]');return Array.isArray(x)?x.filter(t=>Array.isArray(t)&&typeof t[0]==='string'&&t[1]&&typeof t[1]==='object').slice(0,80):[];}catch{return [];}})())
   };
   let lastFocus=null, toastTimer, lastHighKey='', lastLiveFetch=0;
   const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -95,6 +109,7 @@
   }
   function savedKey(x){return safeKey(x._kind,x._id);}
   function discover(){
+    if(state.discoverSource==='explore')return discoverWorld();
     if(state.discoverSource==='github')return discoverOnline();
     const all=discoveryItems();let filtered=all.filter(x=>(state.discoverFilter==='all'||state.discoverFilter===x._category) && (!state.savedOnly||state.saved.has(savedKey(x))) && `${x.title||x.name||''} ${x.description||''} ${x.evidenceSummary||''}`.toLowerCase().includes(state.discoverQuery.toLowerCase()));
     filtered.sort(state.discoverSort==='name'?(a,b)=>String(a.title||a.name).localeCompare(String(b.title||b.name)):(a,b)=>sortDate(b._date)-sortDate(a._date));
@@ -108,7 +123,7 @@
   }
 
   function discoverSourceTabs(){
-    return `<div class="discover-sources" role="group" aria-label="Research source">${tab('HQ records','hq',state.discoverSource,'discover-source')}${tab('Find open source','github',state.discoverSource,'discover-source')}</div>`;
+    return `<div class="discover-sources" role="group" aria-label="Research source">${tab('Explore internet','explore',state.discoverSource,'discover-source')}${tab('Open source','github',state.discoverSource,'discover-source')}${tab('My site','hq',state.discoverSource,'discover-source')}</div>`;
   }
   function githubCandidates(){
     if(!state.githubSavedOnly)return state.githubResults;
@@ -158,6 +173,75 @@
       state.githubSavedOnly=false;notify(state.githubResults.length?'Projects found':'No matching projects');
     }catch(e){state.githubError=String(e.message||'Search unavailable').slice(0,180);notify('Search unavailable');}
     finally{state.githubLoading=false;if(state.page==='discover')render();}
+  }
+
+
+  const worldItems=()=>state.webCache[state.webChannel]?.items||[];
+  function worldSources(){
+    const q=state.webQuery.trim().toLowerCase();
+    return INTERNET_SOURCES.filter(x=>(state.webCategory==='all'||x.categories.includes(state.webCategory)) &&
+      (!q||(x.name+' '+x.description).toLowerCase().includes(q)));
+  }
+  function webSavedCandidates(){
+    const a=worldItems();
+    if(!state.webSavedOnly)return a;
+    return [...new Map([...a,...state.webSaved.values()].map(x=>[x.id,x])).values()].filter(x=>state.webSaved.has(x.id));
+  }
+  function discoverWorld(){
+    if(!state.webStarted[state.webChannel]&&!state.webLoading){
+      state.webStarted[state.webChannel]=true;
+      queueMicrotask(()=>{if(state.discoverSource==='explore')loadWorldFeed();});
+    }
+    const q=state.webQuery.trim().toLowerCase();
+    const all=webSavedCandidates();
+    const filtered=all.filter(x=>(state.webCategory==='all'||x.category===state.webCategory) &&
+      (!q||(x.title+' '+x.description+' '+x.source).toLowerCase().includes(q)));
+    filtered.sort(state.webSort==='name'?(a,b)=>a.title.localeCompare(b.title):
+      state.webSort==='score'?(a,b)=>(b.score||0)-(a.score||0):
+      (a,b)=>sortDate(b.postedAt)-sortDate(a.postedAt));
+    const refs=worldSources(),snap=state.webCache[state.webChannel],searched=Boolean(snap);
+    const tiles=filtered.map(x=>`<article class="lead-card"><div class="lead-top">${badge(x.category==='apps'?'Apps & tools':CATEGORIES.find(c=>c[0]===x.category)?.[1]||'Research')}<button class="save-btn ${state.webSaved.has(x.id)?'is-saved':''}" type="button" data-web-save="${esc(x.id)}" aria-pressed="${state.webSaved.has(x.id)}" aria-label="${state.webSaved.has(x.id)?'Remove saved opportunity':'Save opportunity'}">${state.webSaved.has(x.id)?'★':'☆'}</button></div><button class="lead-body" type="button" data-detail="web" data-id="${esc(x.id)}"><strong>${esc(cut(x.title,110))}</strong><small>${esc(x.description)}</small><span class="lead-meta">Show HN · ${date(x.postedAt)} · ${num(x.score)} points</span><span class="lead-footer">Research ${icon('arrow')}</span></button></article>`).join('');
+    const sourcesMarkup=refs.map(x=>`<a class="discover-source-card" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" aria-label="Browse ${esc(x.name)} in a new tab"><strong>${esc(x.name)}</strong><small>${esc(x.description)}</small><span>Browse source ${icon('external')}</span></a>`).join('');
+    const notice=state.webError?`<strong class="discover-error">${esc(state.webError)}</strong>`:
+      state.webLoading?'Checking public launch signals…':
+      searched?`${filtered.length} signals · checked ${time(snap.checkedAt)}${snap.incomplete?' · Partial':''}`:
+      'Public research leads · no verified demand or profit';
+    const empty=state.webLoading?blank('Loading public launches'):
+      state.webSavedOnly?blank('No saved matches'):
+      q||state.webCategory!=='all'?blank('No matching signals','Browse the sources below or change your filters.'):
+      blank('No signals loaded','Use Scan now or browse the sources below.');
+    return header('Discover','Find what to build, study or monetize',button('web-refresh','Scan now','refresh'))+
+      `<div class="discover-sources" role="group" aria-label="Discovery mode">${discoverSourceTabs()}</div>`+
+      `<div class="discover-world-tools"><div class="filter-scroller compact-tabs" role="group" aria-label="Opportunity category">${CATEGORIES.map(([id,label])=>tab(label,id,state.webCategory,'web-filter')).join('')}</div><div class="discover-channel" role="group" aria-label="Public signal channel">${tab('Launches','launches',state.webChannel,'web-channel')}${tab('Market signals','signals',state.webChannel,'web-channel')}</div></div>`+
+      `<div class="discover-world-search"><label class="inline-search">${icon('search')}<input id="web-query" type="search" placeholder="Filter loaded discoveries" value="${esc(state.webQuery)}" aria-label="Filter loaded discoveries" /></label><select class="select" id="web-sort" aria-label="Sort external opportunities"><option value="newest" ${state.webSort==='newest'?'selected':''}>Newest</option><option value="score" ${state.webSort==='score'?'selected':''}>Points</option><option value="name" ${state.webSort==='name'?'selected':''}>A–Z</option></select>${button('web-saved',state.webSavedOnly?'★ Saved':'☆ Saved','check',state.webSavedOnly?'button-active':'button-subtle')}${button('web-export','Export saved','upload','button-subtle',state.webSaved.size?'':'disabled title="Save a signal first"')}</div>`+
+      `<div class="discover-live-status" role="status" aria-live="polite">${notice}</div><div class="lead-grid scroll-grid" role="region" tabindex="0" aria-label="Internet opportunity signals">${tiles||empty}</div>`+
+      `<div class="discover-sources-header"><h2>Explore more sources</h2><small>Directories open in a new tab · no automatic scraping</small></div><div class="discover-source-grid">${sourcesMarkup||blank('No sources match')}</div>`+
+      `<div class="page-footnote">Categories are title-based hints, not verified market research. Use Details to assess sources, cost and licensing.</div>`;
+  }
+  async function loadWorldFeed(force=false){
+    const channel=state.webChannel;
+    if(state.webLoading)return;
+    if(!force&&state.webCache[channel])return;
+    state.webLoading=true;state.webError='';
+    if(state.page==='discover'&&state.discoverSource==='explore')render();
+    try{
+      const reply=await fetch('/api/discover/feed?channel='+encodeURIComponent(channel),{
+        credentials:'same-origin',headers:{accept:'application/json'},cache:'no-store'});
+      const data=await reply.json().catch(()=>({}));
+      if(!reply.ok)throw Error(data.error||'Research source unavailable');
+      if(data.source!=='hacker-news-public'||!Array.isArray(data.items)||data.channel!==channel)throw Error('Unexpected research source response');
+      const items=data.items.slice(0,12).filter(x=>typeof x.id==='string'&&/^hn-[0-9]{1,14}$/.test(x.id)).map(x=>({
+        id:x.id,title:String(x.title||'Untitled').slice(0,160),description:String(x.description||'Public submission').slice(0,240),
+        category:CATEGORIES.some(c=>c[0]===x.category)?x.category:'apps',
+        source:'Hacker News',sourceUrl:'https://news.ycombinator.com/item?id='+x.id.slice(3),
+        url:link(x.url)||'https://news.ycombinator.com/item?id='+x.id.slice(3),postedAt:String(x.postedAt||''),
+        score:Number.isInteger(x.score)?x.score:0,commentCount:Number.isInteger(x.commentCount)?x.commentCount:0,
+        price:'Unknown',evidence:'Public submission · category inferred',verified:false
+      }));
+      state.webCache[channel]={checkedAt:String(data.checkedAt||''),incomplete:data.incomplete===true,items};
+      notify('Research signals refreshed');
+    }catch(err){state.webError=String(err.message||'Source unavailable').slice(0,180);notify('Source unavailable');}
+    finally{state.webLoading=false;if(state.page==='discover'&&state.discoverSource==='explore')render();}
   }
 
   function assignmentFor(name){const threads=list(state.data.operating,'threads');return threads.filter(x=>x.contract?.owner===name);}
@@ -217,11 +301,11 @@
     if(push&&location.hash!=='#'+to)history.pushState({hqPage:to},'','#'+to);render();window.scrollTo(0,0);}
   function goBack(){const prior=state.navHistory.pop()||'home';state.page=PAGES[prior]?prior:'home';history.replaceState({hqPage:state.page},'','#'+state.page);render();window.scrollTo(0,0);}
   function browserRoute(){const to=location.hash.slice(1);if(!PAGES[to]||to===state.page)return;state.navHistory.push(state.page);state.page=to;render();window.scrollTo(0,0);}
-  function record(kind,id){if(kind==='department')return DEPARTMENTS[Number(id)]||null;if(kind==='github')return state.githubResults.find(x=>String(x.id)===String(id))||state.githubSaved.get(String(id))||null;if(kind==='pulse')return state.pulse[Number(id)]||null;if(kind==='review')return queue()[Number(id)]||null;
+  function record(kind,id){if(kind==='department')return DEPARTMENTS[Number(id)]||null;if(kind==='web')return [...worldItems(),...state.webSaved.values()].find(x=>String(x.id)===String(id))||null;if(kind==='github')return state.githubResults.find(x=>String(x.id)===String(id))||state.githubSaved.get(String(id))||null;if(kind==='pulse')return state.pulse[Number(id)]||null;if(kind==='review')return queue()[Number(id)]||null;
     if(kind==='thread')return list(state.data.operating,'threads').find(x=>x.thread===id)||null;
     if(kind==='decision')return list(state.data.decisionJournal,'events').find(x=>String(x.sequence??x.thread)===String(id))||null;
     const arr=list(state.data,files(kind));return arr.find(x=>String(x.id)===String(id))||(String(id).startsWith('at-')?arr[Number(id.slice(3))]:null)||null;}
-  function sources(x,kind){const raw=[...(Array.isArray(x?.evidence)?x.evidence:[]),x.evidenceUrl,x.evidence_url,x.source_url,x.source,kind==='product'||kind==='github'?x.url:null];return [...new Set(raw.map(link).filter(Boolean))].slice(0,8);}
+  function sources(x,kind){const raw=[...(Array.isArray(x?.evidence)?x.evidence:[]),x.evidenceUrl,x.evidence_url,x.source_url,x.source,kind==='product'||kind==='github'||kind==='web'?x.url:null,kind==='web'?x.sourceUrl:null];return [...new Set(raw.map(link).filter(Boolean))].slice(0,8);}
   function detailFields(items){return `<div class="detail-fields">${items.filter(([,v])=>filled(v)).map(([name,v])=>`<div class="detail-field"><small>${esc(name)}</small><p>${esc(String(v))}</p></div>`).join('')}</div>`;}
   function openDetail(kind,id){let x=record(kind,id);if(!x){notify('Record unavailable');return;}
     state.detail={kind,id};lastFocus=document.activeElement;
@@ -232,6 +316,7 @@
     const fields=kind==='department'?[['Responsibility',x.job],['Independent review',x.review],['Routed records',`${assignmentFor(x.name).length} (not proof of AI work)`],['AI inference',state.data.operating?.aiStatus||'Not connected']]:
       kind==='decision'?[['Status',STATE_LABELS[x.state]||x.state],['Date',time(x.created_at)],['Reason',x.note],['Feedback',x.feedback],['Success condition',x.success_condition],['Measured outcome',x.outcome]]:
        kind==='github'?[['Summary',x.description],['License',x.license||'Unverified'],['GitHub stars',String(x.stars??0)+' · popularity signal only'],['Primary language',x.language],['Updated',time(x.updatedAt)],['Review','Candidate only. Verify license, safety and suitability before reuse.']]:
+       kind==='web'?[['What is it?',x.title],['Why consider it?','A public product or idea to investigate, not a validated opportunity.'],['Potential next move','Read the original → assess customer need → check business model and legal reuse → founder review.'],['Cost or pricing','Not verified'],['Evidence','Public Hacker News submission'],['Category','Inferred from title — verify manually'],['Observed',time(x.postedAt)],['Discussion',String(x.commentCount??0)+' comments (not demand proof)']]:
       [['Summary',target.description||target.evidenceSummary||target.summary||discussion],['Recommendation',target.recommendation],['Priority',target.priority],['Evidence',x.contract?.classification||'Unverified'],['Confidence',target.confidence||target.discoveryConfidence],['Observed',time(target.observedAt||target._date||target.occurredAt)],['Source status',state.source==='live'?'Live report':'Not live-verified']];
     const urls=sources(target,actualKind);let extras='';
     if(kind==='department'){
@@ -321,11 +406,14 @@ Revenue: unavailable`;
   async function toggleAlerts(checked){if(!checked){state.alerts=false;store.set('alerts',false);notify('Browser alerts off');return;}
     if(!('Notification' in window)||!window.isSecureContext){state.alerts=false;notify('Browser alerts require a secure connection');return;}
     let permission=Notification.permission;if(permission==='default')permission=await Notification.requestPermission();state.alerts=permission==='granted';store.set('alerts',state.alerts);notify(state.alerts?'Alerts on · open tab only':'Notification permission unavailable');}
-  function action(cmd){switch(cmd){case 'import':$('report-file').click();break;case 'refresh':refresh(true);break;case 'clear-pulse-search':state.pulseQuery='';render();break;case 'toggle-saved':state.savedOnly=!state.savedOnly;render();break;case 'github-saved':state.githubSavedOnly=!state.githubSavedOnly;render();break;case 'github-clear':state.githubQuery='';state.githubResults=[];state.githubSearched=false;state.githubError='';state.githubSavedOnly=false;render();break;case 'github-export':if(state.githubSaved.size)downloadJson({source:'github-public',exportedAt:today(),projects:[...state.githubSaved.values()]},'hq-open-source-shortlist.json');break;case 'export-report':if(ready())downloadJson(state.data,'hq-evidence-private.json');break;case 'export-decisions':downloadJson({exportedAt:today(),events:list(state.data.decisionJournal,'events')},'hq-decisions-private.json');break;case 'copy-summary':copySummary();break;case 'close-detail':closeDetail();break;}}
+  function action(cmd){switch(cmd){case 'import':$('report-file').click();break;case 'refresh':refresh(true);break;case 'clear-pulse-search':state.pulseQuery='';render();break;case 'toggle-saved':state.savedOnly=!state.savedOnly;render();break;case 'github-saved':state.githubSavedOnly=!state.githubSavedOnly;render();break;case 'github-clear':state.githubQuery='';state.githubResults=[];state.githubSearched=false;state.githubError='';state.githubSavedOnly=false;render();break;case 'github-export':if(state.githubSaved.size)downloadJson({source:'github-public',exportedAt:today(),projects:[...state.githubSaved.values()]},'hq-open-source-shortlist.json');break;case 'web-refresh':loadWorldFeed(true);break;case 'web-saved':state.webSavedOnly=!state.webSavedOnly;render();break;case 'web-export':if(state.webSaved.size)downloadJson({source:'public-hacker-news',exportedAt:today(),opportunities:[...state.webSaved.values()]},'hq-internet-opportunities.json');break;case 'export-report':if(ready())downloadJson(state.data,'hq-evidence-private.json');break;case 'export-decisions':downloadJson({exportedAt:today(),events:list(state.data.decisionJournal,'events')},'hq-decisions-private.json');break;case 'copy-summary':copySummary();break;case 'close-detail':closeDetail();break;}}
   function bind(){document.addEventListener('click',e=>{
       const nav=e.target.closest('[data-page]');if(nav){if($('search-modal').open)$('search-modal').close();if(!$('detail-drawer').hidden)closeDetail();navigate(nav.dataset.page);return;}
       const detail=e.target.closest('[data-detail]');if(detail){if($('search-modal').open)$('search-modal').close();openDetail(detail.dataset.detail,detail.dataset.id);return;}
-      const src=e.target.closest('[data-discover-source]');if(src){state.discoverSource=src.dataset.discoverSource==='github'?'github':'hq';render();return;}
+      const src=e.target.closest('[data-discover-source]');if(src){const source=src.dataset.discoverSource;state.discoverSource=['explore','github','hq'].includes(source)?source:'explore';render();return;}
+      const webGroup=e.target.closest('[data-web-filter]');if(webGroup){state.webCategory=webGroup.dataset.webFilter;render();return;}
+      const webChannel=e.target.closest('[data-web-channel]');if(webChannel){state.webChannel=webChannel.dataset.webChannel==='signals'?'signals':'launches';state.webError='';render();return;}
+      const webStar=e.target.closest('[data-web-save]');if(webStar){const id=webStar.dataset.webSave;const item=[...worldItems(),...state.webSaved.values()].find(x=>x.id===id);if(item){if(state.webSaved.has(id))state.webSaved.delete(id);else state.webSaved.set(id,item);try{sessionStorage.setItem('yh:web-saved',JSON.stringify([...state.webSaved].slice(-80)));}catch{}render();notify(state.webSaved.has(id)?'Saved in this tab':'Removed from saved');}return;}
       const githubCategory=e.target.closest('[data-github-filter]');if(githubCategory){state.githubFilter=githubCategory.dataset.githubFilter;render();return;}
       const ghStar=e.target.closest('[data-github-save]');if(ghStar){const id=ghStar.dataset.githubSave;const item=state.githubResults.find(x=>x.id===id)||state.githubSaved.get(id);if(item){if(state.githubSaved.has(id))state.githubSaved.delete(id);else state.githubSaved.set(id,item);try{sessionStorage.setItem('yh:github-saved',JSON.stringify([...state.githubSaved].slice(-60)));}catch{}render();notify(state.githubSaved.has(id)?'Saved in this tab':'Removed from saved');}return;}
       const d=e.target.closest('[data-discover-filter]');if(d){state.discoverFilter=d.dataset.discoverFilter;render();return;}
@@ -342,8 +430,8 @@ Revenue: unavailable`;
     $('search-input').addEventListener('input',renderSearch);$('search-close').addEventListener('click',()=>$('search-modal').close());$('copy-close').addEventListener('click',()=>$('copy-modal').close());
     $('detail-close').addEventListener('click',closeDetail);$('detail-scrim').addEventListener('click',closeDetail);
     $('report-file').addEventListener('change',e=>{openLocal(e.target.files[0]);e.target.value='';});
-    document.addEventListener('input',e=>{if(e.target.id==='github-query'){state.githubQuery=e.target.value;return;}if(['discover-query','product-query','pulse-query'].includes(e.target.id)){state[e.target.id==='discover-query'?'discoverQuery':e.target.id==='product-query'?'productQuery':'pulseQuery']=e.target.value;render({keepFocus:true});}});
-    document.addEventListener('change',async e=>{if(e.target.id==='discover-sort'){state.discoverSort=e.target.value;render();}if(e.target.id==='github-sort'){state.githubSort=e.target.value;render();}if(e.target.id==='product-filter'){state.productFilter=e.target.value;render();}if(e.target.id==='decision-state')updateDecisionFields();
+    document.addEventListener('input',e=>{if(e.target.id==='github-query'){state.githubQuery=e.target.value;return;}if(e.target.id==='web-query'){state.webQuery=e.target.value;render({keepFocus:true});return;}if(['discover-query','product-query','pulse-query'].includes(e.target.id)){state[e.target.id==='discover-query'?'discoverQuery':e.target.id==='product-query'?'productQuery':'pulseQuery']=e.target.value;render({keepFocus:true});}});
+    document.addEventListener('change',async e=>{if(e.target.id==='discover-sort'){state.discoverSort=e.target.value;render();}if(e.target.id==='github-sort'){state.githubSort=e.target.value;render();}if(e.target.id==='web-sort'){state.webSort=e.target.value;render();}if(e.target.id==='product-filter'){state.productFilter=e.target.value;render();}if(e.target.id==='decision-state')updateDecisionFields();
       if(e.target.id==='compact-toggle'){state.compact=e.target.checked;store.set('compact',state.compact);render();}if(e.target.id==='alerts-toggle'){await toggleAlerts(e.target.checked);render();}});
     document.addEventListener('submit',e=>{if(e.target.getAttribute('id')==='decision-form'){e.preventDefault();submitDecision(e.target);}if(e.target.id==='github-search-form'){e.preventDefault();searchGithub();}});
     window.addEventListener('popstate',browserRoute);window.addEventListener('hashchange',browserRoute);
