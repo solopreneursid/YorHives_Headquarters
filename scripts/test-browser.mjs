@@ -88,6 +88,8 @@ try{
       const txt=await incident.innerText();
       assert.ok(txt.includes('Independent recovery verification'));
       assert.ok(txt.includes('Not completed'));
+      assert.ok(txt.includes('Investigation checklist'));
+      assert.ok(txt.includes('Founder review required')||txt.includes('founder review required'));
       assert.ok(txt.includes('resolved'));
     });
     await test(profile.name+': HQpulse search and filters',async()=>{
