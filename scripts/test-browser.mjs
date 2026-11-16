@@ -38,13 +38,20 @@ const report={
   ],
   memory:{entries:[{memoryId:'memory-finding-abc',runId:'finding-abc',kind:'finding',department:'Security & Independent QA',title:'Synthetic shared memory evidence',evidenceState:'source-recorded-unverified',sourceUrl:'https://yorphives.com/',recommendation:'Founder check source',reviewState:'founder-review',observedAt:'2026-11-16T10:00:00Z',recordedAt:'2026-11-16T10:00:00Z'}]},
   nanoPipeline:{status:'created:2',checkedAt:'2026-11-16T10:00:00Z'},
-  globalSources:{pipelineStatus:'listing-recorded:dev:new:1',active:3,sources:[
+  globalSources:{pipelineStatus:'rate-limited:openalex:new:0',active:2,screened:2,candidates:1,filtered:1,limited:1,
+   sourceSignals:[{sourceIds:['dev','crossref'],sharedTerms:['customer','support'],verifiedDemand:false,evidence:'Two sources share a topic, not proof of demand'}],sources:[
     {id:'dev',name:'DEV Community',category:'Developer problems',status:'listing-recorded',newCount:1,note:'Contributor posts only'},
     {id:'hf',name:'Hugging Face',category:'AI models',status:'listing-recorded',newCount:1,note:'Licenses unverified'},
-    {id:'openalex',name:'OpenAlex',category:'Research',status:'listing-recorded',newCount:1,note:'Bibliographic evidence only'}
+    {id:'openalex',name:'OpenAlex',category:'Research',status:'rate-limited',newCount:0,retryAt:'2026-11-18T10:00:00Z',note:'Bibliographic evidence only'},
+    {id:'crossref',name:'Crossref',category:'Alternative research',status:'not-attempted',newCount:0,note:'Publisher metadata only'}
    ],entries:[{id:'global-synthetic',sourceId:'dev',kind:'community',title:'Synthetic open-source AI agent workflow',
      sourceUrl:'https://dev.to/author/agent-workflow',summary:'Unverified public discussion',
-     observedAt:'2026-11-16T10:00:00Z',verifiedDemand:false,verifiedRevenue:false}]},
+     quality:{grade:'candidate',reason:'Specific technical problem but needs validation'},
+     observedAt:'2026-11-16T10:00:00Z',verifiedDemand:false,verifiedRevenue:false},
+     {id:'global-publicity',sourceId:'dev',kind:'community',title:'Congrats to the AI Challenge Winners!',
+      sourceUrl:'https://dev.to/author/ai-winners',summary:'Publicity only',
+      quality:{grade:'filtered',reason:'Announcement and publicity without a specific problem'},
+      observedAt:'2026-11-16T10:00:00Z',verifiedDemand:false,verifiedRevenue:false}]},
 
 
   investigations:{checked:2,crossPlatform:1,confirmed:2,pending:0,pipelineStatus:'cross-platform-metadata-confirmed',
@@ -185,16 +192,22 @@ try{
       await page.locator('[data-page="team"]:visible').first().click();
       await page.getByText('Global intelligence sources',{exact:true}).waitFor();
       const panel=page.locator('.panel').filter({hasText:'Global intelligence sources'});
-      assert.equal(await panel.locator('.source-card').count(),3);
+      assert.equal(await panel.locator('.source-card').count(),4);
       const text=await panel.innerText();
-      assert.ok(text.includes('DEV Community')&&text.includes('Hugging Face')&&text.includes('OpenAlex'));
-      const backlog=panel.locator('details.source-backlog');
+      assert.ok(text.includes('DEV Community')&&text.includes('Hugging Face')&&text.includes('OpenAlex')&&text.includes('Crossref'));
+      assert.ok(text.includes('Rate-limited')&&text.includes('Low-value announcements'));
+      assert.equal(await panel.locator('.source-card .source-limited').count(),1);
+      assert.equal(await panel.locator('.source-low-value:visible').count(),0,'Quality details must remain hidden until backlog expands');
+      assert.ok(text.includes('cross-source topic overlap'));
+      const backlog=panel.locator('details.source-backlog').last();
       assert.equal(await backlog.getAttribute('open'),null);
       await backlog.locator('summary').click();
       const a=backlog.locator('a[href="https://dev.to/author/agent-workflow"]');
       assert.equal(await a.count(),1);
       assert.equal(await a.getAttribute('rel'),'noopener noreferrer');
       assert.ok((await backlog.innerText()).includes('listing-unverified'));
+      assert.equal(await backlog.locator('.source-low-value').count(),1);
+      assert.ok((await backlog.innerText()).includes('Announcement and publicity'));
     });
     await test(profile.name+': investigation evidence and department questions',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
