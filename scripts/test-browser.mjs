@@ -197,7 +197,7 @@ try{
       assert.ok(text.includes('DEV Community')&&text.includes('Hugging Face')&&text.includes('OpenAlex')&&text.includes('Crossref'));
       assert.ok(text.includes('Rate-limited')&&text.includes('Low-value announcements'));
       assert.equal(await panel.locator('.source-card .source-limited').count(),1);
-      assert.equal(await panel.locator('.source-low-value').count(),0,'Quality details must remain in collapsed backlog');
+      assert.equal(await panel.locator('.source-low-value:visible').count(),0,'Quality details must remain hidden until backlog expands');
       assert.ok(text.includes('cross-source topic overlap'));
       const backlog=panel.locator('details.source-backlog').last();
       assert.equal(await backlog.getAttribute('open'),null);
