@@ -96,6 +96,13 @@ assert.equal(r1.technicalFeasibilityVerified,false);
 const partial=sandbox.review(paper('x','arxiv','Agent tooling','https://arxiv.org/abs/2611.77777',
  'This is a complete author sentence. This truncated incomplete fragment lacking punctuation'));
 assert.equal(partial.authorExcerpts.length,1,'Incomplete excerpt must not be presented as a complete claim');
+
+const decimal=sandbox.review(paper('dec','arxiv','Training reasoning models in simulation','https://arxiv.org/abs/2611.77778',
+ 'The first robotic reasoning model performs complex tasks in a simulation. However, Model 5.2, whereas an earlier model was unreliable, performed better. This excerpt ends without a completed sentence'));
+assert.equal(decimal.authorExcerpts.length,2,'Retain two complete author sentences');
+assert.ok(decimal.authorExcerpts[1].text.startsWith('However, Model 5.2,'));
+assert.ok(!decimal.authorExcerpts.some(x=>x.text.startsWith('2, whereas')),'Never split decimals into false author quotations');
+
 const env={DB};
 for(let i=0;i<3;i++)assert.ok((await sandbox.schedule(env,'2026-11-16T16:55:00Z')).startsWith('review-recorded:'));
 assert.equal(persisted.size,3);

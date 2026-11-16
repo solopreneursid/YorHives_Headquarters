@@ -1080,7 +1080,7 @@ function nano7Report(scans,leads){
  * Uses ONLY previously collected public journal metadata; no LLM, HTTP, tool
  * execution, external outreach, project edits or production permissions.
  */
-const NANO11_VERSION="science-evidence-v1";
+const NANO11_VERSION="science-evidence-v2";
 const NANO11_APPLICATIONS=Object.freeze([
  Object.freeze({id:"workflow-resilience",pattern:/\b(fault\w*|failur\w*|recover\w*|resilien\w*|intervention\w*|unexpected|self.driving lab\w*)\b/i,
   label:"Workflow resilience",
@@ -1115,10 +1115,12 @@ function nano11EvidenceSentence(abstract){
  // Extract only complete author-supplied sentences. The original journal
  // collector stored an excerpt, not the full paper: trailing fragments are
  // never presented as complete scientific claims.
- const parts=txt.match(/[^.!?]+[.!?](?=\s|$)/g)||[];
+ // Split only after a sentence terminator followed by a capitalized next
+ // sentence. A decimal model version such as 5.2 must never start a quote.
+ const parts=txt.split(/(?<=[.!?])\s+(?=[A-Z])/g);
  for(const raw of parts){
   const piece=raw.trim();
-  if(piece.length<25||piece.length>330)continue;
+  if(piece.length<25||piece.length>330||!/[.!?]$/.test(piece))continue;
   result.push({text:clampText(piece,300),kind:"author-abstract-excerpt",verified:false});
   if(result.length===2)break;
  }
