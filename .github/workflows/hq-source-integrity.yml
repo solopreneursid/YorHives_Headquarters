@@ -23,6 +23,7 @@ on:
       - 'scripts/test-nano-dependencies.mjs'
       - 'scripts/test-nano-founder-reviews.mjs'
       - 'scripts/test-deep-links.mjs'
+      - 'scripts/test-growth-evidence.mjs'
       - '.github/workflows/hq-source-integrity.yml'
   workflow_dispatch:
 permissions:
@@ -58,6 +59,7 @@ jobs:
           node scripts/test-nano-dependencies.mjs
           node scripts/test-nano-founder-reviews.mjs
           node scripts/test-deep-links.mjs
+          node scripts/test-growth-evidence.mjs
       - name: Record verification scope
         if: always()
         shell: bash
