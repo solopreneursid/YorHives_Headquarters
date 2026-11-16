@@ -87,7 +87,7 @@ assert.ok(unparsed.manifestStatus.includes('not yet parsed'));
 const prefix='const PILOT_STATIC_BUNDLE = ',i=source.indexOf(prefix)+prefix.length,j=source.indexOf(';\n',i);
 const ui=JSON.parse(source.slice(i,j))['/dashboard.js'];
 assert.ok(ui.includes('function dependencySignalsPanel()'));
-assert.ok(ui.includes('implementationEvidencePanel()+feasibilityPanel()+manifestEvidencePanel()+dependencySignalsPanel()+founderResearchPanel()+experimentPlansPanel()+scienceEvidencePanel()'));
+assert.ok(ui.includes('implementationEvidencePanel()+feasibilityPanel()+manifestEvidencePanel()+dependencySignalsPanel()+founderResearchPanel()+experimentPlansPanel()+experimentEvidencePanel()+scienceEvidencePanel()'));
 assert.ok(ui.includes('$'+'{dependencySignalsPanel()}'));
 assert.ok(ui.includes('esc(e.manifestSha'));
 assert.ok(ui.includes('No safely parsed names yet'));
