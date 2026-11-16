@@ -123,7 +123,7 @@ try{
       await page.locator('#ai-finding').selectOption('finding-1');
       await page.locator('[data-action="ai-analyze"]').click();
       await page.getByText('Test server: external lookups disabled').waitFor();
-      assert.ok((await page.locator('#page-root').innerText()).includes('No automatic remediation') || (await page.locator('#page-root').innerText()).includes('no tools or execution'));
+      assert.ok((await page.locator('#page-root').innerText()).includes('No automatic remediation') || (await page.locator('#page-root').innerText()).includes('no tools.'));
     });
     await test(profile.name+': no horizontal overflow at viewport width',async()=>{
       const dims=await page.evaluate(()=>({screen:document.documentElement.clientWidth,content:document.documentElement.scrollWidth}));
