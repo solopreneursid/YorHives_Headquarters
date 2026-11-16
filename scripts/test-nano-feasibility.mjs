@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 const source=readFileSync('src/hq-worker.mjs','utf8');
 const start=source.indexOf('/* Nano Phase 13 — deterministic');
-const end=source.indexOf('/* Nano Phase 11 — scientific',start);
+const end=source.indexOf('/* Nano Phase 16 — founder-initiated',start);
 assert.ok(start>0&&end>start,'Phase 13 must be in current Worker source');
 const code=source.slice(start,end);
 for(const forbidden of ['fetch(','.run()', '.batch(','.exec(', 'env.AI', 'deploy(', 'POST', 'PUT ', 'DELETE ']){
