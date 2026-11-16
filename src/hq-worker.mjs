@@ -1607,6 +1607,15 @@ export default {
     const learningWrite=route==="/api/learning/review"&&request.method==="POST";
     if(!decisionWrite&&!privateAiWrite&&!learningWrite&&!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
     if(!(await verifyAccess(request,env,ctx))) return new Response("Private Headquarters access not configured or unauthorized",{status:403,headers:{"cache-control":"no-store","x-content-type-options":"nosniff"}});
+    // Only known HQ frontend routes are redirectable. Keep unknown paths private,
+    // and run the Access guard above before returning a redirect.
+    // The dashboard uses #page routing, not server-side /page routing.
+    const deepLink=/^\/(home|discover|team|decisions|growth|control)\/?$/.exec(route);
+    if(deepLink){
+      const target=new URL("/",request.url);
+      target.hash=deepLink[1];
+      return Response.redirect(target.href,302);
+    }
     if(privateAiWrite){
       const origin=request.headers.get("origin");
       const host=new URL(request.url).origin;
