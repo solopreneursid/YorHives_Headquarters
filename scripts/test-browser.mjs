@@ -62,6 +62,17 @@ const report={
        independentlyVerifiedDemand:false,independentlyVerifiedRevenue:false,founderApproved:false,automatedExecution:false}
      ]},
 
+  implementationEvidence:{pipelineStatus:'repository-metadata-checked:robot-paper',checked:2,linked:1,
+    metadataChecked:1,scope:'Only first-party metadata; technical claims are not verified.',entries:[
+    {paperId:'robot-paper',title:'Robot-use agents from simulation',paperUrl:'https://arxiv.org/abs/2611.18562',
+      state:'repository-metadata-checked',repositoryUrl:'https://github.com/research-team/robot-kit',
+      licenseSpdx:'Apache-2.0',evidence:'Public GitHub metadata, not independent replication',
+      lastChecked:'2026-11-16T16:40:00Z',nextCheck:'2026-11-30T16:40:00Z',repositoryDescription:'Unverified demo',
+      archived:false,sourceCodeInspected:false,reproducibilityVerified:false},
+    {paperId:'other-paper',title:'Unverified physics paper',paperUrl:'https://arxiv.org/abs/2611.18546',
+      state:'no-repository-link-observed',repositoryUrl:null,licenseSpdx:null,
+      evidence:'No qualifying GitHub link was seen in the page.',
+      lastChecked:'2026-11-16T16:50:00Z',nextCheck:'2026-11-23T16:50:00Z'}]},
   scienceReviews:{pipelineStatus:'review-recorded:workflow-resilience',reviewed:2,needsReview:2,watch:0,
    independentCodeChecks:0,experimentalRuns:0,commercialValidation:0,top:[
     {paperId:'paper-test-a',title:'Synthetic resilient autonomous laboratory workflows',
@@ -262,6 +273,27 @@ try{
       assert.equal(await card.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),1);
       await card.locator('.brief-checks').last().locator('summary').click();
       assert.ok((await card.innerText()).includes('Security & Independent QA'));
+    });
+    await test(profile.name+': implementation evidence never claims code verification',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      await page.getByText('Implementation evidence',{exact:true}).waitFor();
+      const panel=page.locator('.panel').filter({hasText:'Implementation evidence'});
+      assert.equal(await panel.locator('details.implementation-entry').count(),2);
+      assert.ok((await panel.innerText()).includes('Verified reproducibility: 0'));
+      const first=panel.locator('details.implementation-entry').first();
+      assert.equal(await first.getAttribute('open'),null);
+      await first.locator('summary').click();
+      const text=await first.innerText();
+      assert.ok(text.includes('not verified'));
+      assert.ok(text.includes('Apache-2.0'));
+      assert.ok(text.includes('not legal approval'));
+      assert.ok(text.includes('No code downloaded, run, modified or deployed.'));
+      assert.equal(await first.locator('a[href="https://arxiv.org/abs/2611.18562"]').count(),1);
+      assert.equal(await first.locator('a[href="https://github.com/research-team/robot-kit"]').count(),1);
+      assert.equal(await first.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),2);
+      await page.locator('[data-page="discover"]:visible').first().click();
+      await page.locator('[data-discover-source="journals"]').click();
+      assert.equal(await page.locator('#page-root .implementation-entry').count(),2);
     });
     await test(profile.name+': scientific evidence reviews preserve unknowns',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
