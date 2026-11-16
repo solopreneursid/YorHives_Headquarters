@@ -15,6 +15,7 @@ on:
       - 'scripts/test-nano-global-sources.mjs'
       - 'scripts/test-nano-source-quality.mjs'
       - 'scripts/test-nano-opportunity-briefs.mjs'
+      - 'scripts/test-nano-journals.mjs'
       - 'scripts/test-deep-links.mjs'
       - '.github/workflows/hq-source-integrity.yml'
   workflow_dispatch:
@@ -43,6 +44,7 @@ jobs:
           node scripts/test-nano-global-sources.mjs
           node scripts/test-nano-source-quality.mjs
           node scripts/test-nano-opportunity-briefs.mjs
+          node scripts/test-nano-journals.mjs
           node scripts/test-deep-links.mjs
       - name: Record verification scope
         if: always()
