@@ -1074,6 +1074,174 @@ function nano7Report(scans,leads){
 
 
 
+
+/* Nano Phase 11 — scientific evidence reviews: deterministic research planning,
+ * never proof that a paper was reproduced, code was found or revenue exists.
+ * Uses ONLY previously collected public journal metadata; no LLM, HTTP, tool
+ * execution, external outreach, project edits or production permissions.
+ */
+const NANO11_VERSION="science-evidence-v1";
+const NANO11_APPLICATIONS=Object.freeze([
+ Object.freeze({id:"workflow-resilience",pattern:/\b(fault|failure|recover|resilien|intervention|unexpected|self.driving lab)\b/i,
+  label:"Workflow resilience",
+  fit:"Potential lessons for HQ incident recovery and resilient agent workflows",
+  experiment:"Create an isolated synthetic incident and test whether a human-reviewed recovery checklist catches it; do not connect experimental code to production.",
+  blocker:"Robotic recovery methods may not transfer to software operations"}),
+ Object.freeze({id:"private-model-evaluation",pattern:/\b(open.weight|reasoning models?|reinforcement learning|simulation to|simulate|language models?)\b/i,
+  label:"Private AI evaluation",
+  fit:"Potential evaluation methods for replaceable, privately hosted AI models",
+  experiment:"Specify a simulated task, compare two locally hosted models using repeatable metrics, and document resource needs before any prototype.",
+  blocker:"Hardware, reproducibility and model-weight licensing are unverified"}),
+ Object.freeze({id:"monitoring-intelligence",pattern:/\b(monitor|detect|predictive|sensing|measurement|spatiotemporal|planning)\b/i,
+  label:"Monitoring and anomaly detection",
+  fit:"Potential monitoring or evidence-analysis techniques for HQ reliability or new data tools",
+  experiment:"Define an offline synthetic monitoring dataset, evaluate an existing open-source baseline and compare false positives with a documented acceptance test.",
+  blocker:"Domain transfer and real-world measurement reliability are untested"}),
+ Object.freeze({id:"security-and-privacy",pattern:/\b(privacy|security|cyber|attack|vulnerab|threat|cryptograph)\b/i,
+  label:"Security and privacy",
+  fit:"Potential improvement to evidence-based HQ security monitoring",
+  experiment:"Define a passive-only security test against disposable fixtures and compare an established open-source scanner.",
+  blocker:"Security guarantees, datasets and licensing require independent validation"}),
+ Object.freeze({id:"software-automation",pattern:/\b(code|software|testing|automation|workflow|developer|benchmark)\b/i,
+  label:"Software and automation",
+  fit:"Potential modular automation or quality tooling for YorpHives",
+  experiment:"Write a founder-reviewed isolated test plan comparing two open-source approaches without modifying the live website.",
+  blocker:"Real benefits, integration costs and original implementation claims are unknown"})
+]);
+function nano11EvidenceSentence(abstract){
+ const txt=clampText(String(abstract||""),450);
+ if(!txt)return [];
+ const result=[];
+ // Extract only complete author-supplied sentences. The original journal
+ // collector stored an excerpt, not the full paper: trailing fragments are
+ // never presented as complete scientific claims.
+ const parts=txt.match(/[^.!?]+[.!?](?=\s|$)/g)||[];
+ for(const raw of parts){
+  const piece=raw.trim();
+  if(piece.length<25||piece.length>330)continue;
+  result.push({text:clampText(piece,300),kind:"author-abstract-excerpt",verified:false});
+  if(result.length===2)break;
+ }
+ return result;
+}
+function nano11Application(row){
+ const t=String(row?.title||""),abs=String(row?.abstract_text||"");
+ const match=NANO11_APPLICATIONS.find(x=>x.pattern.test(t))||
+  NANO11_APPLICATIONS.find(x=>x.pattern.test(abs))||null;
+ return match||{id:"general-research",label:"General research watch",
+   fit:"No demonstrated fit to a YorpHives capability from this limited metadata",
+   experiment:"Locate the full paper and relevant code/data before deciding whether an experiment is justified.",
+   blocker:"No clear local application or independent evidence"};
+}
+function nano11Review(row){
+ if(!row||!["arxiv","crossref"].includes(row.source_id)||
+   !nano10Link(row.source_url,row.source_id))return null;
+ const title=clampText(row.title,230),abstract=clampText(row.abstract_text,450);
+ const category=nano11Application(row),claims=nano11EvidenceSentence(abstract);
+ const publishedAt=clampText(row.published_at,35),age=nano10PublicationAge(publishedAt);
+ const preprint=row.source_type==="preprint";
+ const methods=[];
+ const clues=[
+  [/reinforcement learning/i,"Author abstract mentions reinforcement learning"],
+  [/simulat(?:e|ion|ed|or)/i,"Author abstract mentions simulation"],
+  [/linear complementarity/i,"Author abstract mentions linear complementarity modeling"],
+  [/predict(?:ive|ion)/i,"Author abstract mentions prediction"],
+  [/experiment(?:al|s)?/i,"Author abstract mentions experiments"],
+  [/dataset|data collection/i,"Author abstract mentions data collection"],
+  [/benchmark/i,"Author abstract mentions benchmarking"]
+ ];
+ for(const [pattern,label] of clues){if(pattern.test(title+" "+abstract))methods.push(label);if(methods.length===3)break;}
+ const signals={abstractExcerptPresent:abstract.length>=45,authorClaimExcerpts:claims.length,
+  methodsMentioned:methods.length,originalPublicationRecorded:true};
+ const needs=[
+  "Obtain and read the full original publication; stored abstract may be truncated",
+  "Find implementation or supplementary code in an explicitly licensed repository; none has been independently checked",
+  "Locate accessible datasets, model weights and required hardware; availability is unknown",
+  "Identify experimental baselines, metrics, and independent replication attempts",
+  "Review software and dataset licenses, dependencies, security and privacy",
+  "Collect firsthand problem evidence and realistic cost estimates before any commercial proposal"
+ ];
+ const priority=Math.min(60,15+(category.id!=="general-research"?20:0)+
+  (signals.abstractExcerptPresent?8:0)+(methods.length?4:0)+
+  (age==="published-within-one-year"?5:0));
+ const stage=category.id==="general-research"||priority<35?"watch":"review-needed";
+ return {
+  version:NANO11_VERSION,paperId:String(row.paper_id),sourceId:row.source_id,
+  title,sourceUrl:String(row.source_url),sourceType:clampText(row.source_type,40),
+  topicId:clampText(row.topic_id,30),publishedAt,publicationAge:age,
+  category:category.id,stage,researchPriority:priority,applicationHypothesis:category.fit,
+  possibleExperiment:category.experiment,transferRisk:category.blocker,
+  evidenceScope:claims.length?"Author-provided abstract excerpt and bibliographic metadata only":
+   "Bibliographic metadata only; the full paper was not inspected",
+  authorExcerpts:claims,methodMentions:methods,signals,
+  implementationStatus:{code:"not-checked",datasets:"not-checked",weights:"not-checked",
+   licenses:"not-checked",hardware:"not-checked",independentReplication:"not-checked"},
+  missingEvidence:needs,proposedAction:"Investigate sources and propose an opt-in experiment; do not build or deploy automatically",
+  citationsValidated:false,scientificClaimsReproduced:false,technicalFeasibilityVerified:false,
+  productOpportunityValidated:false,customerDemandVerified:false,revenueVerified:false,
+  founderApproved:false,automatedExecution:false,
+  warning:"This is a deterministic research triage plan, not model reasoning, a scientific breakthrough assessment or validated commercial advice."
+ };
+}
+function nano11Fingerprint(row){
+ return fnv(JSON.stringify([NANO11_VERSION,row.paper_id,row.source_id,row.topic_id,
+   row.title,row.source_url,row.source_type,row.abstract_text,row.published_at,
+   row.citation_count,row.assessment_json]).slice(0,8000));
+}
+async function nano11Scheduled(env,scheduledTime){
+ const when=new Date(scheduledTime),at=nowIso();
+ const count=await env.DB.prepare("SELECT COUNT(*) n FROM nano_science_reviews").first();
+ // Bootstrap three papers quickly using the existing five-minute Cron.
+ // Afterward evaluate at most one new/changed record at :05 and :35 UTC.
+ if(Number(count?.n||0)>=3&&![5,35].includes(when.getUTCMinutes()))return "outside-window";
+ const results=await env.DB.prepare(
+  "SELECT p.paper_id,p.source_id,p.topic_id,p.title,p.source_url,p.source_type,"+
+  "p.abstract_text,p.published_at,p.citation_count,p.assessment_json,p.first_seen,p.last_seen,"+
+  "r.input_fingerprint old_fingerprint FROM nano_journal_papers p "+
+  "LEFT JOIN nano_science_reviews r ON r.paper_id=p.paper_id "+
+  "ORDER BY p.last_seen DESC LIMIT 80").all();
+ const candidates=(results.results||[]).map(row=>({
+  row,review:nano11Review(row),fingerprint:nano11Fingerprint(row)
+ })).filter(x=>x.review&&x.row.old_fingerprint!==x.fingerprint)
+   .sort((a,b)=>b.review.researchPriority-a.review.researchPriority||
+     String(b.row.published_at||"").localeCompare(String(a.row.published_at||"")));
+ const chosen=candidates[0];if(!chosen)return "up-to-date";
+ const payload=JSON.stringify(chosen.review);
+ if(payload.length>7500)throw Error("science-review-exceeds-storage-limit");
+ const x=chosen.review;
+ const sql="INSERT INTO nano_science_reviews(paper_id,category,stage,research_priority,input_fingerprint,review_json,created_at,updated_at) "+
+  "SELECT ?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM nano_science_reviews)<600 "+
+  "OR EXISTS(SELECT 1 FROM nano_science_reviews WHERE paper_id=?) "+
+  "ON CONFLICT(paper_id) DO UPDATE SET category=excluded.category,stage=excluded.stage,"+
+  "research_priority=excluded.research_priority,input_fingerprint=excluded.input_fingerprint,"+
+  "review_json=excluded.review_json,updated_at=excluded.updated_at "+
+  "WHERE nano_science_reviews.input_fingerprint!=excluded.input_fingerprint";
+ const saved=await env.DB.prepare(sql).bind(x.paperId,x.category,x.stage,x.researchPriority,
+  chosen.fingerprint,payload,at,at,x.paperId).run();
+ return saved.meta?.changes===1?"review-recorded:"+x.category:"unchanged-or-storage-bound";
+}
+function nano11Report(rows){
+ const all=(Array.isArray(rows)?rows:[]).slice(0,80).map(r=>{
+  let review={};
+  try{review=JSON.parse(String(r.review_json||"{}"));}catch{}
+  if(!review||!review.paperId||!["watch","review-needed"].includes(review.stage))return null;
+  return {...review,scientificClaimsReproduced:false,technicalFeasibilityVerified:false,
+   productOpportunityValidated:false,customerDemandVerified:false,revenueVerified:false,
+   founderApproved:false,automatedExecution:false};
+ }).filter(Boolean);
+ all.sort((a,b)=>b.researchPriority-a.researchPriority||
+   String(b.publishedAt).localeCompare(String(a.publishedAt)));
+ const top=[],themes=new Set();
+ for(const r of all){if(r.stage!=="review-needed"||themes.has(r.category))continue;
+  top.push(r);themes.add(r.category);if(top.length>=3)break;}
+ for(const r of all){if(top.length>=3)break;if(!top.some(x=>x.paperId===r.paperId))top.push(r);}
+ return {top,reviewed:all.length,needsReview:all.filter(x=>x.stage==="review-needed").length,
+  watch:all.filter(x=>x.stage==="watch").length,
+  source:"Stored arXiv and Crossref metadata; no full-paper analysis or independent reproduction",
+  independentCodeChecks:0,experimentalRuns:0,commercialValidation:0,
+  noInference:true,noAutonomousActions:true};
+}
+
 /* Phase 10 — independent academic research journals, zero-cost and evidence-safe.
  * Two public metadata fetches/day have their OWN D1 quota, not the discovery quota.
  * No API keys, page scraping, PDF crawling, LLM calls, commercial assertions or actions.
@@ -1815,6 +1983,13 @@ async function scheduledCycle(env, scheduledTime) {
     const result=await nano7Scheduled(env,scheduledTime);
     if(result!=="outside-window"&&result!=="not-due")await saveStatus(env,"nano_global_sources",result);
   }catch(e){try{await saveStatus(env,"nano_global_sources","error:"+clampText(e?.message,70));}catch{}}
+  // Phase 11 offline scientific evidence reviews from stored publications.
+  // No outbound requests, model calls, experiments or autonomous site changes.
+  try{
+    const result=await nano11Scheduled(env,scheduledTime);
+    if(result!=="outside-window"&&result!=="up-to-date")
+      await saveStatus(env,"nano_scientific_reviews",result);
+  }catch(e){try{await saveStatus(env,"nano_scientific_reviews","error:"+clampText(e?.message,70));}catch{}}
   // Dedicated academic research ingestion: independent 2/day D1 quota, no LLM calls.
   try{
     const result=await nano10Scheduled(env,scheduledTime);
@@ -2154,6 +2329,7 @@ async function report(env) {
   const briefRows=await env.DB.prepare("SELECT * FROM nano_opportunity_briefs ORDER BY priority DESC,updated_at DESC LIMIT 60").all();
   const journalScanRows=await env.DB.prepare("SELECT * FROM nano_journal_scans ORDER BY checked_at DESC LIMIT 4").all();
   const journalPaperRows=await env.DB.prepare("SELECT * FROM nano_journal_papers ORDER BY last_seen DESC LIMIT 60").all();
+  const scienceRows=await env.DB.prepare("SELECT * FROM nano_science_reviews ORDER BY research_priority DESC,updated_at DESC LIMIT 80").all();
   const [incidentRows,incidentEvents]=await Promise.all([
     env.DB.prepare("SELECT * FROM incident_history ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, last_seen DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM incident_events ORDER BY sequence DESC LIMIT 150").all()
@@ -2184,6 +2360,7 @@ async function report(env) {
   return {
     nanoPipeline:{status:metadata.find(x=>x.key==="nano_workflows")?.value||"not-attempted",
       checkedAt:metadata.find(x=>x.key==="nano_workflows")?.checked_at||""},
+    scienceReviews:{...nano11Report(scienceRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_scientific_reviews")?.value||"not-attempted"},
     researchJournals:{...nano10Report(journalScanRows.results||[],journalPaperRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_research_journals")?.value||"not-attempted"},
     opportunityBriefs:{...nano9Report(briefRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_opportunity_briefs")?.value||"not-attempted"},
     globalSources:{...nano7Report(sourceScanRows.results||[],sourceLeadRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_global_sources")?.value||"not-attempted"},
