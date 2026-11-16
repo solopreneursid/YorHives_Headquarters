@@ -92,6 +92,39 @@ const report={
       bytes:120,manifestParser:'package-json-names-only',directNamesObserved:2,exampleNames:['react','zod']},
       {path:'LICENSE',kind:'license',sha:'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
        bytes:800,licenseFileObserved:true}]}]},
+
+  experimentPlans:{eligible:1,preflightReady:0,automaticallyRun:0,commerciallyApproved:0,
+   plansWithCurrentFounderIntent:0,
+   scope:'Evidence-linked MANUAL experiment design. All execution/legal/hardware gates remain unverified.',
+   cost:'Zero additional HTTP calls, D1 writes, AI models, Cron schedules or subscriptions in Phase 17.',
+   entries:[{paperId:'robot-paper',title:'Robot-use agents from simulation',
+    paperUrl:'https://arxiv.org/abs/2611.18562',
+    repositoryUrl:'https://github.com/research-team/robot-kit',
+    manifestSha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    sourceDescription:'Title-search candidate only; paper authorship unconfirmed',
+    sourceStatus:'Some declared names extracted from one root manifest',
+    planStatus:'review-stale',founderReviewRevision:1,
+    founderReviewCurrent:false,founderReviewDisposition:null,
+    declaredNameCount:8,licenseFileObserved:true,
+    computeSignals:['possible-gpu-or-accelerator-stack','robotics-or-simulation'],
+    proposedCaps:{inr:0,runtimeMinutes:0,spentInr:null,capRecorded:false,
+      notSpendingAuthorization:true,estimate:'No measured cost or quote; caps are planning bounds only.'},
+    preflightVerified:0,gatesTotal:10,
+    preflightGates:Array.from({length:10},(_,i)=>({key:'g-'+i,
+      name:i===0?'Research-to-code identity':i===3?'Full software and asset rights':'Gate '+(i+1),
+      status:i===1?'root-manifest-observed':'unverified',
+      evidence:i===1?'Root manifest SHA pinned, not deployment proof':'No independent evidence yet.',
+      proof:'Obtain independent source-linked human verification evidence.'})),
+    stages:Array.from({length:5},(_,i)=>({order:i+1,name:'Manual stage '+(i+1),
+      owner:'Founder/manual reviewer',work:'Review evidence and verify it independently.',
+      output:'Human-reviewed evidence record'})),
+    stopConditions:['Stop if rights are unclear','Stop if credentials are requested',
+      'Stop before spending ceilings','Stop if repeatability fails'],
+    independentSuccess:'Reproducible independent baseline with measured resources.',
+    outcome:'Not executed; no measured cost, license clearance or outcome.',
+    readiness:'NOT approved to execute',automatedExecution:false,
+    commercialReuseApproved:false,measuredCost:false,founderExecutionAuthorized:false,
+    version:'source-grounded-manual-experiment-plan-v1'}]},
   founderResearchReviews:{available:true,candidates:1,reviewRecords:1,currentlyReviewed:0,
     needingRefresh:1,automatedExecution:false,commercialClearance:false,
     scope:'Founder planning records only. No code execution, deployments, license clearance or paid spend.',
@@ -241,7 +274,7 @@ async function test(name,callback){
 try{
   browser=await chromium.launch({headless:true});
   for(const profile of [{name:'desktop',viewport:{width:1366,height:850},isMobile:false},{name:'mobile',viewport:{width:390,height:844},isMobile:true}]){
-    const page=await browser.newPage({viewport:profile.viewport,isMobile:profile.isMobile,hasTouch:profile.isMobile});
+    const page=await browser.newPage({viewport:profile.viewport,isMobile:profile.isMobile,hasTouch:profile.isMobile,acceptDownloads:true});
     const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
     await test(profile.name+': direct AI Employees link survives source query',async()=>{
@@ -458,6 +491,52 @@ try{
       await page.locator('[data-discover-source="journals"]').click();
       assert.equal(await page.locator('.panel').filter({hasText:'Phase 16 · Founder research decisions'})
        .locator('details.implementation-entry').count(),1);
+    });
+
+    await test(profile.name+': Phase 17 source-backed manual experiment export',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      const panel=page.locator('.panel').filter({hasText:'Phase 17 · Manual experiment plans'});
+      await panel.getByText('Phase 17 · Manual experiment plans',{exact:true}).waitFor();
+      assert.ok((await panel.innerText()).includes('0 approved to run'));
+      const item=panel.locator('details.implementation-entry').first();
+      assert.equal(await item.getAttribute('open'),null);
+      await item.locator('summary').first().click();
+      const summary=await item.innerText();
+      assert.ok(summary.includes('No code was run'));
+      assert.ok(summary.includes('₹0'));
+      assert.ok(summary.includes('No measured cost or quote'));
+      assert.ok(summary.includes('possible-gpu-or-accelerator-stack'));
+      assert.ok(summary.includes('MANUAL PLAN ONLY'));
+      assert.ok(summary.includes('not spending permission')||summary.includes('planning bounds only'));
+      assert.ok(summary.includes('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'));
+      const gates=item.locator('details.science-evidence-more').nth(0);
+      await gates.locator('summary').first().click();
+      assert.equal(await gates.locator('ol > li').count(),10);
+      assert.ok((await gates.innerText()).includes('Not independently verified'));
+      const stages=item.locator('details.science-evidence-more').nth(1);
+      await stages.locator('summary').first().click();
+      assert.equal(await stages.locator('ol > li').count(),5);
+      assert.equal(await item.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),2);
+      const [download]=await Promise.all([
+        page.waitForEvent('download'),
+        item.locator('[data-export-experiment="robot-paper"]').click()
+      ]);
+      assert.equal(download.suggestedFilename(),'hq-manual-experiment-robot-paper.json');
+      const dataChunks=[];
+      for await (const chunk of await download.createReadStream())dataChunks.push(chunk);
+      const exported=JSON.parse(Buffer.concat(dataChunks).toString('utf8'));
+      assert.equal(exported.format,'yorphives.hq.manual-experiment-plan.v1');
+      assert.equal(exported.manualPlanOnly,true);
+      assert.equal(exported.executed,false);
+      assert.equal(exported.licenseCleared,false);
+      assert.equal(exported.spendingAuthorized,false);
+      assert.equal(exported.plan.preflightVerified,0);
+      assert.equal(exported.plan.preflightGates.length,10);
+      assert.equal(exported.plan.founderExecutionAuthorized,false);
+      await page.locator('[data-page="discover"]:visible').first().click();
+      await page.locator('[data-discover-source="journals"]').click();
+      assert.equal(await page.locator('.panel').filter({hasText:'Phase 17 · Manual experiment plans'})
+        .locator('details.implementation-entry').count(),1);
     });
     await test(profile.name+': scientific evidence reviews preserve unknowns',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();

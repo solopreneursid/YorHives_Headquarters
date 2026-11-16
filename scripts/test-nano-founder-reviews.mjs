@@ -115,7 +115,7 @@ const ui=JSON.parse(source.slice(a,b))['/dashboard.js'];
 assert.ok(ui.includes('function founderResearchPanel()'));
 assert.ok(ui.includes('function submitFounderResearch(form)'));
 assert.ok(ui.includes("classList.contains('research-review-form')"));
-assert.ok(ui.includes('founderResearchPanel()+scienceEvidencePanel()'));
+assert.ok(ui.includes('founderResearchPanel()+experimentPlansPanel()+scienceEvidencePanel()'));
 assert.ok(ui.includes('$'+'{founderResearchPanel()}'));
 assert.ok(source.includes('const researchReviewWrite=route==="/api/research/review"&&request.method==="POST"'));
 assert.ok(source.includes('!decisionWrite&&!privateAiWrite&&!learningWrite&&!researchReviewWrite'));
