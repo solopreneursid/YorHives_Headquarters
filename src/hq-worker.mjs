@@ -1175,7 +1175,7 @@ async function nano9Scheduled(env,scheduledTime){
  const count=await env.DB.prepare("SELECT COUNT(*) n FROM nano_opportunity_briefs").first();
  if(Number(count?.n||0)>=3&&![15,45].includes(clock.getUTCMinutes()))return "outside-window";
  const q=await env.DB.prepare(
-  "SELECT m.memory_id,m.run_id,m.source_id,m.source_kind,m.title,m.source_url,m.recommendation,"+
+  "SELECT m.memory_id,m.run_id,m.source_id,m.source_kind,m.title,m.source_url,m.recommendation,m.recorded_at,"+
   "o.kind opportunity_kind,l.kind listing_kind,l.summary listing_summary,"+
   "i.state investigation_state,i.facts_json investigation_facts,"+
   "t.fingerprint triage_fingerprint,b.source_fingerprint brief_fingerprint "+
