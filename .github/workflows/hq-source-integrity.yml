@@ -22,6 +22,7 @@ on:
       - 'scripts/test-nano-manifests.mjs'
       - 'scripts/test-nano-dependencies.mjs'
       - 'scripts/test-nano-founder-reviews.mjs'
+      - 'scripts/test-nano-experiment-plans.mjs'
       - 'scripts/test-deep-links.mjs'
       - 'scripts/test-growth-evidence.mjs'
       - '.github/workflows/hq-source-integrity.yml'
@@ -58,6 +59,7 @@ jobs:
           node scripts/test-nano-manifests.mjs
           node scripts/test-nano-dependencies.mjs
           node scripts/test-nano-founder-reviews.mjs
+          node scripts/test-nano-experiment-plans.mjs
           node scripts/test-deep-links.mjs
           node scripts/test-growth-evidence.mjs
       - name: Record verification scope
