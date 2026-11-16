@@ -61,6 +61,19 @@ const report={
        evidenceGaps:['Independent user evidence required'],departments:[],
        independentlyVerifiedDemand:false,independentlyVerifiedRevenue:false,founderApproved:false,automatedExecution:false}
      ]},
+
+  researchJournals:{pipelineStatus:'ok:crossref:saved:1',recordCount:1,active:1,sources:[
+    {id:'crossref',name:'Crossref',status:'ok',detail:'metadata:1',
+      lastChecked:'2026-11-16T15:00:00Z',nextCheckAt:'2026-11-17T15:00:00Z'},
+    {id:'arxiv',name:'arXiv',status:'unavailable',detail:'source-http-503',
+      lastChecked:'2026-11-16T15:05:00Z',nextCheckAt:'2026-11-17T15:05:00Z'}],
+   entries:[{id:'journal-test-1',title:'Modular AI agents for software verification',
+     url:'https://doi.org/10.1234/verified-source',sourceId:'crossref',sourceType:'journal-article',
+     topicId:'ai',publishedAt:'2026-11-10',relevanceRank:47,
+     abstract:'',possibleUse:'Could inform a replaceable AI model, agent, or automation component',
+     nextStep:'Review original work and compare independent evidence',
+     checks:['Read the original paper','Verify original results'],
+     claimsReproduced:false,customerDemandVerified:false,licenseVerified:false,founderApproved:false}]},
   globalSources:{pipelineStatus:'rate-limited:openalex:new:0',active:2,screened:2,candidates:1,filtered:1,limited:1,
    sourceSignals:[{sourceIds:['dev','crossref'],sharedTerms:['customer','support'],verifiedDemand:false,evidence:'Two sources share a topic, not proof of demand'}],sources:[
     {id:'dev',name:'DEV Community',category:'Developer problems',status:'listing-recorded',newCount:1,note:'Contributor posts only'},
@@ -229,6 +242,25 @@ try{
       assert.equal(await card.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),1);
       await card.locator('.brief-checks').last().locator('summary').click();
       assert.ok((await card.innerText()).includes('Security & Independent QA'));
+    });
+    await test(profile.name+': dedicated Research journals shows real-source semantics',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      const panel=page.locator('.panel').filter({hasText:'Research journals'});
+      await panel.getByText('Research journals',{exact:true}).waitFor();
+      assert.equal(await panel.locator('.journal-source').count(),2);
+      assert.equal(await panel.locator('.journal-paper').count(),1);
+      assert.ok((await panel.innerText()).includes('No AI model calls'));
+      const paper=panel.locator('details.journal-paper').first();
+      assert.equal(await paper.getAttribute('open'),null);
+      await paper.locator('summary').click();
+      assert.ok((await paper.innerText()).includes('not been independently verified'));
+      assert.ok((await paper.innerText()).includes('verification'));
+      assert.equal(await paper.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),1);
+      await page.locator('[data-page="discover"]:visible').first().click();
+      await page.locator('[data-discover-source="journals"]').click();
+      assert.equal(await page.locator('#page-root .journal-paper').count(),1);
+      assert.ok((await page.locator('#page-root').innerText()).includes('Research journals'));
+      assert.ok((await page.locator('#page-root').innerText()).includes('Crossref'));
     });
     await test(profile.name+': modular global sources and unverified candidate list',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
