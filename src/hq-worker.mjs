@@ -776,6 +776,37 @@ async function nanoPersist(env,plan){
    plan.evidence_state,plan.title,plan.recommendation,plan.stages_json,plan.observed_at,plan.created_at).run();
  return write.meta?.changes===1;
 }
+/* Phase 3 — shared, evidence-linked departmental memory.
+ * Store only data already recorded by HQ, no inference, web scraping, tools or secrets.
+ * Cross-department retrieval is read-only; revisions remain immutable.
+ */
+function nanoMemoryFromPlan(plan,record){
+ const sourceUrl=clampText(plan.source_kind==="finding"?record.evidence:record.source_url,250);
+ return {memory_id:"memory-"+plan.run_id,run_id:plan.run_id,source_kind:plan.source_kind,source_id:plan.source_id,
+  department:plan.department,title:plan.title,evidence_state:plan.evidence_state,source_url:sourceUrl,
+  recommendation:plan.recommendation,review_state:plan.review_state,observed_at:plan.observed_at,recorded_at:nowIso()};
+}
+async function nanoRemember(env,plan,record){
+ const m=nanoMemoryFromPlan(plan,record);
+ const inserted=await env.DB.prepare(
+  "INSERT INTO nano_memories(memory_id,run_id,source_kind,source_id,department,title,evidence_state,source_url,recommendation,review_state,observed_at,recorded_at) "+
+  "SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM workflow_runs WHERE run_id=?) "+
+  "AND (SELECT COUNT(*) FROM nano_memories)<1000 ON CONFLICT(memory_id) DO NOTHING")
+  .bind(m.memory_id,m.run_id,m.source_kind,m.source_id,m.department,m.title,m.evidence_state,
+   m.source_url,m.recommendation,m.review_state,m.observed_at,m.recorded_at,m.run_id).run();
+ return inserted.meta?.changes===1;
+}
+function nanoRecall(rows,department,limit=5){
+ const valid=Array.isArray(rows)?rows:[];
+ const matches=valid.filter(x=>typeof x?.run_id==="string"&&typeof x?.department==="string"&&
+  (department==="all"||x.department===department)&&["finding","opportunity"].includes(x.source_kind));
+ return matches.slice(0,Math.min(20,Math.max(1,limit))).map(x=>({
+  memoryId:x.memory_id,runId:x.run_id,kind:x.source_kind,department:x.department,
+  title:x.title,evidenceState:x.evidence_state,sourceUrl:x.source_url,
+  recommendation:x.recommendation,reviewState:x.review_state,observedAt:x.observed_at,recordedAt:x.recorded_at
+ }));
+}
+
 async function nanoScheduled(env,scheduledTime){
  if(new Date(scheduledTime).getUTCMinutes()%30!==0)return 0;
  const [findings,opportunities]=await Promise.all([
@@ -784,7 +815,12 @@ async function nanoScheduled(env,scheduledTime){
  ]);
  let created=0;
  const items=[...(findings.results||[]).map(x=>["finding",x]),...(opportunities.results||[]).map(x=>["opportunity",x])].slice(0,4);
- for(const [kind,item] of items)if(await nanoPersist(env,nanoPlan(kind,item)))created++;
+ for(const [kind,item] of items){
+  const plan=nanoPlan(kind,item);
+  if(await nanoPersist(env,plan))created++;
+  // Repair a previously missing memory row even when workflow dedupes.
+  await nanoRemember(env,plan,item);
+ }
  return created;
 }
 
@@ -1063,6 +1099,7 @@ function headquartersHealth(metadata,at=nowIso()) {
 }
 async function report(env) {
   const workflowRows=await env.DB.prepare("SELECT * FROM workflow_runs ORDER BY created_at DESC LIMIT 60").all();
+  const memoryRows=await env.DB.prepare("SELECT * FROM nano_memories ORDER BY recorded_at DESC LIMIT 60").all();
   const [incidentRows,incidentEvents]=await Promise.all([
     env.DB.prepare("SELECT * FROM incident_history ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, last_seen DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM incident_events ORDER BY sequence DESC LIMIT 150").all()
@@ -1090,6 +1127,10 @@ async function report(env) {
   const now=nowIso();
   const journal=await decisionJournal(env);
   return {
+    memory:{entries:nanoRecall(memoryRows.results||[],"all",40),
+      totalShown:Math.min(40,(memoryRows.results||[]).length),
+      scope:"Stored HQ evidence and existing recommendations only; not AI-generated learning",
+      status:"evidence-linked-unverified"},
     workflows:(workflowRows.results||[]).map(x=>({runId:x.run_id,kind:x.source_kind,sourceId:x.source_id,department:x.department,
       revision:x.revision,stage:x.stage,reviewState:x.review_state,evidenceState:x.evidence_state,
       title:x.title,recommendation:x.recommendation,stages:JSON.parse(x.stages_json),observedAt:x.observed_at,createdAt:x.created_at})),
