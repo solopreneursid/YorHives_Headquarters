@@ -3,7 +3,7 @@ const paths={home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1
 const I=(n,size=18)=>`<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[n]||paths.info}</svg>`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pages=[{id:'home',name:'Home',icon:'home'},{id:'discover',name:'Discover',icon:'compass'},{id:'team',name:'AI Team',icon:'team'},{id:'decisions',name:'Decisions',icon:'check'},{id:'growth',name:'Growth',icon:'chart'},{id:'control',name:'Control',icon:'shield'}];
-const categories=['All','Apps & Tools','Technology','Markets','Competitors','Revenue'];
+const categories=['All','Revenue','Apps & Tools','Technology','Markets','Competitors'];
 const roles=[['Engineering & Operations','Website and HQ health','shield'],['Research & Innovation','Products, tools and technology','spark'],['Global Market Intelligence','Customer needs and markets','globe'],['Competitive Intelligence','Alternatives and differentiation','compass'],['Product & Growth','Ideas and user growth','chart'],['Revenue & Business','Business models and revenue','bolt']];
 let data=null,apiError='',category='All',search='',savedOnly=false,sort='recent',moreOpen=false,detailId=null,loadingScan=false,previousFocus=null,loadingAudit=false,revenueShowDismissed=false;
 function route(){const name=location.hash.replace(/^#\/?/,'');return pages.some(p=>p.id===name)?name:'home';}
@@ -33,7 +33,7 @@ function revenueList(){
 }
 function revenueCard(x){
  const status=x.action==='new'?'Idea':x.action==='plan'?'Planned':x.action==='shortlist'?'Shortlisted':'Dismissed';
- return `<article class="panel idea revenue-idea"><div class="flex wrap">${badge(x.channel,'blue')}${badge(status,x.action==='plan'?'green':x.action==='dismiss'?'amber':'')}<span class="spacer"></span>${badge(`${x.priority}/100 priority`)}</div><h3>${esc(x.title)}</h3><p>${esc(x.summary)}</p><small class="quiet">For ${esc(x.target_name)} · ${esc(x.basis)}</small><div class="revenue-next"><strong>Next:</strong> ${esc(x.next_step)}</div><div class="foot"><span class="source">${esc(x.effort)} effort · Revenue unverified</span><button class="button linklike" data-revenue-detail="${esc(x.id)}">Plan ${I('arrow',15)}</button></div></article>`;
+ return `<article class="panel idea revenue-idea"><div class="flex wrap">${badge(x.channel,'blue')}${badge(status,x.action==='plan'?'green':x.action==='dismiss'?'amber':'')}<span class="spacer"></span>${badge(`${x.priority>=80?'High':x.priority>=60?'Medium':'Explore'} priority`)}</div><h3>${esc(x.title)}</h3><p>${esc(x.summary)}</p><small class="quiet">For ${esc(x.target_name)} · ${esc(x.basis)}</small><div class="revenue-next"><strong>Next:</strong> ${esc(x.next_step)}</div><div class="foot"><span class="source">${esc(x.effort)} effort · Revenue unverified</span><button class="button linklike" data-revenue-detail="${esc(x.id)}">Plan ${I('arrow',15)}</button></div></article>`;
 }
 function revenueHub(){
  const apps=data?.appInventory||[],healthy=apps.filter(x=>x.status==='online').length,issues=apps.filter(x=>x.status==='error').length;
