@@ -73,6 +73,16 @@ const report={
       state:'no-repository-link-observed',repositoryUrl:null,licenseSpdx:null,
       evidence:'No qualifying GitHub link was seen in the page.',
       lastChecked:'2026-11-16T16:50:00Z',nextCheck:'2026-11-23T16:50:00Z'}]},
+  feasibilityReviews:{reviewed:1,sourceMetadataChecked:1,highCostSignals:1,fullyValidated:0,
+    scope:'Provisional metadata-only assessment; licenses, dependencies and cost NOT verified.',
+    entries:[{paperId:'robot-paper',title:'Robot-use agents from simulation',
+      paperUrl:'https://arxiv.org/abs/2611.18562',repositoryUrl:'https://github.com/research-team/robot-kit',
+      relationship:'title-search-candidate-unconfirmed',licenseSpdx:'Apache-2.0',
+      licenseDisposition:'human-review-required; not cleared',dependencyDisposition:'not-inspected',
+      hardwareDisposition:'possible-specialized-hardware-cost; unverified',
+      outcome:'defer-until-hardware-budget-established',
+      blockers:['Repository-paper connection not confirmed','Direct and transitive dependencies not inspected'],
+      steps:['Verify upstream provenance','Obtain founder approval before any isolated execution']} ]},
   scienceReviews:{pipelineStatus:'review-recorded:workflow-resilience',reviewed:2,needsReview:2,watch:0,
    independentCodeChecks:0,experimentalRuns:0,commercialValidation:0,top:[
     {paperId:'paper-test-a',title:'Synthetic resilient autonomous laboratory workflows',
@@ -293,7 +303,28 @@ try{
       assert.equal(await first.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),2);
       await page.locator('[data-page="discover"]:visible').first().click();
       await page.locator('[data-discover-source="journals"]').click();
-      assert.equal(await page.locator('#page-root .implementation-entry').count(),2);
+      assert.equal(await page.locator('.panel').filter({hasText:'Implementation evidence'}).locator('details.implementation-entry').count(),2);
+      assert.equal(await page.locator('.panel').filter({hasText:'Phase 13 · Implementation feasibility'}).locator('details.implementation-entry').count(),1);
+    });
+    await test(profile.name+': Phase 13 feasibility stays provisional on mobile and desktop',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      const panel=page.locator('.panel').filter({hasText:'Phase 13 · Implementation feasibility'});
+      await panel.getByText('Phase 13 · Implementation feasibility',{exact:true}).waitFor();
+      assert.ok((await panel.innerText()).includes('0 independently validated'));
+      const row=panel.locator('details.implementation-entry').first();
+      assert.equal(await row.getAttribute('open'),null);
+      await row.locator('summary').click();
+      const txt=await row.innerText();
+      assert.ok(txt.includes('not a license clearance'));
+      assert.ok(txt.includes('not-inspected'));
+      assert.ok(txt.includes('possible-specialized-hardware-cost; unverified'));
+      assert.ok(txt.includes('human-review-required; not cleared'));
+      assert.ok(txt.includes('founder approval'));
+      assert.equal(await row.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),2);
+      await page.locator('[data-page="discover"]:visible').first().click();
+      await page.locator('[data-discover-source="journals"]').click();
+      assert.equal(await page.locator('.panel').filter({hasText:'Phase 13 · Implementation feasibility'})
+        .locator('details.implementation-entry').count(),1);
     });
     await test(profile.name+': scientific evidence reviews preserve unknowns',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
