@@ -738,6 +738,8 @@ async function scheduledCycle(env, scheduledTime) {
     await env.DB.prepare("DELETE FROM security_watch WHERE observed_at < ?")
       .bind(new Date(Date.now()-120*86400000).toISOString()).run();
   }
+  // Lower-priority scouts never block uptime or the normal scheduler heartbeat.
+  try{await scheduledInternetScouts(env,scheduledTime);}catch{}
   await saveStatus(env,"last_cron","cycle:"+nowIso());
 }
 function base64UrlBytes(value) {
@@ -959,6 +961,20 @@ async function saveDecision(request,env) {
   return json({saved:true,revision:input.revision+1,state:input.state,executionTriggered:false},201);
 }
 
+// Report proves authenticated API+D1 response, not external network uptime.
+function headquartersHealth(metadata,at=nowIso()) {
+  const cron=metadata.find(x=>x.key==="last_cron");
+  const age=Date.parse(at)-Date.parse(cron?.checked_at||"");
+  const valid=Number.isFinite(age)&&age>=0;
+  const fresh=valid&&age<20*60*1000;
+  return {
+    status:!valid?"unknown":fresh?"responding":"delayed",
+    api:"responding",database:"responding",collector:!valid?"unknown":fresh?"current":"stale",
+    lastCollectorCheck:cron?.checked_at||null,checkedAt:at,staleAfterMinutes:20,
+    independentCheck:"external-access-gate-only",
+    note:"Authenticated report verifies API and database; scheduled heartbeat is not independent uptime."
+  };
+}
 async function report(env) {
   const [assets,findings,leads,quota,status,security,hypotheses]=await Promise.all([
     env.DB.prepare("SELECT * FROM assets ORDER BY kind ASC,name ASC LIMIT 150").all(),
@@ -985,6 +1001,7 @@ async function report(env) {
   return {
     decisionJournal:journal, operating:operatingBrief(f,o,journal,now),
     schemaVersion:"yorphives.hq-intelligence.v1", generatedAt:now,
+    hqHealth:headquartersHealth(metadata,now),
     briefing:makeFounderBriefing(a,f,o,hypotheses.results||[],metadata,quotaUsed.public_fetches||0,now),
     verification:{method:"cloudflare-worker-readonly-http",complete:discoveryComplete,
       limitations:"Public GET evidence only. A complete catalog requires an explicit owner manifest; page changes and functionality need independent verification.",
@@ -1042,6 +1059,228 @@ async function report(env) {
       errors:fresh?[]:["Collector heartbeat stale or absent"]}
   };
 }
+
+// Strictly bounded read-only public repository lookup. The founder must initiate every search.
+const publicGithubCache=new Map();
+let lastPublicGithubRequest=0;
+function githubRepoMetadata(repo){
+  const fullName=String(repo?.full_name||"");
+  if(!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(fullName)||repo?.private===true||repo?.archived===true)return null;
+  const topics=Array.isArray(repo.topics)?repo.topics.filter(x=>typeof x==="string").slice(0,12):[];
+  const technology=/(^|[-_ ])(ai|llm|ml|agents?|machine-learning|models?|framework|sdk|mcp|inference|transformers)($|[-_ ])/i;
+  const license=String(repo.license?.spdx_id||"");
+  return {id:fullName,title:fullName,description:String(repo.description||"").slice(0,280),
+    url:"https://github.com/"+fullName,
+    license:/^[A-Za-z0-9.-]{1,40}$/.test(license)&&license!=="NOASSERTION"?license:null,
+    stars:Number.isSafeInteger(repo.stargazers_count)&&repo.stargazers_count>=0?repo.stargazers_count:0,
+    language:typeof repo.language==="string"?repo.language.slice(0,40):"",
+    topics,category:topics.some(t=>technology.test(t))||technology.test(fullName)?"technology":"apps",
+    updatedAt:typeof repo.updated_at==="string"?repo.updated_at:"",
+    source:"github-public",verified:false};
+}
+async function discoverPublicGithub(request){
+  const u=new URL(request.url),q=String(u.searchParams.get("q")||"").normalize("NFKC").trim().replace(/\s+/g," ");
+  if(!/^[\p{L}\p{N} ._-]{2,64}$/u.test(q)||q.split(/\s+/).length>8)return json({error:"Enter 2–64 letters or numbers, up to 8 words."},400);
+  const key=q.toLowerCase(),now=Date.now();
+  for(const [k,v] of publicGithubCache)if(now-v.at>300000)publicGithubCache.delete(k);
+  const hit=publicGithubCache.get(key);
+  if(hit)return json({...hit.data,cached:true});
+  // Isolate-local cooldown; upstream rate limits still apply across edge instances.
+  if(now-lastPublicGithubRequest<15000)return json({error:"Search cooldown. Retry shortly."},429);
+  lastPublicGithubRequest=now;
+  const api=new URL("https://api.github.com/search/repositories");
+  api.searchParams.set("q",q+" in:name,description fork:false archived:false");
+  api.searchParams.set("per_page","12");
+  try{
+    const response=await fetch(api.href,{method:"GET",redirect:"error",cache:"no-store",
+      headers:{accept:"application/vnd.github+json","user-agent":"YorpHives-HQ-ReadOnly-Discovery"},
+      signal:AbortSignal.timeout(7000)});
+    if(response.status===403||response.status===429)return json({error:"GitHub search is rate-limited. Retry later."},429);
+    if(!response.ok)return json({error:"Public GitHub search is temporarily unavailable."},503);
+    if(Number(response.headers.get("content-length")||0)>1000000)return json({error:"Search response too large."},502);
+    const raw=await response.text();
+    if(raw.length>1000000)return json({error:"Search response too large."},502);
+    const data=JSON.parse(raw);
+    if(!Array.isArray(data.items))return json({error:"Unexpected GitHub response."},502);
+    const items=data.items.slice(0,12).map(githubRepoMetadata).filter(Boolean);
+    const payload={query:q,source:"github-public",searchedAt:new Date(now).toISOString(),
+      total:Math.max(0,Number(data.total_count)||0),incomplete:data.incomplete_results===true,items,
+      licenseNotice:"Verify each repository license and obligations before copying or adapting code."};
+    if(publicGithubCache.size>=40)publicGithubCache.delete(publicGithubCache.keys().next().value);
+    publicGithubCache.set(key,{at:now,data:payload});
+    return json(payload);
+  }catch{return json({error:"Public GitHub search did not respond."},503);}
+}
+
+
+// Zero-paid-source research scouts. These are deterministic classifiers, NOT running LLMs.
+// Each output has an original source and an explicit human-review checkpoint.
+const DISCOVERY_ROLES=Object.freeze([
+  {id:"product",name:"Product Scout",focus:"apps"},
+  {id:"technology",name:"Technology Scout",focus:"technology"},
+  {id:"market",name:"Market Scout",focus:"markets"},
+  {id:"competitor",name:"Competitor Scout",focus:"competitors"},
+  {id:"revenue",name:"Revenue Scout",focus:"revenue"},
+  {id:"evaluator",name:"Opportunity Evaluator",focus:"evidence"}
+]);
+const HN_CHANNELS=Object.freeze({launches:"showstories",signals:"newstories"});
+const hnFeedCache=new Map(),hnFeedLastFetch=new Map();
+const DISCOVERY_TTL_MS=45*60*1000;
+function classifyInternetOpportunity(title){
+  const t=String(title||"").toLowerCase();
+  if(/\b(alternative to|compare|versus|competitor|replacement for)\b/.test(t))return "competitors";
+  if(/\b(mrr|arr|monetiz|subscription|billing|payment|checkout|pricing|sales|affiliate|invoice|marketplace|ecommerce|e-commerce)\b/.test(t))return "revenue";
+  if(/\b(education|students?|teachers?|health|travel|tourism|housing|real estate|hiring|recruit|farm|agriculture|finance|insurance|legal|restaurant|school|caregiving)\b/.test(t))return "markets";
+  if(/\b(llm|open.source|agentic|ai agents?|model|inference|sdk|framework|library|compiler|database|vector|api|developer|kubernetes|linux|rust|python|machine.learning|benchmark)\b/.test(t))return "technology";
+  return "apps";
+}
+function scoutReview(title,category,source,engagement=0){
+  const clean=String(title||"").slice(0,160);
+  const matched=DISCOVERY_ROLES.find(x=>x.focus===category)||DISCOVERY_ROLES[0];
+  // Lightweight triage is NOT evidence of demand, ownership, profitability or feasibility.
+  const signals=Math.min(3,Math.floor(Math.log10(Math.max(1,Number(engagement)||1))));
+  return {scout:matched.name,reviewer:"Opportunity Evaluator",stage:"unverified-lead",
+    priority:signals>=2?"Review":"Explore",why:"Public listing in "+source+
+      ". Topic suggests "+category.replace("apps","a possible product")+" research.",
+    next:"Read original source; verify actual product, demand, license, competition and costs.",
+    rulesOnly:true,aiInference:false};
+}
+function normalizeHackerNewsItem(x){
+  if(!x||x.deleted||x.dead||!Number.isSafeInteger(x.id)||x.id<=0||typeof x.title!=="string")return null;
+  const title=x.title.replace(/^Show HN:\s*/i,"").trim().slice(0,160);
+  if(!title)return null;
+  let postedAt="";try{if(Number.isFinite(x.time)&&x.time>0)postedAt=new Date(x.time*1000).toISOString();}catch{}
+  let url=null;
+  try{const u=new URL(String(x.url||""));if(["https:","http:"].includes(u.protocol)&&!u.username&&!u.password)url=u.href;}catch{}
+  const category=classifyInternetOpportunity(title),score=Number.isInteger(x.score)?Math.max(0,x.score):0;
+  return {id:"hn-"+x.id,title,description:"Public Hacker News submission — unverified research lead.",
+    category,source:"Hacker News",sourceUrl:"https://news.ycombinator.com/item?id="+x.id,
+    url:url||"https://news.ycombinator.com/item?id="+x.id,price:"Unknown",license:null,postedAt,
+    score,commentCount:Number.isInteger(x.descendants)?Math.max(0,x.descendants):0,
+    evidence:"Public submission; category inferred from title",verified:false,
+    review:scoutReview(title,category,"Hacker News",score)};
+}
+function normalizeAlgoliaHit(x){
+  if(!x||!/^\d+$/.test(String(x.objectID||"")))return null;
+  const id=Number(x.objectID);
+  return normalizeHackerNewsItem({id,title:String(x.title||x.story_title||""),
+    time:Number(x.created_at_i),url:x.url||x.story_url,score:x.points,descendants:x.num_comments});
+}
+function normalizeDevArticle(x){
+  if(!x||!Number.isSafeInteger(x.id)||typeof x.title!=="string")return null;
+  const title=x.title.trim().slice(0,160);
+  if(!title)return null;
+  const url="https://dev.to"+String(x.path||"");
+  if(!/^https:\/\/dev\.to\/[a-z0-9_-]+\/[a-z0-9_-]+(?:\/)?$/i.test(url))return null;
+  const category=classifyInternetOpportunity(title),score=Math.max(0,Number(x.public_reactions_count)||0);
+  return {id:"devto-"+x.id,title,description:String(x.description||"Technical article; not a verified product.").slice(0,220),
+    category,source:"DEV Community",sourceUrl:url,url,price:"Unknown",license:null,
+    postedAt:String(x.published_at||""),score,commentCount:Number(x.comments_count)||0,
+    evidence:"Public developer article; not necessarily a launched product",verified:false,
+    review:scoutReview(title,category,"DEV Community",score)};
+}
+async function fetchPublicJson(url,deadline=5500,maxChars=250000){
+  const r=await fetch(url,{method:"GET",redirect:"error",cache:"no-store",
+    signal:AbortSignal.timeout(deadline),
+    headers:{accept:"application/json","user-agent":"YorpHives-HQ-ReadOnly-Discovery"}});
+  if(!r.ok)throw Error("Public source unavailable");
+  const len=Number(r.headers.get("content-length")||0);
+  if(len>maxChars)throw Error("Public source response too large");
+  const body=await boundedText(r,maxChars);
+  if(body===null)throw Error("Public source response too large");
+  return JSON.parse(body);
+}
+async function collectSource(channel){
+  // One bounded primary call to HN or DEV. Fallback uses max 5 subrequests total,
+  // avoiding the former 14 parallel connections and public-source rate exhaustion.
+  let items=[],origin="",failed=[];
+  try{
+    if(channel==="launches"){
+      const ids=await fetchPublicJson("https://hacker-news.firebaseio.com/v0/showstories.json",5000,18000);
+      if(!Array.isArray(ids))throw Error("Invalid source list");
+      const four=ids.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,4);
+      const details=await Promise.allSettled(four.map(x=>
+        fetchPublicJson("https://hacker-news.firebaseio.com/v0/item/"+x+".json",4800,10000)));
+      items=details.filter(x=>x.status==="fulfilled").map(x=>normalizeHackerNewsItem(x.value)).filter(Boolean);
+      origin="Hacker News Firebase"; 
+    }else{
+      const articles=await fetchPublicJson("https://dev.to/api/articles?per_page=12&top=7",6000,120000);
+      if(!Array.isArray(articles))throw Error("Invalid developer article list");
+      items=articles.slice(0,12).map(normalizeDevArticle).filter(Boolean);
+      origin="DEV Community";
+    }
+  }catch(e){failed.push(channel==="launches"?"Hacker News Firebase":"DEV Community");}
+  if(items.length)return {items:items.slice(0,12),origin,partial:failed.length>0};
+  try{
+    const tags=channel==="launches"?"show_hn":"front_page";
+    const api="https://hn.algolia.com/api/v1/search_by_date?tags="+tags+"&hitsPerPage=12";
+    const data=await fetchPublicJson(api,6000,150000);
+    if(!Array.isArray(data.hits))throw Error("Invalid search hits");
+    items=data.hits.map(normalizeAlgoliaHit).filter(Boolean);
+    origin="Hacker News Search"; 
+  }catch{failed.push("Hacker News Search");}
+  if(!items.length)throw Error("Public sources unavailable: "+failed.join(", "));
+  return {items:items.slice(0,12),origin,partial:true};
+}
+async function loadStoredDiscovery(env,channel){
+  if(!env?.DB)return null;
+  try{
+    const row=await env.DB.prepare("SELECT value,checked_at FROM status WHERE key=?")
+      .bind("public_scouts_"+channel).first();
+    if(!row)return null;
+    const data=JSON.parse(row.value);
+    if(!["hacker-news-public","public-research"].includes(data?.source)||!Array.isArray(data.items)||data.channel!==channel)return null;
+    return {data,at:Date.parse(row.checked_at)||0};
+  }catch{return null;}
+}
+async function persistDiscovery(env,channel,data){
+  if(!env?.DB)return;
+  // Existing status table; no schema migrations or third-party storage.
+  try{await env.DB.prepare("INSERT INTO status(key,value,checked_at) VALUES(?,?,?) "+
+    "ON CONFLICT(key) DO UPDATE SET value=excluded.value,checked_at=excluded.checked_at")
+    .bind("public_scouts_"+channel,JSON.stringify(data),nowIso()).run();}
+  catch(e){console.warn("Public discovery cache unavailable");}
+}
+async function getDiscoveryResult(channel,env,{force=false}={}){
+  if(!(channel in HN_CHANNELS))return {status:400,error:"Unknown discovery channel"};
+  const now=Date.now(),hit=hnFeedCache.get(channel);
+  const stored=await loadStoredDiscovery(env,channel);
+  const candidate=stored?.at>(hit?.at||0)?stored:hit;
+  if(candidate&&!force&&now-candidate.at<DISCOVERY_TTL_MS)
+    return {status:200,data:{...candidate.data,cached:true,stale:false}};
+  if(now-(hnFeedLastFetch.get(channel)||0)<60000){
+    if(candidate)return {status:200,data:{...candidate.data,cached:true,stale:true,notice:"Showing last verified public-source snapshot; retry later."}};
+    return {status:429,error:"Source cooldown. Browse source directories or retry later."};
+  }
+  hnFeedLastFetch.set(channel,now);
+  try{
+    const scan=await collectSource(channel);
+    const payload={source:"public-research",channel,checkedAt:new Date(now).toISOString(),items:scan.items,
+      origin:scan.origin,incomplete:scan.partial,cached:false,stale:false,
+      scouts:DISCOVERY_ROLES.map(x=>x.name),
+      note:"Six rule-based research roles; no running LLM. Public listings only. No verified demand, cost or reuse rights."};
+    hnFeedCache.set(channel,{at:now,data:payload});
+    await persistDiscovery(env,channel,payload);
+    return {status:200,data:payload};
+  }catch{
+    if(candidate)return {status:200,data:{...candidate.data,cached:true,stale:true,
+      notice:"Live sources unavailable. Showing last successful recorded results."}};
+    return {status:503,error:"Live public sources unavailable. No stored results yet; browse the source directory below."};
+  }
+}
+async function discoverInternetFeed(request,env){
+  const u=new URL(request.url),channel=u.searchParams.get("channel")||"launches";
+  const result=await getDiscoveryResult(channel,env,{force:u.searchParams.get("refresh")==="1"});
+  return result.status===200?json(result.data):json({error:result.error},result.status);
+}
+async function scheduledInternetScouts(env,scheduledTime){
+  // Two scans in 24 hours per channel, no extra Cron trigger. No AI API billing.
+  const t=new Date(scheduledTime);
+  if(t.getUTCMinutes()!==35||![2,8,14,20].includes(t.getUTCHours()))return;
+  const channel=t.getUTCHours()%12===2?"launches":"signals";
+  await getDiscoveryResult(channel,env);
+}
+
 function json(value,status=200) {return new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});}
 export default {
   async fetch(request,env,ctx) {
@@ -1053,6 +1292,9 @@ export default {
       try{return await saveDecision(request,env);}catch{return json({error:"Decision could not be saved; refresh before retrying"},503);}
     }
     if(route==="/api/decisions"&&request.method==="GET")return json(await decisionJournal(env));
+    if(route==="/api/discover"&&request.method==="GET")return discoverPublicGithub(request);
+    if(route==="/api/discover/feed"&&request.method==="GET")return discoverInternetFeed(request,env);
+    if(route==="/api/discover"&&request.method==="HEAD")return new Response(null,{status:200,headers:JSON_HEADERS});
     if(route==="/api/report") {
       if(!env.DB) return json({error:"Evidence database is not configured"},503);
       const result=await report(env);
@@ -1070,6 +1312,16 @@ export default {
     const path=route==="/" ? "/index.html" : route;
     const item=PILOT_STATIC_BUNDLE && PILOT_STATIC_BUNDLE[path];
     if(!item) return new Response("Private UI assets not configured",{status:503});
+    // Only these exact official logo images may be returned as binary assets.
+    if(path==="/assets/yorphives-logo.webp"||path==="/assets/yorphives-mark.webp"){
+      if(typeof item!=="string"||!/^[A-Za-z0-9+/]+={0,2}$/.test(item))
+        return new Response("Brand asset unavailable",{status:503});
+      const bytes=Uint8Array.from(atob(item),ch=>ch.charCodeAt(0));
+      return new Response(request.method==="HEAD"?null:bytes,{status:200,
+        headers:{"content-type":"image/webp","cache-control":"private,no-store",
+          "x-content-type-options":"nosniff","x-frame-options":"DENY",
+          "referrer-policy":"no-referrer"}});
+    }
     const type=path.endsWith(".css")?"text/css; charset=utf-8":
       path.endsWith(".js")?"text/javascript; charset=utf-8":"text/html; charset=utf-8";
     return new Response(request.method==="HEAD"?null:item,{status:200,
@@ -1085,4 +1337,4 @@ export default {
     }));
   }
 };
-export {safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report,decisionTransition,evidenceContract,operatingBrief,saveDecision,validateExperiment};
+export {DISCOVERY_ROLES,scoutReview,normalizeDevArticle,normalizeAlgoliaHit,collectSource,getDiscoveryResult,loadStoredDiscovery,persistDiscovery,scheduledInternetScouts,classifyInternetOpportunity,normalizeHackerNewsItem,discoverInternetFeed,githubRepoMetadata,discoverPublicGithub,headquartersHealth,safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report,decisionTransition,evidenceContract,operatingBrief,saveDecision,validateExperiment};

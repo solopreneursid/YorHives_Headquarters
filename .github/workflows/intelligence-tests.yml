@@ -66,7 +66,8 @@ jobs:
           python3 -m playwright install --with-deps chromium firefox webkit
       - name: Exercise navigation, sample provenance, imports, and XSS checks
         run: |
-          python3 tests/ui_smoke.py
-          python3 tests/decision_browser.py
+          python3 tests/hq_six_page_browser.py
+          python3 tests/hq_home_browser.py
+          python3 tests/hq_discover_browser.py
+          python3 tests/hq_internet_browser.py
           python3 tests/test_assurance_browser.py
-          python3 tests/responsive_crossbrowser.py
