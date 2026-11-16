@@ -1824,7 +1824,7 @@ function nano17Report(checks,manifestRows,reviewRows){
    founderReviewDisposition:current?decision.disposition:null,
    founderReviewCurrent:current,planStatus:status,
    declaredNameCount:declared,licenseFileObserved:license,computeSignals:signals,
-   proposedCaps:{inr:budget,runtimeMinutes:runtime,spentInr:0,
+   proposedCaps:{inr:budget,runtimeMinutes:runtime,spentInr:null,
     capRecorded:planningOnly,notSpendingAuthorization:true,
     estimate:"No measured cost or quote; caps are planning bounds only."},
    preflightGates:checksToComplete,preflightVerified:0,
