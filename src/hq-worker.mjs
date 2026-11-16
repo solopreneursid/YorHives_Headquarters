@@ -1734,6 +1734,172 @@ function nano13Report(rows){
   nextStep:"Founder-reviewed repository file inspection and isolated test planning; no automatic code execution."};
 }
 
+/* Nano Phase 18 — founder-submitted evidence for manual experiment gates.
+ * Evidence links are never fetched. A founder note is NOT independent QA,
+ * license clearance, paid-spend authority, or approval to execute code.
+ * The only write is the explicit authenticated founder append endpoint.
+ */
+const NANO18_VERSION="founder-evidence-gates-v1";
+const NANO18_GATE_KEYS=Object.freeze([
+ "authorship","source","dependencies","licenses","data",
+ "isolation","hardware","cost","acceptance","permission"
+]);
+const NANO18_ASSESSMENTS=Object.freeze([
+ "needs-review","evidence-submitted","blocker-reported"
+]);
+const NANO18_EVIDENCE_TYPES=Object.freeze([
+ "research-source","code-or-license","independent-qa","measurement","other"
+]);
+function nano18EvidenceUrl(value){
+ if(typeof value!=="string"||value.length<12||value.length>420||
+   /[\u0000-\u0020\u007f\\]/.test(value))return null;
+ let url;try{url=new URL(value);}catch{return null;}
+ const host=url.hostname.toLowerCase();
+ if(url.protocol!=="https:"||url.username||url.password||
+   (url.port&&url.port!=="443")||url.search||url.hash||
+   host.length<4||host.length>253||!host.includes(".")||
+   !/^(?:[a-z0-9-]+\.)+[a-z]{2,24}$/.test(host)||
+   host==="localhost"||
+   /(?:\.local|\.localhost|\.internal|\.test|\.invalid|\.example|\.onion)$/.test(host)||
+   /(?:^|\.)(?:local|localhost|internal|intranet|private)$/.test(host))
+  return null;
+ return url.href;
+}
+function nano18Report(checks,manifestRows,reviewRows,evidenceRows,enabled=false){
+ const phase17=nano17Report(checks,manifestRows,reviewRows);
+ const groups=new Map();
+ for(const row of Array.isArray(evidenceRows)?evidenceRows:[]){
+  if(!row||!NANO18_GATE_KEYS.includes(row.gate_key)||typeof row.paper_id!=="string")continue;
+  const key=row.paper_id+"|"+row.gate_key;
+  if(!groups.has(key))groups.set(key,[]);
+  if(groups.get(key).length<25)groups.get(key).push(row);
+ }
+ let recordsCurrent=0,recordsStale=0,reportedBlockers=0;
+ const entries=phase17.entries.map(plan=>{
+  const gates=plan.preflightGates.map(g=>{
+   const records=(groups.get(plan.paperId+"|"+g.key)||[]).slice().sort((a,b)=>Number(b.revision)-Number(a.revision));
+   const latest=records[0];
+   const safeUrl=latest?nano18EvidenceUrl(latest.evidence_url):null;
+   const latestCurrent=Boolean(latest&&
+    latest.repository_url===plan.repositoryUrl&&
+    latest.manifest_sha===plan.manifestSha&&
+    Number(latest.founder_review_version)===plan.founderReviewRevision);
+   if(latest&&latestCurrent)recordsCurrent++;
+   if(latest&&!latestCurrent)recordsStale++;
+   if(latestCurrent&&latest.assessment==="blocker-reported")reportedBlockers++;
+   const history=records.slice(0,3).map(r=>({
+    revision:Number(r.revision)||0,
+    assessment:NANO18_ASSESSMENTS.includes(r.assessment)?r.assessment:"needs-review",
+    recordedAt:r.recorded_at||null,
+    sourceCurrent:r.repository_url===plan.repositoryUrl&&r.manifest_sha===plan.manifestSha&&
+      Number(r.founder_review_version)===plan.founderReviewRevision
+   }));
+   return {key:g.key,name:g.name,proofNeeded:g.proof,
+    existingObservation:g.evidence,
+    latest:latest?{revision:Number(latest.revision)||0,
+     assessment:NANO18_ASSESSMENTS.includes(latest.assessment)?latest.assessment:"needs-review",
+     type:NANO18_EVIDENCE_TYPES.includes(latest.evidence_type)?latest.evidence_type:"other",
+     evidenceUrl:safeUrl,
+     explanation:clampText(latest.explanation,350),recordedAt:latest.recorded_at||null,
+     sourceCurrent:latestCurrent,verifiedIndependently:false}:null,
+    revision:latest?Math.max(0,Number(latest.revision)||0):0,
+    history,independentlyVerified:false,approved:false};
+  });
+  return {paperId:plan.paperId,title:plan.title,paperUrl:plan.paperUrl,
+   repositoryUrl:plan.repositoryUrl,manifestSha:plan.manifestSha,
+   founderReviewVersion:plan.founderReviewRevision,
+   founderReviewCurrent:plan.founderReviewCurrent,
+   status:plan.planStatus,gates,gateCount:gates.length,
+   currentEvidenceEntries:gates.filter(g=>g.latest?.sourceCurrent).length,
+   staleEvidenceEntries:gates.filter(g=>g.latest&&!g.latest.sourceCurrent).length,
+   independentClearances:0,legallyApproved:false,executionApproved:false,
+   message:"Founder-submitted link and note only; no URL was fetched, no independent proof was verified, and no execution is approved."};
+ });
+ return {entries,eligible:entries.length,recordedEntries:(Array.isArray(evidenceRows)?evidenceRows:[]).length,
+  currentGateEvidence:recordsCurrent,staleGateEvidence:recordsStale,
+  currentBlockers:reportedBlockers,independentlyVerified:0,
+  preflightReady:0,executionAuthorized:false,commercialUseApproved:false,
+  available:enabled===true,
+  caution:"All gates remain UNVERIFIED. Founder-submitted evidence is not an independent audit, legal clearance, hardware benchmark or permission to execute.",
+  cost:"No new external requests, inference, Cron, or automated execution; one private D1 append per founder submission."};
+}
+async function nano18Save(request,env){
+ if(env.HQ_DECISIONS_ENABLED!=="true"||!env.DB)
+  return json({error:"Founder evidence entry is unavailable"},503);
+ const origin=new URL(request.url).origin;
+ if(request.headers.get("origin")!==origin||
+   request.headers.get("x-hq-founder-action")!=="gate-evidence-v1"||
+   request.headers.get("content-type")?.split(";")[0]!=="application/json")
+  return json({error:"Same-origin founder evidence action required"},403);
+ let data;
+ try{
+  const body=await boundedText(request,2000);
+  if(body===null)return json({error:"Evidence entry too large"},413);
+  data=JSON.parse(body);
+ }catch{return json({error:"Invalid evidence JSON"},400);}
+ if(!data||typeof data!=="object"||Array.isArray(data))
+  return json({error:"Invalid evidence object"},400);
+ const paperId=typeof data.paperId==="string"?data.paperId:"";
+ const gateKey=typeof data.gateKey==="string"?data.gateKey:"";
+ const assessment=typeof data.assessment==="string"?data.assessment:"";
+ const type=typeof data.evidenceType==="string"?data.evidenceType:"";
+ const evidenceUrl=nano18EvidenceUrl(data.evidenceUrl);
+ const explanation=typeof data.explanation==="string"?data.explanation.trim():"";
+ const expectedVersion=data.expectedGateVersion;
+ const expectedFounderVersion=data.expectedFounderVersion;
+ const expectedSha=typeof data.expectedManifestSha==="string"?data.expectedManifestSha:null;
+ if(!/^[a-zA-Z0-9_-]{1,80}$/.test(paperId)||
+   !NANO18_GATE_KEYS.includes(gateKey)||!NANO18_ASSESSMENTS.includes(assessment)||
+   !NANO18_EVIDENCE_TYPES.includes(type)||!evidenceUrl||
+   explanation.length<20||explanation.length>350||
+   !Number.isInteger(expectedVersion)||expectedVersion<0||expectedVersion>=25||
+   !Number.isInteger(expectedFounderVersion)||expectedFounderVersion<0||expectedFounderVersion>25||
+   expectedSha===null||!(expectedSha===""||/^[a-f0-9]{40}$/.test(expectedSha)))
+  return json({error:"Invalid evidence. Provide a public HTTPS link without query tokens, an explanation and a current gate revision."},400);
+ const row=await env.DB.prepare(
+  "SELECT i.*,p.title paper_title,p.source_url,m.catalog_json,m.evidence_json,"+
+  "m.repository_url saved_repository_url,"+
+  "COALESCE((SELECT MAX(version) FROM nano_research_founder_reviews WHERE paper_id=i.paper_id),0) founder_version "+
+  "FROM nano_implementation_checks i JOIN nano_journal_papers p ON p.paper_id=i.paper_id "+
+  "LEFT JOIN nano_manifest_evidence m ON m.paper_id=i.paper_id WHERE i.paper_id=? LIMIT 1"
+ ).bind(paperId).first();
+ if(!row)return json({error:"Research candidate not found"},404);
+ const repo=nano14Candidate(row);
+ if(!repo)return json({error:"Public GitHub candidate identity unverified"},409);
+ const source=row.saved_repository_url?{
+  repository_url:row.saved_repository_url,catalog_json:row.catalog_json,
+  evidence_json:row.evidence_json}:null;
+ const assessmentRow=nano15Assess(row,source);
+ const sha=assessmentRow?.manifestSha||"";
+ if(sha!==expectedSha||Number(row.founder_version)!==expectedFounderVersion)
+  return json({error:"Evidence or founder decision changed. Refresh before recording."},409);
+ const entryId=crypto.randomUUID(),recorded=nowIso();
+ // Insert only if repository facts, manifest content, current founder version,
+ // and latest gate revision are unchanged. No UPDATE/DELETE or task dispatch.
+ const sql="INSERT INTO nano_experiment_gate_evidence(entry_id,paper_id,gate_key,revision,"+
+  "repository_url,manifest_sha,founder_review_version,assessment,evidence_type,evidence_url,explanation,recorded_at) "+
+  "SELECT ?,i.paper_id,?,"+
+  "(SELECT COALESCE(MAX(revision),0)+1 FROM nano_experiment_gate_evidence WHERE paper_id=i.paper_id AND gate_key=?),"+
+  "i.repository_url,?,?,?,?,?,?,? FROM nano_implementation_checks i "+
+  "WHERE i.paper_id=? AND i.state='repository-metadata-checked' "+
+  "AND i.repository_url=? AND i.facts_json=? "+
+  "AND COALESCE((SELECT m.catalog_json FROM nano_manifest_evidence m WHERE m.paper_id=i.paper_id),'[]')=? "+
+  "AND COALESCE((SELECT m.evidence_json FROM nano_manifest_evidence m WHERE m.paper_id=i.paper_id),'[]')=? "+
+  "AND COALESCE((SELECT MAX(version) FROM nano_research_founder_reviews WHERE paper_id=i.paper_id),0)=? "+
+  "AND COALESCE((SELECT MAX(revision) FROM nano_experiment_gate_evidence WHERE paper_id=i.paper_id AND gate_key=?),0)=? "+
+  "AND (SELECT COUNT(*) FROM nano_experiment_gate_evidence)<600";
+ try{
+  const saved=await env.DB.prepare(sql).bind(entryId,gateKey,gateKey,sha,expectedFounderVersion,
+   assessment,type,evidenceUrl,explanation,recorded,paperId,repo,row.facts_json,
+   row.catalog_json||"[]",row.evidence_json||"[]",expectedFounderVersion,gateKey,expectedVersion).run();
+  if(Number(saved.meta?.changes)!==1)
+   return json({error:"Source or gate revision changed. Refresh and retry."},409);
+ }catch{return json({error:"Evidence conflict or storage unavailable"},409);}
+ return json({saved:true,paperId,gateKey,revision:expectedVersion+1,
+  evidenceSubmitted:true,independentlyVerified:false,licenseCleared:false,
+  executionAuthorized:false,spendingAuthorized:false,sourceFetched:false},201);
+}
+
 /* Nano Phase 17 — bounded research experiment planning. All advisory.
  * Plans compile existing Phase 12–16 facts, contain no executable steps,
  * cannot grant license clearance, and never authorize or run an experiment.
@@ -3257,6 +3423,7 @@ async function report(env) {
   const implementationRows=await env.DB.prepare("SELECT c.*,p.title paper_title,p.source_url FROM nano_implementation_checks c JOIN nano_journal_papers p ON p.paper_id=c.paper_id ORDER BY c.checked_at DESC LIMIT 40").all();
   const manifestRows=await env.DB.prepare("SELECT * FROM nano_manifest_evidence ORDER BY checked_at DESC LIMIT 40").all();
   const researchReviewRows=await env.DB.prepare("SELECT * FROM nano_research_founder_reviews ORDER BY reviewed_at DESC, version DESC LIMIT 80").all();
+  const gateEvidenceRows=await env.DB.prepare("SELECT * FROM nano_experiment_gate_evidence ORDER BY recorded_at DESC, revision DESC LIMIT 600").all();
   const [incidentRows,incidentEvents]=await Promise.all([
     env.DB.prepare("SELECT * FROM incident_history ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, last_seen DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM incident_events ORDER BY sequence DESC LIMIT 150").all()
@@ -3290,6 +3457,7 @@ async function report(env) {
     dependencySignals:nano15Report(implementationRows.results||[],manifestRows.results||[]),
     founderResearchReviews:nano16Report(implementationRows.results||[],manifestRows.results||[],researchReviewRows.results||[],env.HQ_DECISIONS_ENABLED==="true"),
     experimentPlans:nano17Report(implementationRows.results||[],manifestRows.results||[],researchReviewRows.results||[]),
+    experimentGateEvidence:nano18Report(implementationRows.results||[],manifestRows.results||[],researchReviewRows.results||[],gateEvidenceRows.results||[],env.HQ_DECISIONS_ENABLED==="true"),
     manifestEvidence:{...nano14Report(implementationRows.results||[],manifestRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_manifest_evidence")?.value||"not-attempted"},
     feasibilityReviews:nano13Report(implementationRows.results||[]),
     implementationEvidence:{...nano12Report(implementationRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_implementation_evidence")?.value||"not-attempted"},
@@ -3700,7 +3868,8 @@ export default {
     const privateAiWrite=route==="/api/ai/analyze"&&request.method==="POST";
     const learningWrite=route==="/api/learning/review"&&request.method==="POST";
     const researchReviewWrite=route==="/api/research/review"&&request.method==="POST";
-    if(!decisionWrite&&!privateAiWrite&&!learningWrite&&!researchReviewWrite&&!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
+    const gateEvidenceWrite=route==="/api/experiment/evidence"&&request.method==="POST";
+    if(!decisionWrite&&!privateAiWrite&&!learningWrite&&!researchReviewWrite&&!gateEvidenceWrite&&!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
     if(!(await verifyAccess(request,env,ctx))) return new Response("Private Headquarters access not configured or unauthorized",{status:403,headers:{"cache-control":"no-store","x-content-type-options":"nosniff"}});
     // Only known HQ frontend routes are redirectable. Keep unknown paths private,
     // and run the Access guard above before returning a redirect.
@@ -3719,6 +3888,7 @@ export default {
     }
     if(learningWrite){try{return await saveNanoLearning(request,env);}catch{return json({error:"Founder feedback not saved"},503);}}
     if(researchReviewWrite){try{return await nano16Save(request,env);}catch{return json({error:"Research review not saved"},503);}}
+    if(gateEvidenceWrite){try{return await nano18Save(request,env);}catch{return json({error:"Experiment evidence not saved"},503);}}
     if(route==="/api/growth-evidence"&&request.method==="GET"){
       try{return json(await loadGrowthEvidence());}
       catch{return json({available:false,reason:"production-growth-evidence-unavailable",readOnly:true},503);}
