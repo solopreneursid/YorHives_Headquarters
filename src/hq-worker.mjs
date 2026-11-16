@@ -1072,6 +1072,153 @@ function nano7Report(scans,leads){
   scope:"Quality assesses review value, not truth. Cross-source topic overlap is NOT verified demand or independent technical validation"};
 }
 
+
+/* Nano Phase 9: zero-inference, evidence-aware opportunity dossiers.
+ * Creates research hypotheses and validation steps, NOT facts, founder decisions,
+ * customer/revenue proof or permission for any autonomous implementation.
+ * Each dossier links to immutable source memory and survives routine Cron cycles. */
+const NANO9_VERSION="dossier-v1";
+const NANO9_THEMES=Object.freeze([
+ {id:"agent-workforce",match:/\b(agent|agents|agentic|skillset|agent skills|coding agent|automation platform|multi.agent)\b/i,
+  fit:"Potential YorpHives HQ workforce component",
+  build:"Investigate a modular, self-hostable agent skill or workflow management component",
+  adopt:"Compare permissively licensed agent tooling with HQ's existing adapters before any adoption",
+  revenue:"Possible setup, integration or support service for self-hosted agent operations",
+  experiment:"Document three concrete user workflow problems from distinct sources, compare two licensed solutions, and estimate local hosting resources"},
+ {id:"private-ai",match:/\b(local(?:ly)?|open.weight|open.source)\b.*\b(llm|model|ai|inference)\b|\b(llm|model|ai)\b.*\b(local|self.host|open.weight)\b/i,
+  fit:"Potential private, replaceable inference infrastructure for YorpHives",
+  build:"Evaluate a portable model gateway and modest offline deployment requirements",
+  adopt:"Check license, model weights, memory needs and reproducible local benchmarks before selection",
+  revenue:"Potential privacy-focused installation or maintenance service, not a proven market",
+  experiment:"Compare at least two downloadable models on identical hardware and document latency, RAM, licenses and actual workload usefulness"},
+ {id:"quality-automation",match:/\b(qa|testing|quality|code review|bugs?|test automation|verification|productivity|developer tools?)\b/i,
+  fit:"Potential YorpHives quality assurance or developer productivity component",
+  build:"Investigate a small, permission-limited QA or evidence-review utility",
+  adopt:"Check existing self-hosted test tools and whether access can remain read-only",
+  revenue:"Possible QA audit or deployment-assistance service; willingness to pay is unverified",
+  experiment:"Collect three independently described QA pain points and run a founder-approved internal prototype against a disposable test project"},
+ {id:"browser-products",match:/\b(browser|game|wasm|webassembly|multiplayer|rts|web app)\b/i,
+  fit:"Possible browser-based product or visitor-engagement experiment",
+  build:"Investigate a lightweight, mobile-accessible browser experience with clear differentiation",
+  adopt:"Check compatibility, assets, licenses, load times and accessibility before any reuse",
+  revenue:"Possible sponsorship or optional premium functionality, not validated earnings",
+  experiment:"Compare existing alternatives, validate a concrete user need, then propose a tiny opt-in prototype for founder approval"}
+]);
+function nano9Profile(row){
+ const title=clampText(row?.title,170),kind=String(row?.listing_kind||"");
+ const quality=nano8Quality({title,kind:kind||"community",summary:row?.listing_summary||""});
+ const theme=NANO9_THEMES.find(t=>t.match.test(title))||null;
+ const isUntrustedModel=kind==="model"||/uncensored|jailbreak|heretic/i.test(title);
+ const isFiltered=quality.grade==="filtered";
+ const primarySource=String(row?.source_url||"");
+ const sourceUrl=/^https:\/\/[a-z0-9.-]+(?:[/:?#]|$)/i.test(primarySource)&&primarySource.length<=380?primarySource:"";
+ const investigation=String(row?.investigation_state||"");
+ const checkedMetadata=investigation==="primary-metadata-confirmed"||investigation==="cross-platform-metadata-confirmed";
+ const score=isFiltered?0:isUntrustedModel?12:theme?(50+(quality.grade==="candidate"?6:0)+(checkedMetadata?7:0)):16;
+ const rank=Math.min(score,69);
+ const stage=isFiltered?"filtered":isUntrustedModel?"monitor":theme?"research-needed":"monitor";
+ const risks=[
+  "Demand, willingness to pay and revenue are not independently verified",
+  "Source listing may omit limitations, competing products and user context",
+  "Reuse requires license, security, privacy and dependency checks"
+ ];
+ const gaps=[
+  "At least two independent firsthand problem reports or customer interviews",
+  "A dated comparison of existing alternatives and a clear differentiation hypothesis",
+  "Licensing and technical feasibility evidence from a controlled test",
+  "Explicit founder approval before development, deployment or outreach"
+ ];
+ if(!checkedMetadata)gaps.unshift("Independent confirmation of the original technical or product claims");
+ const departments=[
+  {name:"Research & Innovation",task:"Compare alternatives, provenance and maturity; identify what can be tested rather than assumed"},
+  {name:"Engineering & Operations",task:"Estimate offline/self-hostable integration requirements, portability and operational burden"},
+  {name:"Global Market Intelligence",task:"Seek independently sourced problem reports, region by region; do not infer demand from engagement"},
+  {name:"Product & Growth",task:"Identify a narrow user task and smallest observable experiment, without changing production"},
+  {name:"Revenue & Business",task:"Form a pricing/service hypothesis; only customer evidence could validate willingness to pay"},
+  {name:"Security & Independent QA",task:"Verify original licenses, dependencies, privacy, reproducible behavior and approval boundary"}
+ ];
+ let factualMetadata=[];
+ try{const parsed=JSON.parse(String(row?.investigation_facts||"[]"));if(Array.isArray(parsed)){
+   factualMetadata=parsed.slice(0,2).map(x=>({provider:clampText(x.provider,35),url:clampText(x.url,280),
+     note:clampText(x.notes,190)})).filter(x=>/^https:\/\//.test(x.url));
+ }}catch{}
+ const evidence=[
+  {kind:"recorded-link",label:"Recorded public source; claims not verified",url:sourceUrl,verified:false},
+  ...factualMetadata.map(x=>({kind:"first-party-metadata",label:x.provider+" platform metadata checked; business claims unverified",
+   url:x.url,verified:false}))
+ ].filter(x=>x.url).slice(0,3);
+ const fit=theme?.fit||"No concrete product fit established from this listing";
+ const dossier={
+  version:NANO9_VERSION,memoryId:String(row?.memory_id||""),sourceId:String(row?.source_id||""),
+  title,sourceUrl,category:theme?.id|| (isUntrustedModel?"model-watch":"uncategorized"),
+  stage,rank,qualityGrade:quality.grade,qualityReason:quality.reason,
+  fitHypothesis:fit,
+  buildHypothesis:theme?.build||"No implementation recommended until a specific user problem is evidenced",
+  adoptHypothesis:theme?.adopt||"Research alternatives and rights before considering reuse",
+  revenueHypothesis:theme?.revenue||"No defensible revenue hypothesis from the current evidence",
+  proposedValidation:theme?.experiment||"Find concrete user problems and primary evidence before proposing an experiment",
+  evidence,metadataCheck:checkedMetadata?"Platform metadata checked, not underlying assertions":"No confirmed platform metadata",
+  evidenceGaps:gaps,risks,departments,
+  independentlyVerifiedDemand:false,independentlyVerifiedRevenue:false,technicalClaimsVerified:false,
+  founderApproved:false,automatedExecution:false,
+  caution:"Automated research planning from unverified source records. This is NOT an AI model investigation, customer validation or permission to build."
+ };
+ return dossier;
+}
+function nano9Fingerprint(row){
+ return fnv(JSON.stringify([NANO9_VERSION,row.memory_id,row.run_id,row.title,row.source_url,
+  row.recommendation,row.listing_kind,row.listing_summary,row.opportunity_kind,
+  row.triage_fingerprint,row.investigation_state,row.investigation_facts]).slice(0,6000));
+}
+async function nano9Scheduled(env,scheduledTime){
+ const clock=new Date(scheduledTime);
+ const first=await env.DB.prepare("SELECT memory_id FROM nano_opportunity_briefs LIMIT 1").first();
+ if(first&&![15,45].includes(clock.getUTCMinutes()))return "outside-window";
+ const q=await env.DB.prepare(
+  "SELECT m.memory_id,m.run_id,m.source_id,m.source_kind,m.title,m.source_url,m.recommendation,"+
+  "o.kind opportunity_kind,l.kind listing_kind,l.summary listing_summary,"+
+  "i.state investigation_state,i.facts_json investigation_facts,"+
+  "t.fingerprint triage_fingerprint,b.source_fingerprint brief_fingerprint "+
+  "FROM nano_memories m LEFT JOIN opportunities o ON o.id=m.source_id "+
+  "LEFT JOIN nano_source_leads l ON l.lead_id=m.source_id "+
+  "LEFT JOIN nano_investigations i ON i.memory_id=m.memory_id "+
+  "LEFT JOIN nano_triage t ON t.memory_id=m.memory_id "+
+  "LEFT JOIN nano_opportunity_briefs b ON b.memory_id=m.memory_id "+
+  "WHERE m.source_kind='opportunity' ORDER BY m.recorded_at DESC LIMIT 50").all();
+ const rows=(q.results||[]).map(row=>({row,profile:nano9Profile(row),fingerprint:nano9Fingerprint(row)}))
+  .filter(x=>x.profile.stage==="research-needed"&&x.fingerprint!==x.row.brief_fingerprint)
+  .sort((a,b)=>b.profile.rank-a.profile.rank||String(b.row.recorded_at||"").localeCompare(String(a.row.recorded_at||"")));
+ const candidate=rows[0];
+ if(!candidate)return "up-to-date";
+ const p=candidate.profile;
+ const r=await env.DB.prepare(
+  "INSERT INTO nano_opportunity_briefs(memory_id,source_id,title,category,stage,priority,source_fingerprint,brief_json,created_at,updated_at) "+
+  "SELECT ?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM nano_opportunity_briefs)<250 "+
+  "ON CONFLICT(memory_id) DO UPDATE SET title=excluded.title,category=excluded.category,"+
+  "stage=excluded.stage,priority=excluded.priority,source_fingerprint=excluded.source_fingerprint,"+
+  "brief_json=excluded.brief_json,updated_at=excluded.updated_at "+
+  "WHERE nano_opportunity_briefs.source_fingerprint!=excluded.source_fingerprint")
+  .bind(p.memoryId,p.sourceId,p.title,p.category,p.stage,p.rank,candidate.fingerprint,
+   JSON.stringify(p).slice(0,7500),nowIso(),nowIso()).run();
+ return r.meta?.changes===1?"brief-recorded:"+p.category:"storage-limit-or-unchanged";
+}
+function nano9Report(rows){
+ const all=(Array.isArray(rows)?rows:[]).slice(0,60).map(x=>{
+  let d={};try{d=JSON.parse(String(x.brief_json||"{}"));}catch{}
+  return {memoryId:x.memory_id,category:x.category,title:x.title,stage:x.stage,
+   priority:x.priority,updatedAt:x.updated_at,
+   ...d,independentlyVerifiedDemand:false,independentlyVerifiedRevenue:false,
+   founderApproved:false,automatedExecution:false};
+ }).filter(x=>x.stage==="research-needed"&&x.sourceUrl);
+ all.sort((a,b)=>Number(b.priority)-Number(a.priority)||String(b.updatedAt).localeCompare(String(a.updatedAt)));
+ const top=[],seen=new Set();
+ for(const item of all){if(seen.has(item.category))continue;top.push(item);seen.add(item.category);if(top.length===3)break;}
+ for(const item of all){if(top.length===3)break;if(!top.includes(item))top.push(item);}
+ return {top,available:all.length,generated:(Array.isArray(rows)?rows:[]).length,
+  state:"research-hypotheses-only",autonomousDecisions:false,automatedInference:false,
+  scope:"Deterministic, source-linked, versioned research plans; no customer proof, funding commitment or production changes"};
+}
+
 /* Nano Phase 6 — low-cost, source-specific, bounded public investigations.
  * GitHub and Hacker News FIRST-PARTY API endpoints only. Never fetch supplied URLs,
  * execute source instructions, or interpret existence/engagement as demand or revenue.
@@ -1431,6 +1578,11 @@ async function scheduledCycle(env, scheduledTime) {
     const result=await nano7Scheduled(env,scheduledTime);
     if(result!=="outside-window"&&result!=="not-due")await saveStatus(env,"nano_global_sources",result);
   }catch(e){try{await saveStatus(env,"nano_global_sources","error:"+clampText(e?.message,70));}catch{}}
+  // Phase 9 creates at most one read-only opportunity dossier from stored evidence per bounded Cron.
+  try{
+    const state=await nano9Scheduled(env,scheduledTime);
+    if(state!=="outside-window"&&state!=="up-to-date")await saveStatus(env,"nano_opportunity_briefs",state);
+  }catch(e){try{await saveStatus(env,"nano_opportunity_briefs","error:"+clampText(e?.message,75));}catch{}}
   if(plan.products) await checkProducts(env);
   // On a newly initialized HQ database, discover/research immediately rather
   // than waiting up to six hours or one day for the first scheduled window.
@@ -1756,6 +1908,7 @@ async function report(env) {
   const investigationRows=await env.DB.prepare("SELECT * FROM nano_investigations ORDER BY checked_at DESC,memory_id DESC LIMIT 40").all();
   const sourceScanRows=await env.DB.prepare("SELECT * FROM nano_source_scans ORDER BY checked_at DESC LIMIT 10").all();
   const sourceLeadRows=await env.DB.prepare("SELECT * FROM nano_source_leads ORDER BY observed_at DESC LIMIT 12").all();
+  const briefRows=await env.DB.prepare("SELECT * FROM nano_opportunity_briefs ORDER BY priority DESC,updated_at DESC LIMIT 60").all();
   const [incidentRows,incidentEvents]=await Promise.all([
     env.DB.prepare("SELECT * FROM incident_history ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, last_seen DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM incident_events ORDER BY sequence DESC LIMIT 150").all()
@@ -1786,6 +1939,7 @@ async function report(env) {
   return {
     nanoPipeline:{status:metadata.find(x=>x.key==="nano_workflows")?.value||"not-attempted",
       checkedAt:metadata.find(x=>x.key==="nano_workflows")?.checked_at||""},
+    opportunityBriefs:{...nano9Report(briefRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_opportunity_briefs")?.value||"not-attempted"},
     globalSources:{...nano7Report(sourceScanRows.results||[],sourceLeadRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_global_sources")?.value||"not-attempted"},
     investigations:{...nanoInvestigationReport(investigationRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_investigations")?.value||"not-attempted"},
     triage:{...triage,autoAiStatus:metadata.find(x=>x.key==="nano_auto_ai")?.value||"disabled",
