@@ -1075,6 +1075,176 @@ function nano7Report(scans,leads){
 
 
 
+
+/* Phase 12 — safe, first-party paper → code-evidence trail.
+ * Only an allowlisted arXiv landing page and a GitHub repository metadata API.
+ * A page link is NOT proof that the author wrote the code; repository metadata
+ * is NOT a verified license, implementation, benchmark or scientific replication.
+ */
+const NANO12_VERSION="paper-code-evidence-v1";
+const NANO12_FETCH_LIMIT=2;
+function nano12RepoLink(raw){
+ let u;try{u=new URL(String(raw||""));}catch{return null;}
+ if(u.protocol!=="https:"||u.hostname!=="github.com"||u.port||u.username||
+    u.password||u.search||u.hash||u.href.length>260)return null;
+ const match=/^\/([A-Za-z0-9-]{1,39})\/([A-Za-z0-9_.-]{1,90})\/?$/.exec(u.pathname);
+ if(!match||match[2]==="."||match[2]==="..")return null;
+ return "https://github.com/"+match[1]+"/"+match[2];
+}
+function nano12ExtractRepo(html){
+ const content=String(html||"");
+ if(content.length>180000)throw Error("paper-page-too-large");
+ // Only href values. Never visit embedded links or scripts.
+ for(const match of content.matchAll(/\bhref\s*=\s*(?:"([^"]{1,320})"|'([^']{1,320})')/gi)){
+  const candidate=(match[1]||match[2]||"").replace(/&amp;/g,"&").trim();
+  const link=nano12RepoLink(candidate);
+  if(link)return link;
+ }
+ return null; // No observed link in this fetched page, not proof no code exists.
+}
+function nano12PageUrl(paper){
+ if(paper?.source_id!=="arxiv")return null;
+ const url=nano10Link(paper?.source_url,"arxiv");
+ return url&&url===paper.source_url?url:null;
+}
+function nano12ApiUrl(repo){
+ const url=nano12RepoLink(repo);
+ if(!url)return null;
+ return "https://api.github.com/repos/"+url.slice("https://github.com/".length);
+}
+function nano12RepoFacts(payload,repo){
+ const expected=nano12RepoLink(repo),actual=nano12RepoLink(payload?.html_url);
+ if(!expected||actual!==expected||payload?.private!==false||
+    payload?.disabled===true||String(payload?.full_name||"").toLowerCase()!==
+      expected.slice("https://github.com/".length).toLowerCase())throw Error("repository-identity-mismatch");
+ const spdx=String(payload?.license?.spdx_id||"");
+ const reported=/^[A-Za-z0-9.+-]{1,70}$/.test(spdx)&&spdx!=="NOASSERTION"?spdx:"";
+ return {name:clampText(payload.full_name,132),url:expected,
+  description:clampText(payload.description,200),
+  archived:payload.archived===true,fork:payload.fork===true,
+  defaultBranch:clampText(payload.default_branch,80),
+  lastPushAt:clampText(payload.pushed_at,45),
+  licenseReported:reported||null,
+  licenseStatus:reported?"GitHub-recognized-license-metadata-only":"no-recognized-license-metadata",
+  independentlyLicenseReviewed:false,sourceCodeInspected:false,
+  implementationTested:false,independentReplication:false,
+  metadataSource:"public GitHub repository API, unverified scientific relationship"};
+}
+async function nano12FetchBudget(env){
+ const day=nowIso().slice(0,10);
+ const token=await env.DB.prepare(
+  "INSERT INTO quota(day,kind,used) VALUES(?,'nano_implementation_fetches',1) "+
+  "ON CONFLICT(day,kind) DO UPDATE SET used=used+1 WHERE used<"+NANO12_FETCH_LIMIT+
+  " RETURNING used").bind(day).first();
+ return Boolean(token)&&await reserveFetch(env);
+}
+async function nano12Get(env,url,type){
+ if(type==="paper" && !/^https:\/\/arxiv\.org\/abs\/\d{4}\.\d{4,5}$/.test(url))
+  throw Error("paper-target-not-approved");
+ if(type==="repo"&&(!/^https:\/\/api\.github\.com\/repos\/[A-Za-z0-9-]{1,39}\/[A-Za-z0-9_.-]{1,90}$/.test(url)))
+  throw Error("repo-target-not-approved");
+ if(!["paper","repo"].includes(type))throw Error("unknown-investigation-type");
+ if(!(await nano12FetchBudget(env)))throw Error("implementation-daily-budget");
+ const response=await fetch(url,{method:"GET",redirect:"manual",cache:"no-store",
+   signal:AbortSignal.timeout(5500),headers:{
+   "user-agent":"YorpHivesHQ-ReadOnly-PaperEvidence/1.0",
+   accept:type==="repo"?"application/vnd.github+json":"text/html"}});
+ if(response.status!==200){const code=response.status;
+  const retryAfter=response.headers.get("retry-after");
+  await response.body?.cancel();
+  const e=Error("source-http-"+code);e.status=code;e.retryAfter=retryAfter;throw e;}
+ const contentType=response.headers.get("content-type")||"";
+ if(type==="paper"&&!/\btext\/html\b/i.test(contentType)||
+   type==="repo"&&!/\bapplication\/(?:[\w.+-]*\+)?json\b/i.test(contentType)){
+  await response.body?.cancel();throw Error("implementation-type-mismatch");
+ }
+ const raw=await boundedText(response,type==="paper"?180000:45000);
+ if(raw===null)throw Error("implementation-response-too-large");
+ return type==="repo"?JSON.parse(raw):raw;
+}
+function nano12NextCheck(state,attempts,at=nowIso()){
+ const days=state==="repository-link-observed"?1:state==="repository-metadata-checked"?14:
+  state==="page-unavailable"||state==="repository-unavailable"?Math.min(7,Math.pow(2,Math.max(0,Math.min(3,attempts-1)))):7;
+ return new Date(Date.parse(at)+days*86400000).toISOString();
+}
+async function nano12Investigate(env,paper,existing,at=nowIso()){
+ const page=nano12PageUrl(paper);
+ if(!page)return "unsupported-paper-source";
+ if(existing?.next_check_at&&Date.parse(existing.next_check_at)>Date.parse(at))
+  return "not-due";
+ const candidate=existing?.repository_url&&nano12RepoLink(existing.repository_url);
+ const stage=existing?.state==="repository-link-observed"&&candidate?"repo":"paper";
+ const target=stage==="repo"?nano12ApiUrl(candidate):page;
+ const attempts=Math.min(20,Math.max(0,Number(existing?.attempts)||0)+1);
+ let state="page-unavailable",repository=candidate||null,license=null,facts={};
+ try{
+  const payload=await nano12Get(env,target,stage);
+  if(stage==="paper"){
+   repository=nano12ExtractRepo(payload);
+   state=repository?"repository-link-observed":"no-repository-link-observed";
+   facts={paperPageChecked:true,repositoryLinkFound:Boolean(repository),
+     repositoryLinkProvenance:"GitHub URL observed in arXiv landing-page HTML; author relationship NOT verified"};
+  }else{
+   const detail=nano12RepoFacts(payload,candidate);
+   state="repository-metadata-checked";license=detail.licenseReported;
+   facts=detail;
+  }
+ }catch(e){
+  if(String(e?.message)==="implementation-daily-budget")return "budget-reached";
+  state=stage==="repo"?"repository-unavailable":"page-unavailable";
+  facts={error:/^source-http-\d{3}$/.test(String(e?.message))?e.message:"fetch-or-parse-unavailable",
+    verified:false};
+ }
+ const next=nano12NextCheck(state,attempts,at);
+ const r=await env.DB.prepare(
+  "INSERT INTO nano_implementation_checks(paper_id,state,repository_url,license_spdx,facts_json,attempts,checked_at,next_check_at) "+
+  "VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(paper_id) DO UPDATE SET state=excluded.state,"+
+  "repository_url=excluded.repository_url,license_spdx=excluded.license_spdx,facts_json=excluded.facts_json,"+
+  "attempts=excluded.attempts,checked_at=excluded.checked_at,next_check_at=excluded.next_check_at"
+ ).bind(paper.paper_id,state,repository,license,JSON.stringify(facts).slice(0,1400),
+  attempts,at,next).run();
+ return Number(r.meta?.changes)>0?state+":"+paper.paper_id:"storage-unavailable";
+}
+async function nano12Scheduled(env,scheduledTime){
+ const clock=new Date(scheduledTime),at=nowIso();
+ const counts=await env.DB.prepare("SELECT COUNT(*) n FROM nano_implementation_checks").first();
+ // One per existing 5-minute tick during first two bootstrap scans; thereafter
+ // only the UTC 04:20 and 16:20 slots, with a max 2/day atomic fetch quota.
+ if(Number(counts?.n||0)>=2&&!(clock.getUTCMinutes()===20&&[4,16].includes(clock.getUTCHours())))
+  return "outside-window";
+ const all=await env.DB.prepare(
+  "SELECT p.paper_id,p.source_id,p.source_url,p.title,p.published_at,"+
+  "r.research_priority,c.state,c.repository_url,c.attempts,c.next_check_at "+
+  "FROM nano_journal_papers p LEFT JOIN nano_science_reviews r ON r.paper_id=p.paper_id "+
+  "LEFT JOIN nano_implementation_checks c ON c.paper_id=p.paper_id "+
+  "WHERE p.source_id='arxiv' ORDER BY COALESCE(r.research_priority,0) DESC,p.published_at DESC LIMIT 30").all();
+ const eligible=(all.results||[]).filter(x=>nano12PageUrl(x)&&
+    (!x.next_check_at||Date.parse(x.next_check_at)<=Date.parse(at)));
+ eligible.sort((a,b)=>Number(b.state==="repository-link-observed")-Number(a.state==="repository-link-observed")||
+  Number(b.research_priority||0)-Number(a.research_priority||0));
+ if(!eligible.length)return "no-due-papers";
+ return nano12Investigate(env,eligible[0],eligible[0],at);
+}
+function nano12Report(checks){
+ const rows=(Array.isArray(checks)?checks:[]).slice(0,40).map(x=>{
+  let facts={};try{facts=JSON.parse(String(x.facts_json||"{}"));}catch{}
+  return {paperId:x.paper_id,title:x.paper_title||"",paperUrl:x.source_url||"",
+   state:x.state,repositoryUrl:nano12RepoLink(x.repository_url),licenseSpdx:x.license_spdx||null,
+   lastChecked:x.checked_at,nextCheck:x.next_check_at,
+   evidence:clampText(facts.error||facts.repositoryLinkProvenance||
+    facts.metadataSource||"Only the arXiv landing page was checked.",210),
+   repositoryDescription:clampText(facts.description,200),
+   archived:facts.archived===true,
+   sourceCodeInspected:false,repositoryAuthorVerified:false,
+   licenseLegallyReviewed:false,reproducibilityVerified:false,
+   datasetsVerified:false,modelWeightsVerified:false,hardwareBenchmarked:false};
+ });
+ return {entries:rows.slice(0,12),checked:rows.length,linked:rows.filter(x=>x.repositoryUrl).length,
+  metadataChecked:rows.filter(x=>x.state==="repository-metadata-checked").length,
+  scope:"Linked repository candidates and first-party metadata only; code, dependencies, license applicability, provenance and reproducibility not verified.",
+  budget:"Maximum two implementation-evidence GET requests per UTC day; existing shared free-tier cap; no code execution"};
+}
+
 /* Nano Phase 11 — scientific evidence reviews: deterministic research planning,
  * never proof that a paper was reproduced, code was found or revenue exists.
  * Uses ONLY previously collected public journal metadata; no LLM, HTTP, tool
@@ -1985,6 +2155,12 @@ async function scheduledCycle(env, scheduledTime) {
     const result=await nano7Scheduled(env,scheduledTime);
     if(result!=="outside-window"&&result!=="not-due")await saveStatus(env,"nano_global_sources",result);
   }catch(e){try{await saveStatus(env,"nano_global_sources","error:"+clampText(e?.message,70));}catch{}}
+  // Phase 12: passive, bounded first-party paper/repository evidence only.
+  try{
+    const result=await nano12Scheduled(env,scheduledTime);
+    if(!["outside-window","no-due-papers"].includes(result))
+      await saveStatus(env,"nano_implementation_evidence",result);
+  }catch(e){try{await saveStatus(env,"nano_implementation_evidence","error:"+clampText(e?.message,70));}catch{}}
   // Phase 11 offline scientific evidence reviews from stored publications.
   // No outbound requests, model calls, experiments or autonomous site changes.
   try{
@@ -2332,6 +2508,7 @@ async function report(env) {
   const journalScanRows=await env.DB.prepare("SELECT * FROM nano_journal_scans ORDER BY checked_at DESC LIMIT 4").all();
   const journalPaperRows=await env.DB.prepare("SELECT * FROM nano_journal_papers ORDER BY last_seen DESC LIMIT 60").all();
   const scienceRows=await env.DB.prepare("SELECT * FROM nano_science_reviews ORDER BY research_priority DESC,updated_at DESC LIMIT 80").all();
+  const implementationRows=await env.DB.prepare("SELECT c.*,p.title paper_title,p.source_url FROM nano_implementation_checks c JOIN nano_journal_papers p ON p.paper_id=c.paper_id ORDER BY c.checked_at DESC LIMIT 40").all();
   const [incidentRows,incidentEvents]=await Promise.all([
     env.DB.prepare("SELECT * FROM incident_history ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, last_seen DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM incident_events ORDER BY sequence DESC LIMIT 150").all()
@@ -2362,6 +2539,7 @@ async function report(env) {
   return {
     nanoPipeline:{status:metadata.find(x=>x.key==="nano_workflows")?.value||"not-attempted",
       checkedAt:metadata.find(x=>x.key==="nano_workflows")?.checked_at||""},
+    implementationEvidence:{...nano12Report(implementationRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_implementation_evidence")?.value||"not-attempted"},
     scienceReviews:{...nano11Report(scienceRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_scientific_reviews")?.value||"not-attempted"},
     researchJournals:{...nano10Report(journalScanRows.results||[],journalPaperRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_research_journals")?.value||"not-attempted"},
     opportunityBriefs:{...nano9Report(briefRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_opportunity_briefs")?.value||"not-attempted"},
