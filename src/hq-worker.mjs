@@ -843,7 +843,10 @@ const NANO7_REGISTRY=Object.freeze([
    note:"Model listings are self-reported; open weights do not imply safe licenses."}),
  Object.freeze({id:"openalex",name:"OpenAlex",category:"Technical research",kind:"paper",
    endpoint:"https://api.openalex.org/works?search=autonomous%20AI%20agents&per_page=8&select=id,title,publication_date,cited_by_count",
-   note:"Bibliographic metadata does not verify experimental findings."})
+   note:"Bibliographic metadata does not verify experimental findings."}),
+ Object.freeze({id:"crossref",name:"Crossref",category:"Alternative scholarly metadata",kind:"paper",
+   endpoint:"https://api.crossref.org/works?query.title=autonomous%20AI%20agents&rows=8&select=DOI,title,URL,is-referenced-by-count",
+   note:"Public publisher DOI metadata; neither research findings nor demand are independently confirmed."})
 ]);
 const NANO7_DAILY_LIMIT=3;
 function nano7Link(raw,id){
@@ -852,10 +855,11 @@ function nano7Link(raw,id){
  if(id==="dev"&&u.hostname==="dev.to"&&/^\/[\w-]+\/[\w-]{2,140}\/?$/.test(u.pathname))return u.href;
  if(id==="hf"&&u.hostname==="huggingface.co"&&/^\/[\w.-]{1,80}\/[\w.-]{1,110}\/?$/.test(u.pathname))return u.href;
  if(id==="openalex"&&u.hostname==="openalex.org"&&/^\/W\d{1,18}$/.test(u.pathname))return u.href;
+ if(id==="crossref"&&u.hostname==="doi.org"&&/^\/10\.\d{4,9}\/[A-Za-z0-9._;()/:+-]{2,120}$/.test(u.pathname))return u.href;
  return null;
 }
 function nano7Normalize(provider,data){
- const values=provider.id==="openalex"?data?.results:data;
+ const values=provider.id==="openalex"?data?.results:provider.id==="crossref"?data?.message?.items:data;
  if(!Array.isArray(values))throw Error("invalid-provider-shape");
  const list=[],seen=new Set();
  for(const x of values.slice(0,12)){
@@ -878,6 +882,14 @@ function nano7Normalize(provider,data){
    if(!/\b(ai|agent|language model|llm|machine learning|autonom|automation|neural|intelligence|robot)\b/i.test(title))continue;
    summary="Research publication metadata. Findings and applicability require independent verification.";
    signals={citations:Math.min(100000000,Math.max(0,Number(x.cited_by_count)||0))};
+  }else if(provider.id==="crossref"){
+   const doi=String(x.DOI||"");
+   if(!/^10\.\d{4,9}\/[A-Za-z0-9._;()/:+-]{2,120}$/.test(doi))continue;
+   title=clampText(Array.isArray(x.title)?x.title[0]:x.title,150);
+   url=nano7Link("https://doi.org/"+doi,"crossref");
+   if(!/\b(ai|agent|language model|llm|machine learning|autonom|automation|neural|intelligence|robot)\b/i.test(title))continue;
+   summary="DOI and publication metadata only; scientific conclusions and market relevance are not validated.";
+   signals={citations:Math.min(100000000,Math.max(0,Number(x["is-referenced-by-count"])||0))};
   }else throw Error("source-not-registered");
   if(!url||!title||seen.has(url))continue;
   seen.add(url);
@@ -887,6 +899,68 @@ function nano7Normalize(provider,data){
  }
  return list;
 }
+
+/* Nano Phase 8: explainable quality gate.
+ * These are deterministic *routing* assessments, never source reliability,
+ * market proof, safety certification, or founder-verified outcomes. */
+const NANO8_QUALITY_VERSION="source-quality-v1";
+function nano8Quality(record){
+ const title=String(record?.title||""),summary=String(record?.summary||"");
+ const text=(title+" "+summary).toLowerCase(),kind=String(record?.kind||"");
+ if(/\b(congratulations?|congrats?|winner(?:s)?|awards?|giveaway|sweepstakes|roundup|recap|weekly digest|hacktoberfest challenge)\b/i.test(title))
+  return {grade:"filtered",priority:0,reason:"Announcement, publicity or competition result; no concrete user problem evidenced",verified:false};
+ if(/\b(uncensored|jailbreak|heretic|unfiltered)\b/i.test(title))
+  return {grade:"monitor",priority:10,reason:"Model safety and license review required before considering adoption",verified:false};
+ if(kind==="model")
+  return {grade:"monitor",priority:25,reason:"Model listing only; independent license, weights and benchmark checks required",verified:false};
+ if(kind==="paper")
+  return {grade:"monitor",priority:20,reason:"Publication metadata only; cannot establish reproducibility or market demand",verified:false};
+ if(/\b(problem|struggl|need a|looking for|how to|can't|cannot|broken|bottleneck|pain point|alternative|workflow|fix|build|automate|self.host)\b/i.test(title))
+  return {grade:"candidate",priority:50,reason:"Specific problem or implementation topic; needs independently corroborated evidence",verified:false};
+ if(/\b(case study|survey|surveyed|measured|benchmark|research|user interview)\b/i.test(text))
+  return {grade:"monitor",priority:30,reason:"Reported research signal; methodology and original evidence not checked",verified:false};
+ return {grade:"monitor",priority:15,reason:"General technology mention; practical relevance and customer need unverified",verified:false};
+}
+function nano8Keywords(title){
+ const stop=new Set(["ai","llm","agent","agents","autonomous","open","source","model","models","tools",
+  "research","technology","technical","with","from","into","your","that","this","more","using",
+  "about","build","building","best","what","were","into","have","2026","the","for","and",
+  "new","are","can","how","why","agentic","machine","learning","language","system"]);
+ return [...new Set(String(title||"").toLowerCase().split(/[^a-z0-9]+/)
+  .filter(x=>x.length>=5&&!stop.has(x)))].slice(0,18);
+}
+function nano8TopicSignals(entries){
+ const results=[],rows=(Array.isArray(entries)?entries:[]).filter(x=>x.quality?.grade!=="filtered");
+ for(let i=0;i<rows.length;i++)for(let j=i+1;j<rows.length;j++){
+  const a=rows[i],b=rows[j];
+  if(a.sourceId===b.sourceId||a.kind==="model"||b.kind==="model")continue;
+  const ta=nano8Keywords(a.title),tb=new Set(nano8Keywords(b.title));
+  const overlap=ta.filter(x=>tb.has(x));
+  if(overlap.length<2)continue;
+  results.push({sourceIds:[a.sourceId,b.sourceId],titles:[a.title,b.title],
+   sourceUrls:[a.sourceUrl,b.sourceUrl],sharedTerms:overlap.slice(0,4),
+   evidence:"Two distinct public source domains mention overlapping terms; not confirmation of facts, customer demand or revenue",
+   verifiedDemand:false,verifiedRevenue:false,verifiedProduct:false});
+  if(results.length>=3)return results;
+ }
+ return results;
+}
+function nano8RetryDelay(previousDetail,retryAfter,status,at=nowIso()){
+ const prev=String(previousDetail||"");
+ const matched=/^rate-limited:429:attempt-(\d+)$/.exec(prev);
+ const streak=status===429?Math.min(6,(matched?Number(matched[1]):/429/.test(prev)?1:0)+1):0;
+ let seconds=status===429?Math.min(7*86400,12*3600*Math.pow(2,streak)):24*3600;
+ if(typeof retryAfter==="string"&&retryAfter.trim()){
+  const raw=retryAfter.trim();
+  const numeric=/^\d+$/.test(raw)?Math.min(30*86400,Number(raw)):null;
+  const deadline=numeric!==null?Date.parse(at)+numeric*1000:Date.parse(raw);
+  if(Number.isFinite(deadline)&&deadline>Date.parse(at))
+    seconds=Math.max(seconds,Math.ceil((deadline-Date.parse(at))/1000));
+ }
+ seconds=Math.min(30*86400,Math.max(3600,seconds));
+ return {seconds,detail:status===429?"rate-limited:429:attempt-"+streak:"source-http-"+status};
+}
+
 async function nano7Fetch(env,provider){
  if(!NANO7_REGISTRY.includes(provider))throw Error("unregistered-provider");
  const day=nowIso().slice(0,10);
@@ -897,7 +971,13 @@ async function nano7Fetch(env,provider){
  if(!ticket||!(await reserveFetch(env)))throw Error("daily-budget-reached");
  const r=await fetch(provider.endpoint,{method:"GET",redirect:"manual",cache:"no-store",
   signal:AbortSignal.timeout(5000),headers:{accept:"application/json","user-agent":"YorpHivesHQ-ReadOnly-Research/1.0"}});
- if(r.status!==200){await r.body?.cancel();throw Error("source-http-"+r.status);}
+ if(r.status!==200){
+  const retryAfter=r.headers.get("retry-after");
+  await r.body?.cancel();
+  const err=Error("source-http-"+r.status);
+  err.status=r.status;err.retryAfter=retryAfter;
+  throw err;
+ }
  if(!/\bapplication\/(?:[\w.+-]*\+)?json\b/i.test(r.headers.get("content-type")||"")){
   await r.body?.cancel();throw Error("source-content-type");
  }
@@ -914,6 +994,9 @@ async function nano7Save(env,provider,item){
  ).bind(item.id,provider.id,item.kind,item.title,item.url,item.summary,
   JSON.stringify(item.signals).slice(0,400),"listing-unverified",item.recordedAt).run();
  if(stored.meta?.changes!==1)return false;
+ // Low-quality publicity stays in the source ledger but never enters
+ // opportunities / founder queue. Older records remain for audit.
+ if(nano8Quality(item).grade==="filtered")return true;
  await env.DB.prepare(
   "INSERT OR IGNORE INTO opportunities(id,title,description,recommendation,source_url,observed_at,score,kind) "+
   "VALUES(?,?,?,?,?,?,?,?)"
@@ -924,21 +1007,30 @@ async function nano7Save(env,provider,item){
 }
 async function nano7Scan(env,provider,at=nowIso()){
  if(!NANO7_REGISTRY.includes(provider))throw Error("unregistered-provider");
- let state="unavailable",added=0,details="";
+ let state="unavailable",added=0,details="",nextDelay=86400;
+ const previous=await env.DB.prepare("SELECT detail,next_check_at FROM nano_source_scans WHERE source_id=? LIMIT 1")
+   .bind(provider.id).first();
+ if(previous?.next_check_at&&Date.parse(previous.next_check_at)>Date.parse(at))return "cooldown:"+provider.id;
  try{
   const list=nano7Normalize(provider,await nano7Fetch(env,provider));
   for(const item of list)if(await nano7Save(env,provider,item))added++;
   state="listing-recorded";details="candidates:"+list.length;
  }catch(e){
   const msg=String(e?.message||"");
-  details=/^source-http-\d{3}$/.test(msg)?msg:/budget/.test(msg)?"budget-reached":"source-unavailable";
-  if(details==="budget-reached")return "budget-reached";
+  if(/daily-budget/.test(msg))return "budget-reached";
+  if(/^source-http-\d{3}$/.test(msg)){
+   const status=Number(msg.slice(-3));
+   const retry=nano8RetryDelay(previous?.detail,e?.retryAfter,status,at);
+   details=retry.detail;nextDelay=retry.seconds;
+  }else{
+   details="source-unavailable";nextDelay=86400;
+  }
  }
  await env.DB.prepare(
   "INSERT INTO nano_source_scans(source_id,state,detail,added,checked_at,next_check_at) VALUES(?,?,?,?,?,?) "+
   "ON CONFLICT(source_id) DO UPDATE SET state=excluded.state,detail=excluded.detail,added=excluded.added,"+
   "checked_at=excluded.checked_at,next_check_at=excluded.next_check_at"
- ).bind(provider.id,state,details,added,at,new Date(Date.parse(at)+86400000).toISOString()).run();
+ ).bind(provider.id,state,details,added,at,new Date(Date.parse(at)+nextDelay*1000).toISOString()).run();
  return state+":"+provider.id+":new:"+added;
 }
 async function nano7Scheduled(env,scheduledTime){
@@ -955,15 +1047,28 @@ async function nano7Scheduled(env,scheduledTime){
 }
 function nano7Report(scans,leads){
  const scanned=new Map((Array.isArray(scans)?scans:[]).map(x=>[x.source_id,x]));
- const sources=NANO7_REGISTRY.map(x=>{const r=scanned.get(x.id);return {
-  id:x.id,name:x.name,category:x.category,status:r?.state||"not-attempted",
-  checkedAt:r?.checked_at||null,newCount:Number(r?.added)||0,note:x.note,detail:r?.detail||""};});
- const entries=(Array.isArray(leads)?leads:[]).slice(0,12).map(x=>({
-  id:x.lead_id,sourceId:x.source_id,kind:x.kind,title:x.title,sourceUrl:x.source_url,
-  summary:x.summary,observedAt:x.observed_at,verifiedDemand:false,verifiedRevenue:false,verifiedFunctionality:false}));
- return {sources,entries,totalShown:entries.length,active:sources.filter(x=>x.status==="listing-recorded").length,
-  budget:"Maximum three public source requests per day, shared public-fetch limit; no AI calls",
-  scope:"External listings are unverified research signals, not verified markets or product capabilities"};
+ const sources=NANO7_REGISTRY.map(x=>{const r=scanned.get(x.id);
+  const limited=r?.state==="unavailable"&&(String(r.detail||"").includes("429")||String(r.detail||"").includes("rate-limited"));
+  return {id:x.id,name:x.name,category:x.category,
+   status:limited?"rate-limited":r?.state||"not-attempted",
+   checkedAt:r?.checked_at||null,newCount:Number(r?.added)||0,
+   retryAt:r?.next_check_at||null,note:x.note,detail:r?.detail||""};
+ });
+ const entries=(Array.isArray(leads)?leads:[]).slice(0,50).map(x=>{
+  const item={id:x.lead_id,sourceId:x.source_id,kind:x.kind,title:x.title,
+   sourceUrl:x.source_url,summary:x.summary,observedAt:x.observed_at,
+   verifiedDemand:false,verifiedRevenue:false,verifiedFunctionality:false};
+  return {...item,quality:nano8Quality(item)};
+ });
+ const candidates=entries.filter(x=>x.quality.grade==="candidate");
+ const filtered=entries.filter(x=>x.quality.grade==="filtered");
+ const sourceSignals=nano8TopicSignals(entries);
+ return {sources,entries:entries.slice(0,12),totalShown:Math.min(entries.length,12),
+  screened:entries.length,filtered:filtered.length,candidates:candidates.length,
+  sourceSignals,active:sources.filter(x=>x.status==="listing-recorded").length,
+  limited:sources.filter(x=>x.status==="rate-limited").length,
+  budget:"At most 3 public source requests/UTC day, shared public budget; no AI calls",
+  scope:"Quality assesses review value, not truth. Cross-source topic overlap is NOT verified demand or independent technical validation"};
 }
 
 /* Nano Phase 6 — low-cost, source-specific, bounded public investigations.
