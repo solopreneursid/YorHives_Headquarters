@@ -1110,6 +1110,66 @@ async function discoverPublicGithub(request){
   }catch{return json({error:"Public GitHub search did not respond."},503);}
 }
 
+
+const HN_CHANNELS=Object.freeze({launches:"showstories",signals:"newstories"});
+const hnFeedCache=new Map();
+const hnFeedLastFetch=new Map();
+function classifyInternetOpportunity(title){
+  const t=String(title||"").toLowerCase();
+  if(/\b(alternative to|compare|vs\.?|competitor|replacement for)\b/.test(t))return "competitors";
+  if(/\b(mrr|arr|monetiz|subscription|billing|payment|checkout|pricing|sales|affiliate|invoice|marketplace|ecommerce|e-commerce)\b/.test(t))return "revenue";
+  if(/\b(education|students?|teacher|health|travel|tourism|housing|real estate|hiring|recruit|farm|agriculture|finance|insurance|legal|restaurant|school|caregiving)\b/.test(t))return "markets";
+  if(/\b(llm|open.source|agentic|ai agents?|model|inference|sdk|framework|library|compiler|database|vector|api|developer|kubernetes|linux|rust|python|machine.learning|benchmark)\b/.test(t))return "technology";
+  return "apps";
+}
+function normalizeHackerNewsItem(x){
+  if(!x||x.deleted||x.dead||!Number.isSafeInteger(x.id)||x.id<=0||typeof x.title!=="string")return null;
+  const title=x.title.replace(/^Show HN:\s*/i,"").trim().slice(0,160);
+  if(!title)return null;
+  const postedAt=Number.isFinite(x.time)&&x.time>0?new Date(x.time*1000).toISOString():"";
+  let originalUrl=null;
+  try{const u=new URL(String(x.url||""));if(["https:","http:"].includes(u.protocol)&&!u.username&&!u.password)originalUrl=u.href;}catch{}
+  return {id:"hn-"+x.id,title,description:"Public Hacker News submission — research lead, not a product recommendation.",
+    category:classifyInternetOpportunity(title),source:"Hacker News",sourceUrl:"https://news.ycombinator.com/item?id="+x.id,
+    url:originalUrl||"https://news.ycombinator.com/item?id="+x.id,
+    price:"Unknown",license:null,postedAt,score:Number.isInteger(x.score)&&x.score>=0?x.score:0,
+    commentCount:Number.isInteger(x.descendants)&&x.descendants>=0?x.descendants:0,
+    evidence:"Title and public listing only",verified:false};
+}
+async function fetchPublicJson(url,deadline=6000,maxChars=400000){
+  const r=await fetch(url,{method:"GET",redirect:"error",cache:"no-store",signal:AbortSignal.timeout(deadline),
+    headers:{"accept":"application/json","user-agent":"YorpHives-HQ-ReadOnly-Discovery"}});
+  if(!r.ok)throw Error("Public source unavailable");
+  const len=Number(r.headers.get("content-length")||0);
+  if(len>maxChars)throw Error("Public source response too large");
+  const body=await r.text();
+  if(body.length>maxChars)throw Error("Public source response too large");
+  return JSON.parse(body);
+}
+async function discoverInternetFeed(request){
+  const u=new URL(request.url),channel=u.searchParams.get("channel")||"launches";
+  const remote=HN_CHANNELS[channel];
+  if(!remote)return json({error:"Unknown discovery channel"},400);
+  const now=Date.now(),cached=hnFeedCache.get(channel);
+  if(cached&&now-cached.checkedAt<15*60000)return json({...cached.data,cached:true});
+  if(now-(hnFeedLastFetch.get(channel)||0)<30*1000)return json({error:"This source was recently checked. Try again shortly."},429);
+  hnFeedLastFetch.set(channel,now);
+  const base="https://hacker-news.firebaseio.com/v0/";
+  try{
+    const ids=await fetchPublicJson(base+remote+".json",7000,100000);
+    if(!Array.isArray(ids))throw Error("Public source returned no list");
+    const selected=ids.filter(x=>Number.isSafeInteger(x)&&x>0).slice(0,14);
+    const stories=await Promise.allSettled(selected.map(x=>fetchPublicJson(base+"item/"+x+".json",6000,12000)));
+    const items=stories.filter(x=>x.status==="fulfilled").map(x=>normalizeHackerNewsItem(x.value)).filter(Boolean).slice(0,12);
+    if(!items.length)throw Error("No public records available");
+    const result={source:"hacker-news-public",channel,checkedAt:new Date(now).toISOString(),items,
+      incomplete:stories.some(x=>x.status!=="fulfilled"),
+      note:"Public HN submissions. Categories inferred from titles; prices, demand, ownership and feasibility unverified."};
+    hnFeedCache.set(channel,{checkedAt:now,data:result});
+    return json(result);
+  }catch{return json({error:"Public source unavailable. Browse directories directly or retry later."},503);}
+}
+
 function json(value,status=200) {return new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});}
 export default {
   async fetch(request,env,ctx) {
@@ -1122,6 +1182,7 @@ export default {
     }
     if(route==="/api/decisions"&&request.method==="GET")return json(await decisionJournal(env));
     if(route==="/api/discover"&&request.method==="GET")return discoverPublicGithub(request);
+    if(route==="/api/discover/feed"&&request.method==="GET")return discoverInternetFeed(request);
     if(route==="/api/discover"&&request.method==="HEAD")return new Response(null,{status:200,headers:JSON_HEADERS});
     if(route==="/api/report") {
       if(!env.DB) return json({error:"Evidence database is not configured"},503);
@@ -1165,4 +1226,4 @@ export default {
     }));
   }
 };
-export {githubRepoMetadata,discoverPublicGithub,headquartersHealth,safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report,decisionTransition,evidenceContract,operatingBrief,saveDecision,validateExperiment};
+export {classifyInternetOpportunity,normalizeHackerNewsItem,discoverInternetFeed,githubRepoMetadata,discoverPublicGithub,headquartersHealth,safeToolUrl,sitemapTools,hubTools,manifestTools,feedLeads,classifyLead,parseAdvisories,siteBundleRefs,safeProductUrl,productManifest,sitemapEntries,publicStructuredProducts,publicBundleToolHints,publicPageFingerprint,robotsAllowsPath,competitorClaimEvidence,makeFounderBriefing,schedulePlan,verifyAccess,report,decisionTransition,evidenceContract,operatingBrief,saveDecision,validateExperiment};
