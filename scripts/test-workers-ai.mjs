@@ -41,7 +41,7 @@ resp=await sandbox.analyze(request('Security & Independent QA'),env);assert.equa
 resp=await sandbox.analyze(request(),env);assert.equal(resp.status,429);
 assert.equal(calls.length,2,'Budget must prevent third inference');
 assert.equal(count,2);
-const denied={...env,DB:{prepare:sql=>({bind:()=>({first:async()=>{throw Error('D1 unavailable')}})})}};
+const denied={...env,DB:{prepare:sql=>sql.includes('FROM findings')?env.DB.prepare(sql):({bind:()=>({first:async()=>{throw Error('D1 quota unavailable')}})})}};
 resp=await sandbox.analyze(request(),denied);assert.equal(resp.status,429);
 assert.equal(calls.length,2,'DB quota failures must fail closed');
 assert.equal(sandbox.status({}).configured,false);
