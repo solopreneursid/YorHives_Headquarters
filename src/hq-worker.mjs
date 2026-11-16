@@ -977,7 +977,7 @@ async function nanoInvestigateOne(env,observedAt=nowIso()){
 }
 async function nanoInvestigationScheduled(env,scheduledTime){
   const stamp=new Date(scheduledTime);
-  if(stamp.getUTCMinutes()%30!==0)return "outside-window";
+  if(stamp.getUTCMinutes()%30!==20)return "outside-window"; // Offset from expensive discovery and uptime windows.
   return nanoInvestigateOne(env,nowIso());
 }
 function nanoInvestigationReport(rows){
