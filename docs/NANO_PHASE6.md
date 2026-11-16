@@ -12,8 +12,8 @@ Autonomously investigate public research entries at zero additional cost without
 
 ## Data and processing
 - `nano_investigations` is a bounded one-row-per-memory D1/SQLite ledger. It includes platform sources, capped metadata summaries, department-specific research questions, simple status codes, timestamps and a source fingerprint.
-- Every half hour at UTC minute 20 or 50, the existing five-minute Cron selects at most one due opportunity memory. Recheck is no earlier than three days after normal metadata checks, or 24 hours after a temporary unavailable source.
-- **At most four outgoing investigation fetches per UTC day**, enforced with atomic D1 quotas, shared public-fetch budgeting, bounded response size (45 KB), a four-second timeout, manual redirects disabled, and no credentials.
+- On an empty investigation ledger, the next five-minute Cron bootstraps one opportunity memory. Thereafter, every half hour at UTC minute 20 or 50, the existing Cron selects at most one due memory. Recheck is no earlier than three days after normal metadata checks, or 24 hours after a temporary unavailable source.
+- **At most four outgoing investigation fetches per UTC day**, enforced with atomic D1 quotas, shared public-fetch budgeting, bounded response size (45 KB), a four-second timeout, redirect following disabled using Cloudflare-compatible `redirect: 'manual'` and rejection of 3xx status, and no credentials.
 - The scheduler makes zero LLM calls, zero deployments, no site writes and no purchase/payment calls.
 - A reviewable "Research investigations" card in AI Employees shows public metadata, optional cross-platform evidence, clear limitations and department questions. The existing priority shortlist remains evidence-gated. No investigation result automatically becomes a founder decision.
 
