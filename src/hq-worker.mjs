@@ -1733,6 +1733,143 @@ function nano13Report(rows){
   nextStep:"Founder-reviewed repository file inspection and isolated test planning; no automatic code execution."};
 }
 
+/* Nano Phase 16 — founder-initiated, append-only research reviews.
+ * Human notes are advisory planning history, not a legally approved
+ * implementation or permission for agents to fetch code, run it or spend.
+ * The only write is an authenticated same-origin founder review append.
+ */
+const NANO16_VERSION="founder-research-review-v1";
+const NANO16_DISPOSITIONS=Object.freeze([
+ "needs-evidence","manual-shortlist","defer","plan-isolated-test"
+]);
+const NANO16_LICENSE=Object.freeze([
+ "unreviewed","manual-legal-review","blocker-observed"
+]);
+const NANO16_TECHNICAL=Object.freeze([
+ "unknown","needs-validation","blocked"
+]);
+function nano16Report(checks,manifestRows,reviewRows,enabled=false){
+ const manifestMap=new Map((Array.isArray(manifestRows)?manifestRows:[]).map(x=>[x.paper_id,x]));
+ const grouped=new Map();
+ for(const row of Array.isArray(reviewRows)?reviewRows:[]){
+  if(!row||typeof row.paper_id!=="string")continue;
+  if(!grouped.has(row.paper_id))grouped.set(row.paper_id,[]);
+  const arr=grouped.get(row.paper_id);
+  if(arr.length<25)arr.push(row);
+ }
+ const entries=(Array.isArray(checks)?checks:[]).slice(0,40).map(row=>{
+  const assessment=nano15Assess(row,manifestMap.get(row.paper_id));
+  if(!assessment)return null;
+  const history=(grouped.get(row.paper_id)||[]).slice().sort((a,b)=>Number(b.version)-Number(a.version));
+  const last=history[0];
+  const latest=last?{
+   version:Number(last.version)||0,disposition:last.disposition,
+   licenseConcern:last.license_concern,technicalConcern:last.technical_concern,
+   maxBudgetInr:Number(last.max_budget_inr)||0,
+   maxRuntimeMinutes:Number(last.max_runtime_minutes)||0,
+   reason:clampText(last.reason,350),nextStep:clampText(last.next_step,350),
+   recordedAt:last.reviewed_at||null,
+   evidenceCurrent:last.repository_url===assessment.repositoryUrl&&
+    last.manifest_sha===(assessment.manifestSha||""),
+   canExecute:false,licenseCleared:false,spendingAuthorized:false
+  }:null;
+  return {paperId:assessment.paperId,title:assessment.title,
+   paperUrl:assessment.paperUrl,repositoryUrl:assessment.repositoryUrl,
+   manifestSha:assessment.manifestSha||"",manifestStatus:assessment.manifestStatus,
+   provenance:assessment.relationship,hardware:assessment.hardwareAssessment,
+   licenseStatus:assessment.licenseAssessment,latest,revision:latest?.version||0,
+   history:history.slice(0,3).map(r=>({version:Number(r.version)||0,
+    disposition:r.disposition,reason:clampText(r.reason,350),recordedAt:r.reviewed_at,
+    evidenceCurrent:r.repository_url===assessment.repositoryUrl&&
+     r.manifest_sha===(assessment.manifestSha||"")}))};
+ }).filter(Boolean);
+ return {entries:entries.slice(0,10),candidates:entries.length,
+  reviewRecords:(Array.isArray(reviewRows)?reviewRows:[]).length,
+  currentlyReviewed:entries.filter(e=>e.latest?.evidenceCurrent===true).length,
+  needingRefresh:entries.filter(e=>e.latest&&!e.latest.evidenceCurrent).length,
+  available:enabled===true,automatedExecution:false,commercialClearance:false,
+  scope:"Founder planning decisions only. No source-code execution, deployments, license clearances, paid spend or independent reproduction.",
+  note:"Review history is append-only; changing GitHub identity or manifest SHA marks prior decisions stale."};
+}
+async function nano16Save(request,env){
+ if(env.HQ_DECISIONS_ENABLED!=="true"||!env.DB)
+  return json({error:"Founder research review is unavailable"},503);
+ const origin=new URL(request.url).origin;
+ if(request.headers.get("origin")!==origin||
+    request.headers.get("x-hq-founder-action")!=="research-review-v1"||
+    request.headers.get("content-type")?.split(";")[0]!=="application/json")
+  return json({error:"Same-origin founder action required"},403);
+ let input;
+ try{
+  const body=await boundedText(request,1800);
+  if(body===null)return json({error:"Review body too large"},413);
+  input=JSON.parse(body);
+ }catch{return json({error:"Invalid review JSON"},400);}
+ if(!input||typeof input!=="object"||Array.isArray(input))
+  return json({error:"Review must be a JSON object"},400);
+ const paperId=typeof input.paperId==="string"?input.paperId:"";
+ const disposition=typeof input.disposition==="string"?input.disposition:"";
+ const license=typeof input.licenseConcern==="string"?input.licenseConcern:"";
+ const technical=typeof input.technicalConcern==="string"?input.technicalConcern:"";
+ const reason=typeof input.reason==="string"?input.reason.trim():"";
+ const next=typeof input.nextStep==="string"?input.nextStep.trim():"";
+ const budget=input.maxBudgetInr,minutes=input.maxRuntimeMinutes;
+ const expected=input.expectedVersion;
+ const expectedSha=typeof input.expectedManifestSha==="string"?input.expectedManifestSha:null;
+ if(!/^[a-zA-Z0-9_-]{1,80}$/.test(paperId)||
+    !NANO16_DISPOSITIONS.includes(disposition)||
+    !NANO16_LICENSE.includes(license)||
+    !NANO16_TECHNICAL.includes(technical)||
+    !Number.isInteger(expected)||expected<0||expected>=25||
+    !Number.isInteger(budget)||budget<0||budget>5000||
+    !Number.isInteger(minutes)||minutes<0||minutes>120||
+    (disposition!=="plan-isolated-test"&&(budget!==0||minutes!==0))||
+    (disposition==="plan-isolated-test"&&minutes<5)||
+    reason.length<16||reason.length>350||
+    next.length<16||next.length>350||
+    expectedSha===null||!(expectedSha===""||/^[a-f0-9]{40}$/.test(expectedSha)))
+  return json({error:"Invalid review fields. Enter a rationale, next manual step, and safe planning caps."},400);
+ const row=await env.DB.prepare(
+  "SELECT i.*,p.title paper_title,p.source_url,m.catalog_json,m.evidence_json,m.repository_url saved_repository_url "+
+  "FROM nano_implementation_checks i JOIN nano_journal_papers p ON p.paper_id=i.paper_id "+
+  "LEFT JOIN nano_manifest_evidence m ON m.paper_id=i.paper_id WHERE i.paper_id=? LIMIT 1"
+ ).bind(paperId).first();
+ if(!row)return json({error:"Repository candidate not found"},404);
+ const candidate=nano14Candidate(row);
+ if(!candidate)return json({error:"Public repository identity cannot be verified"},409);
+ const snapshot=row.saved_repository_url?{
+  repository_url:row.saved_repository_url,catalog_json:row.catalog_json,
+  evidence_json:row.evidence_json}:null;
+ const assessment=nano15Assess(row,snapshot);
+ const currentSha=assessment?.manifestSha||"";
+ if(currentSha!==expectedSha)return json({error:"Repository evidence changed. Refresh before reviewing."},409);
+ const entryId=crypto.randomUUID(),stamp=nowIso();
+ // Compare-and-swap against the current source record, catalogue, evidence
+ // and latest founder version. No UPDATE/DELETE or agent-issued instructions.
+ const sql="INSERT INTO nano_research_founder_reviews(entry_id,paper_id,repository_url,manifest_sha,"+
+  "version,disposition,license_concern,technical_concern,max_budget_inr,max_runtime_minutes,reason,next_step,reviewed_at) "+
+  "SELECT ?,i.paper_id,i.repository_url,?,"+
+  "(SELECT COALESCE(MAX(version),0)+1 FROM nano_research_founder_reviews WHERE paper_id=i.paper_id),"+
+  "?,?,?,?,?,?,?,? "+
+  "FROM nano_implementation_checks i WHERE i.paper_id=? AND i.state='repository-metadata-checked' "+
+  "AND i.repository_url=? AND i.facts_json=? "+
+  "AND COALESCE((SELECT m.catalog_json FROM nano_manifest_evidence m WHERE m.paper_id=i.paper_id),'[]')=? "+
+  "AND COALESCE((SELECT m.evidence_json FROM nano_manifest_evidence m WHERE m.paper_id=i.paper_id),'[]')=? "+
+  "AND COALESCE((SELECT MAX(version) FROM nano_research_founder_reviews WHERE paper_id=i.paper_id),0)=? "+
+  "AND (SELECT COUNT(*) FROM nano_research_founder_reviews)<500";
+ try{
+  const saved=await env.DB.prepare(sql).bind(entryId,currentSha,disposition,license,technical,
+   budget,minutes,reason,next,stamp,paperId,candidate,row.facts_json,
+   row.catalog_json||"[]",row.evidence_json||"[]",expected).run();
+  if(Number(saved.meta?.changes)!==1)
+   return json({error:"Review source or version changed. Refresh before retrying."},409);
+ }catch{
+  return json({error:"Review conflict or storage unavailable. Refresh before retrying."},409);
+ }
+ return json({saved:true,paperId,revision:expected+1,reviewOnly:true,
+  executionTriggered:false,spendingAuthorized:false,licenseApproved:false},201);
+}
+
 /* Nano Phase 11 — scientific evidence reviews: deterministic research planning,
  * never proof that a paper was reproduced, code was found or revenue exists.
  * Uses ONLY previously collected public journal metadata; no LLM, HTTP, tool
@@ -3004,6 +3141,7 @@ async function report(env) {
   const scienceRows=await env.DB.prepare("SELECT * FROM nano_science_reviews ORDER BY research_priority DESC,updated_at DESC LIMIT 80").all();
   const implementationRows=await env.DB.prepare("SELECT c.*,p.title paper_title,p.source_url FROM nano_implementation_checks c JOIN nano_journal_papers p ON p.paper_id=c.paper_id ORDER BY c.checked_at DESC LIMIT 40").all();
   const manifestRows=await env.DB.prepare("SELECT * FROM nano_manifest_evidence ORDER BY checked_at DESC LIMIT 40").all();
+  const researchReviewRows=await env.DB.prepare("SELECT * FROM nano_research_founder_reviews ORDER BY reviewed_at DESC, version DESC LIMIT 80").all();
   const [incidentRows,incidentEvents]=await Promise.all([
     env.DB.prepare("SELECT * FROM incident_history ORDER BY CASE status WHEN 'open' THEN 0 ELSE 1 END, last_seen DESC LIMIT 80").all(),
     env.DB.prepare("SELECT * FROM incident_events ORDER BY sequence DESC LIMIT 150").all()
@@ -3035,6 +3173,7 @@ async function report(env) {
     nanoPipeline:{status:metadata.find(x=>x.key==="nano_workflows")?.value||"not-attempted",
       checkedAt:metadata.find(x=>x.key==="nano_workflows")?.checked_at||""},
     dependencySignals:nano15Report(implementationRows.results||[],manifestRows.results||[]),
+    founderResearchReviews:nano16Report(implementationRows.results||[],manifestRows.results||[],researchReviewRows.results||[],env.HQ_DECISIONS_ENABLED==="true"),
     manifestEvidence:{...nano14Report(implementationRows.results||[],manifestRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_manifest_evidence")?.value||"not-attempted"},
     feasibilityReviews:nano13Report(implementationRows.results||[]),
     implementationEvidence:{...nano12Report(implementationRows.results||[]),pipelineStatus:metadata.find(x=>x.key==="nano_implementation_evidence")?.value||"not-attempted"},
@@ -3444,7 +3583,8 @@ export default {
     const decisionWrite=route==="/api/decisions"&&request.method==="POST";
     const privateAiWrite=route==="/api/ai/analyze"&&request.method==="POST";
     const learningWrite=route==="/api/learning/review"&&request.method==="POST";
-    if(!decisionWrite&&!privateAiWrite&&!learningWrite&&!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
+    const researchReviewWrite=route==="/api/research/review"&&request.method==="POST";
+    if(!decisionWrite&&!privateAiWrite&&!learningWrite&&!researchReviewWrite&&!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
     if(!(await verifyAccess(request,env,ctx))) return new Response("Private Headquarters access not configured or unauthorized",{status:403,headers:{"cache-control":"no-store","x-content-type-options":"nosniff"}});
     // Only known HQ frontend routes are redirectable. Keep unknown paths private,
     // and run the Access guard above before returning a redirect.
@@ -3462,6 +3602,7 @@ export default {
       return privateAiAnalyze(request,env);
     }
     if(learningWrite){try{return await saveNanoLearning(request,env);}catch{return json({error:"Founder feedback not saved"},503);}}
+    if(researchReviewWrite){try{return await nano16Save(request,env);}catch{return json({error:"Research review not saved"},503);}}
     if(route==="/api/ai/status"&&request.method==="GET")return json(privateAiStatus(env));
     if(decisionWrite) {
       try{return await saveDecision(request,env);}catch{return json({error:"Decision could not be saved; refresh before retrying"},503);}
