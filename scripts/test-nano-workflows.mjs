@@ -5,7 +5,8 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 const source=readFileSync('src/hq-worker.mjs','utf8');
 const start=source.indexOf('/* YorpMind Nano Phase 2:');
-const end=source.indexOf('async function scheduledCycle(env, scheduledTime)',start);
+// Scope the Phase 2/3 no-AI invariant to its original orchestration engine. Phase 5 AI is tested separately.
+const end=source.indexOf('/* Nano Phase 5 — automated, deterministic triage.',start);
 assert.ok(start>0&&end>start,'Nano engine missing');
 const now='2026-11-16T12:30:00.000Z';
 const fnv=x=>{let h=2166136261;for(const c of String(x)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return (h>>>0).toString(16);};
