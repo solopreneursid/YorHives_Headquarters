@@ -1325,7 +1325,7 @@ function privateAiStatus(env){
 async function privateAiAnalyze(request,env){
  const cfg=privateAiConfig(env);if(!cfg)return json({error:"Self-hosted inference not configured"},503);
  if(Number(request.headers.get("content-length")||0)>1024)return json({error:"Request too large"},413);
- let body;try{body=await request.json();}catch{return json({error:"Invalid request"},400);}
+ let body;try{const raw=await request.text();if(raw.length>1024)return json({error:"Request too large"},413);body=JSON.parse(raw);}catch{return json({error:"Invalid request"},400);}
  const department=String(body?.department||""),id=String(body?.findingId||"");
  if(!HQ_AI_ROLES.includes(department)||!/^[a-zA-Z0-9_-]{1,80}$/.test(id))return json({error:"Invalid department or finding ID"},400);
  if(!env.DB)return json({error:"Evidence database missing"},503);
