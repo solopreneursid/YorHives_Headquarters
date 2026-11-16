@@ -38,6 +38,21 @@ const report={
   ],
   memory:{entries:[{memoryId:'memory-finding-abc',runId:'finding-abc',kind:'finding',department:'Security & Independent QA',title:'Synthetic shared memory evidence',evidenceState:'source-recorded-unverified',sourceUrl:'https://yorphives.com/',recommendation:'Founder check source',reviewState:'founder-review',observedAt:'2026-11-16T10:00:00Z',recordedAt:'2026-11-16T10:00:00Z'}]},
   nanoPipeline:{status:'created:2',checkedAt:'2026-11-16T10:00:00Z'},
+
+  investigations:{checked:2,crossPlatform:1,confirmed:2,pending:0,pipelineStatus:'cross-platform-metadata-confirmed',
+    entries:[{memoryId:'memory-opportunity-mock',title:'Synthetic AI developer project',
+      department:'Research & Innovation',state:'cross-platform-metadata-confirmed',
+      primaryUrl:'https://news.ycombinator.com/item?id=123',
+      secondaryUrl:'https://github.com/acme/freedom-tools',
+      facts:[{provider:'Hacker News',url:'https://news.ycombinator.com/item?id=123',points:8,comments:2,notes:'Not verified customer demand'},
+       {provider:'GitHub',url:'https://github.com/acme/freedom-tools',project:'acme/freedom-tools',description:'Mock open-source project',stars:10,forks:1,notes:'Not verified functionality'}],
+      checklist:[{department:'Security & Independent QA',question:'Review licensing and security before reuse.'}],
+      checkedAt:'2026-11-16T10:00:00Z',demandVerified:false,revenueVerified:false,productFunctionalityVerified:false
+    },{memoryId:'memory-opportunity-unsupported',title:'Unsupported public lead',
+      department:'Research & Innovation',state:'unsupported-source',
+      primaryUrl:'',secondaryUrl:'',facts:[],checklist:[],checkedAt:'2026-11-16T10:00:00Z',
+      demandVerified:false,revenueVerified:false,productFunctionalityVerified:false}]},
+
   triage:{reviewCount:1,researchFirst:1,screened:2,pipelineStatus:'updated:2',autoAiStatus:'disabled',
     ready:[{memoryId:'memory-finding-abc',sourceKind:'finding',sourceId:'finding-1',department:'Engineering & Operations',
       title:'Synthetic homepage outage',score:95,state:'review-now',action:'Founder: verify failure independently',
@@ -157,6 +172,22 @@ try{
       await learningPage.click();
       const optional=page.locator('.panel').filter({hasText:'Learning playbooks'}).locator('details.triage-backlog');
       assert.equal(await optional.getAttribute('open'),null,'Long feedback form starts collapsed');
+    });
+    await test(profile.name+': investigation evidence and department questions',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      await page.getByText('Research investigations',{exact:true}).waitFor();
+      const section=page.locator('.panel').filter({hasText:'Research investigations'});
+      assert.equal(await section.locator('details.investigation-item').count(),2);
+      const row=section.locator('details.investigation-item').first();
+      await row.locator('summary').click();
+      assert.equal(await row.getAttribute('open'),'');
+      const body=await row.innerText();
+      assert.ok(body.includes('Hacker News'));
+      assert.ok(body.includes('GitHub'));
+      assert.ok(body.includes('customer demand'));
+      assert.ok(body.includes('Security & Independent QA'));
+      assert.equal(await row.locator('a[href="https://github.com/acme/freedom-tools"]').count(),1);
+      assert.equal(await row.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),2);
     });
     await test(profile.name+': Nano workflow pipeline and evidence review',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
