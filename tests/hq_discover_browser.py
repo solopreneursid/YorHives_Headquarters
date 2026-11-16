@@ -70,24 +70,10 @@ with sync_playwright() as pw:
             page.evaluate("location.hash='discover'")
             page.wait_for_timeout(30)
             assert page.locator("h1").inner_text()=="Discover"
-            assert page.locator('[data-discover-source="hq"]').get_attribute("aria-pressed")=="true"
-            assert page.locator(".lead-card").count()==6
-            assert page.evaluate("window.__discoverCalls.length")==0
-            # HQ records: categories, query, sort, saved, source details.
-            page.locator('[data-discover-filter="technology"]').click()
-            assert page.locator(".lead-card").count()==1
-            page.locator("#discover-query").fill("AI tooling")
-            assert page.locator(".lead-card").count()==1
-            page.locator("#discover-query").fill("nonexistent")
-            assert page.locator(".lead-card").count()==0
-            page.locator("#discover-query").fill("")
-            page.locator(".save-btn").first.click()
-            page.locator('[data-action="toggle-saved"]').click()
-            assert page.locator(".lead-card").count()==1
-            page.locator(".lead-body").first.click()
-            assert page.locator("#detail-drawer").is_visible()
-            assert page.locator('a[href="https://github.com/example/ai"]').count()==1
-            page.keyboard.press("Escape")
+            # Discover defaults to the external internet feed, never YorpHives tools.
+            assert page.locator('[data-discover-source="explore"]').get_attribute("aria-pressed")=="true"
+            assert page.locator('[data-detail="product"]').count()==0
+            assert page.locator('a[href="https://betalist.com/"]').count()==1
             page.locator('[data-discover-source="github"]').click()
             assert page.evaluate("window.__discoverCalls.length")==0
             assert page.locator(".lead-card").count()==0
@@ -127,7 +113,7 @@ with sync_playwright() as pw:
             assert "License" in page.locator("#detail-drawer").inner_text()
             page.keyboard.press("Escape")
             # Saved candidates remain available after switching sources and clearing search.
-            page.locator('[data-discover-source="hq"]').click()
+            page.locator('[data-discover-source="explore"]').click()
             page.locator('[data-discover-source="github"]').click()
             assert page.locator(".lead-card").count()==1
             page.locator("#github-query").fill("nothing here")

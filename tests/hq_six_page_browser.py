@@ -89,12 +89,14 @@ with sync_playwright() as pw:
         assert abs(panels[0]["width"]-panels[1]["width"])<=2,panels
         assert abs(panels[0]["bottom"]-panels[1]["bottom"])<=4,panels
       page.evaluate("location.hash='discover'")
-      page.wait_for_timeout(25)
-      page.locator('[data-discover-filter="technology"]').first.click()
-      assert page.locator(".lead-card").count()==1
-      page.locator(".save-btn").first.click()
-      page.locator('[data-action="toggle-saved"]').click()
-      assert page.locator(".lead-card").count()==1
+      page.wait_for_timeout(45)
+      assert page.locator('[data-discover-source="explore"]').get_attribute("aria-pressed")=="true"
+      assert page.locator('[data-detail="product"]').count()==0
+      assert page.locator('a[href="https://betalist.com/"]').count()==1
+      page.locator('[data-web-filter="revenue"]').click()
+      assert page.locator('a[href="https://trustmrr.com/"]').count()==1
+      page.locator('[data-discover-source="github"]').click()
+      assert page.locator("#github-query").count()==1
       page.evaluate("location.hash='team'")
       page.wait_for_timeout(25)
       page.locator(".member-card").first.click()
