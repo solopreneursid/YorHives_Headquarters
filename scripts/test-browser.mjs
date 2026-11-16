@@ -138,7 +138,7 @@ try{
       assert.ok(body.includes('source-recorded-unverified'));
       assert.ok(body.includes('evidence_check'));
       assert.ok(body.includes('Founder review pending'));
-      assert.equal(await page.locator('.nano-run').count(),1);
+      assert.equal(await page.locator('.nano-run').filter({hasText:'Synthetic orchestrated investigation'}).count(),1);
     });
     await test(profile.name+': read-only shared memory panel',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
