@@ -895,9 +895,10 @@ function nano7Normalize(provider,data){
   seen.add(url);
   list.push({id:fnv("global-v1:"+provider.id+":"+url),sourceId:provider.id,kind:provider.kind,
     title,url,summary,signals,recordedAt:nowIso()});
-  if(list.length>=2)break;
+  // Inspect at most the eight public listings already returned, then prefer
+  // concrete problems over announcements before selecting two new leads.
  }
- return list;
+ return list.sort((a,b)=>nano8Quality(b).priority-nano8Quality(a).priority).slice(0,2);
 }
 
 /* Nano Phase 8: explainable quality gate.
