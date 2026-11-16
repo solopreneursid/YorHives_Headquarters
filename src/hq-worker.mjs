@@ -1138,34 +1138,55 @@ async function nano12FetchBudget(env){
   " RETURNING used").bind(day).first();
  return Boolean(token)&&await reserveFetch(env);
 }
+function nano12SearchUrl(title){
+ const clean=String(title||"").replace(/[^A-Za-z0-9 ]/g," ").replace(/\s+/g," ").trim().slice(0,140);
+ if(clean.length<15)return null;
+ return "https://api.github.com/search/repositories?q="+encodeURIComponent('"'+clean+'" in:description')+"&per_page=4";
+}
+function nano12SearchCandidate(payload,title){
+ const normalized=x=>String(x||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+ const expected=normalized(title);
+ if(expected.length<15||!Array.isArray(payload?.items))throw Error("invalid-github-search-response");
+ for(const row of payload.items.slice(0,4)){
+  if(!row||normalized(row.description)!==expected)continue;
+  const url=nano12RepoLink(row.html_url);
+  if(!url)continue;
+  try{return nano12RepoFacts(row,url);}catch{}
+ }
+ return null;
+}
+
 async function nano12Get(env,url,type){
  if(type==="paper" && !/^https:\/\/arxiv\.org\/abs\/\d{4}\.\d{4,5}$/.test(url))
   throw Error("paper-target-not-approved");
  if(type==="repo"&&(!/^https:\/\/api\.github\.com\/repos\/[A-Za-z0-9-]{1,39}\/[A-Za-z0-9_.-]{1,90}$/.test(url)))
   throw Error("repo-target-not-approved");
- if(!["paper","repo"].includes(type))throw Error("unknown-investigation-type");
+ if(type==="search"&&!/^https:\/\/api\.github\.com\/search\/repositories\?q=[A-Za-z0-9%._-]{15,330}&per_page=4$/.test(url))
+  throw Error("search-target-not-approved");
+ if(!["paper","repo","search"].includes(type))throw Error("unknown-investigation-type");
  if(!(await nano12FetchBudget(env)))throw Error("implementation-daily-budget");
  const response=await fetch(url,{method:"GET",redirect:"manual",cache:"no-store",
    signal:AbortSignal.timeout(5500),headers:{
    "user-agent":"YorpHivesHQ-ReadOnly-PaperEvidence/1.0",
-   accept:type==="repo"?"application/vnd.github+json":"text/html"}});
+   accept:type==="paper"?"text/html":"application/vnd.github+json"}});
  if(response.status!==200){const code=response.status;
   const retryAfter=response.headers.get("retry-after");
   await response.body?.cancel();
   const e=Error("source-http-"+code);e.status=code;e.retryAfter=retryAfter;throw e;}
  const contentType=response.headers.get("content-type")||"";
  if(type==="paper"&&!/\btext\/html\b/i.test(contentType)||
-   type==="repo"&&!/\bapplication\/(?:[\w.+-]*\+)?json\b/i.test(contentType)){
+   type!=="paper"&&!/\bapplication\/(?:[\w.+-]*\+)?json\b/i.test(contentType)){
   await response.body?.cancel();throw Error("implementation-type-mismatch");
  }
  const raw=await boundedText(response,type==="paper"?180000:45000);
  if(raw===null)throw Error("implementation-response-too-large");
- return type==="repo"?JSON.parse(raw):raw;
+ return type==="paper"?raw:JSON.parse(raw);
 }
 function nano12NextCheck(state,attempts,at=nowIso()){
  // A discovered link can get its own metadata check on a later 5-min tick.
  // Daily quota still gates every HTTP request.
- if(state==="repository-link-observed")return new Date(Date.parse(at)+5*60000).toISOString();
+ if(state==="repository-link-observed"||state==="no-repository-link-observed"&&attempts===1)
+  return new Date(Date.parse(at)+5*60000).toISOString();
  const days=state==="repository-metadata-checked"?14:
   state==="page-unavailable"||state==="repository-unavailable"?Math.min(7,Math.pow(2,Math.max(0,Math.min(3,attempts-1)))):7;
  return new Date(Date.parse(at)+days*86400000).toISOString();
@@ -1173,11 +1194,15 @@ function nano12NextCheck(state,attempts,at=nowIso()){
 async function nano12Investigate(env,paper,existing,at=nowIso()){
  const page=nano12PageUrl(paper);
  if(!page)return "unsupported-paper-source";
- if(existing?.next_check_at&&Date.parse(existing.next_check_at)>Date.parse(at))
+ const canSearch=existing?.state==="no-repository-link-observed"&&
+  Number(existing?.attempts)===1&&!existing?.repository_url;
+ if(existing?.next_check_at&&Date.parse(existing.next_check_at)>Date.parse(at)&&!canSearch)
   return "not-due";
  const candidate=existing?.repository_url&&nano12RepoLink(existing.repository_url);
- const stage=candidate&&["repository-link-observed","repository-unavailable","repository-metadata-checked"].includes(existing?.state)?"repo":"paper";
- const target=stage==="repo"?nano12ApiUrl(candidate):page;
+ const stage=candidate&&["repository-link-observed","repository-unavailable","repository-metadata-checked"].includes(existing?.state)?"repo":
+  canSearch?"search":"paper";
+ const target=stage==="repo"?nano12ApiUrl(candidate):stage==="search"?nano12SearchUrl(paper.title):page;
+ if(!target)return "invalid-search-title";
  const attempts=Math.min(20,Math.max(0,Number(existing?.attempts)||0)+1);
  let state="page-unavailable",repository=candidate||null,license=null,facts={};
  try{
@@ -1186,7 +1211,20 @@ async function nano12Investigate(env,paper,existing,at=nowIso()){
    repository=nano12ExtractRepo(payload);
    state=repository?"repository-link-observed":"no-repository-link-observed";
    facts={paperPageChecked:true,repositoryLinkFound:Boolean(repository),
-     repositoryLinkProvenance:"GitHub URL observed in arXiv landing-page HTML; author relationship NOT verified"};
+     repositoryLinkProvenance:repository?
+      "GitHub URL observed in arXiv landing-page HTML; author relationship NOT verified":
+      "No qualifying GitHub URL was observed on the fetched arXiv page; absence of code NOT established"};
+  }else if(stage==="search"){
+   const found=nano12SearchCandidate(payload,paper.title);
+   if(found){
+    repository=found.url;state="repository-metadata-checked";license=found.licenseReported;
+    facts={...found,metadataSource:"GitHub public repository search, exact description/title match; NOT linked from arXiv page or author-confirmed",
+     discoveryMethod:"title-matched-github-search"};
+   }else{
+    state="no-repository-link-observed";
+    facts={paperPageChecked:true,githubTitleSearchChecked:true,
+     repositoryLinkProvenance:"No exact-title GitHub repository search candidate was observed; NOT proof code is absent"};
+   }
   }else{
    const detail=nano12RepoFacts(payload,candidate);
    state="repository-metadata-checked";license=detail.licenseReported;
@@ -1221,14 +1259,18 @@ async function nano12Scheduled(env,scheduledTime){
   "FROM nano_journal_papers p LEFT JOIN nano_science_reviews r ON r.paper_id=p.paper_id "+
   "LEFT JOIN nano_implementation_checks c ON c.paper_id=p.paper_id "+
   "WHERE p.source_id='arxiv' ORDER BY COALESCE(r.research_priority,0) DESC,p.published_at DESC LIMIT 30").all();
+ const pending=x=>x.state==="no-repository-link-observed"&&
+    Number(x.attempts)===1&&!x.repository_url;
  const eligible=(all.results||[]).filter(x=>nano12PageUrl(x)&&
-    (!x.next_check_at||Date.parse(x.next_check_at)<=Date.parse(at)));
- eligible.sort((a,b)=>Number(b.state==="repository-link-observed")-Number(a.state==="repository-link-observed")||
+    (!x.next_check_at||Date.parse(x.next_check_at)<=Date.parse(at)||pending(x)));
+ eligible.sort((a,b)=>Number(b.state==="repository-link-observed"||pending(b))-
+  Number(a.state==="repository-link-observed"||pending(a))||
   Number(b.research_priority||0)-Number(a.research_priority||0));
  if(!eligible.length)return "no-due-papers";
  const inWindow=clock.getUTCMinutes()===20&&[4,16].includes(clock.getUTCHours());
  const bootstrap=Number(counts?.n||0)===0 ||
-  (Number(counts?.n||0)===1&&eligible[0].state==="repository-link-observed");
+  (Number(counts?.n||0)===1&&
+   (eligible[0].state==="repository-link-observed"||pending(eligible[0])));
  if(!bootstrap&&!inWindow)return "outside-window";
  return nano12Investigate(env,eligible[0],eligible[0],at);
 }
