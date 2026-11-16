@@ -36,6 +36,7 @@ const report={
     {id:'inc-1',title:'Synthetic incident — OPEN',category:'reliability',severity:'high',asset:'https://yorphives.com',status:'open',firstSeen:'2026-11-16T09:50:00Z',lastSeen:'2026-11-16T10:00:00Z',resolvedAt:null,description:'Test-only record',recommendation:'Review external evidence',evidence:'https://yorphives.com/',occurrences:1,recoveryVerified:false},
     {id:'inc-2',title:'Synthetic incident — RECOVERED',category:'reliability',severity:'medium',asset:'https://yorphives.com',status:'resolved',firstSeen:'2026-11-16T08:00:00Z',lastSeen:'2026-11-16T09:00:00Z',resolvedAt:'2026-11-16T09:00:00Z',description:'Test-only resolved record',recommendation:'Independently verify recovery',evidence:'https://yorphives.com/',occurrences:2,recoveryVerified:false}
   ],
+  memory:{entries:[{memoryId:'memory-finding-abc',runId:'finding-abc',kind:'finding',department:'Security & Independent QA',title:'Synthetic shared memory evidence',evidenceState:'source-recorded-unverified',sourceUrl:'https://yorphives.com/',recommendation:'Founder check source',reviewState:'founder-review',observedAt:'2026-11-16T10:00:00Z',recordedAt:'2026-11-16T10:00:00Z'}]},
   workflows:[{runId:'finding-abc',kind:'finding',sourceId:'finding-1',department:'Security & Independent QA',revision:1,
     stage:'founder_review',reviewState:'founder-review',evidenceState:'source-recorded-unverified',
     title:'Synthetic orchestrated investigation',recommendation:'Founder to review source',
@@ -138,6 +139,17 @@ try{
       assert.ok(body.includes('evidence_check'));
       assert.ok(body.includes('Founder review pending'));
       assert.equal(await page.locator('.nano-run').count(),1);
+    });
+    await test(profile.name+': read-only shared memory panel',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      await page.getByText('Shared memory', {exact:true}).waitFor();
+      const memory=page.locator('.nano-run').filter({hasText:'Synthetic shared memory evidence'});
+      await memory.locator('summary').click();
+      assert.equal(await memory.getAttribute('open'),'');
+      const visible=await memory.innerText();
+      assert.ok(visible.includes('source-recorded-unverified'));
+      assert.ok(visible.includes('Founder check source'));
+      assert.ok(visible.includes('no self-learning yet'));
     });
     await test(profile.name+': private AI controls fail safely without model server',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
