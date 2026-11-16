@@ -38,6 +38,29 @@ const report={
   ],
   memory:{entries:[{memoryId:'memory-finding-abc',runId:'finding-abc',kind:'finding',department:'Security & Independent QA',title:'Synthetic shared memory evidence',evidenceState:'source-recorded-unverified',sourceUrl:'https://yorphives.com/',recommendation:'Founder check source',reviewState:'founder-review',observedAt:'2026-11-16T10:00:00Z',recordedAt:'2026-11-16T10:00:00Z'}]},
   nanoPipeline:{status:'created:2',checkedAt:'2026-11-16T10:00:00Z'},
+  opportunityBriefs:{available:2,generated:2,pipelineStatus:'brief-recorded:agent-workforce',
+    state:'research-hypotheses-only',top:[
+      {memoryId:'memory-opportunity-aabbccdd',title:'Synthetic developer agent skill workflows',category:'agent-workforce',
+       stage:'research-needed',rank:57,fitHypothesis:'Potential YorpHives HQ workforce component',
+       buildHypothesis:'Investigate a self-hostable agent skills utility',
+       adoptHypothesis:'Compare compatible permissive open-source libraries',
+       revenueHypothesis:'Possible integration service, not proven revenue',
+       proposedValidation:'Compare two portable tools and three independent user complaints',
+       metadataCheck:'Platform metadata checked, not underlying assertions',
+       evidence:[{kind:'first-party-metadata',label:'GitHub platform record',url:'https://github.com/itsmeyaw/skillset'}],
+       risks:['Demand and revenue not independently verified'],evidenceGaps:['Obtain independent firsthand user problems'],
+       departments:[{name:'Research & Innovation',task:'Check alternative tools'},{name:'Security & Independent QA',task:'Verify licenses'}],
+       independentlyVerifiedDemand:false,independentlyVerifiedRevenue:false,automatedExecution:false,founderApproved:false},
+      {memoryId:'memory-opportunity-ddccbb12',title:'Synthetic internal QA automation problem',category:'quality-automation',
+       stage:'research-needed',rank:51,fitHypothesis:'Potential YorpHives QA tool',
+       buildHypothesis:'Investigate an isolated test tool',
+       adoptHypothesis:'Compare self-hosted QA options',
+       revenueHypothesis:'Potential support service only',
+       proposedValidation:'Collect source-backed QA problems',metadataCheck:'No confirmed platform metadata',
+       evidence:[{kind:'recorded-link',url:'https://dev.to/author/testing-workflows'}],risks:[],
+       evidenceGaps:['Independent user evidence required'],departments:[],
+       independentlyVerifiedDemand:false,independentlyVerifiedRevenue:false,founderApproved:false,automatedExecution:false}
+     ]},
   globalSources:{pipelineStatus:'rate-limited:openalex:new:0',active:2,screened:2,candidates:1,filtered:1,limited:1,
    sourceSignals:[{sourceIds:['dev','crossref'],sharedTerms:['customer','support'],verifiedDemand:false,evidence:'Two sources share a topic, not proof of demand'}],sources:[
     {id:'dev',name:'DEV Community',category:'Developer problems',status:'listing-recorded',newCount:1,note:'Contributor posts only'},
@@ -187,6 +210,25 @@ try{
       await learningPage.click();
       const optional=page.locator('.panel').filter({hasText:'Learning playbooks'}).locator('details.triage-backlog');
       assert.equal(await optional.getAttribute('open'),null,'Long feedback form starts collapsed');
+    });
+    await test(profile.name+': opportunity hypotheses and strict founder gates',async()=>{
+      await page.locator('[data-page="team"]:visible').first().click();
+      await page.getByText('Opportunity briefs',{exact:true}).waitFor();
+      const panel=page.locator('.panel').filter({hasText:'Opportunity briefs'});
+      assert.equal(await panel.locator('.brief-card').count(),2);
+      assert.ok((await panel.innerText()).includes('zero independently verified customer demand'));
+      const card=panel.locator('details.brief-card').first();
+      assert.equal(await card.getAttribute('open'),null);
+      await card.locator('summary.brief-summary').click();
+      const text=await card.innerText();
+      assert.ok(text.includes('Possible integration service, not proven revenue'));
+      assert.ok(text.includes('Platform metadata checked, not underlying assertions'));
+      assert.ok(text.includes('Nothing was deployed, purchased, or approved.'));
+      assert.ok(text.includes('not evidence confidence'));
+      assert.equal(await card.locator('a[href="https://github.com/itsmeyaw/skillset"]').count(),1);
+      assert.equal(await card.locator('a[target="_blank"][rel="noopener noreferrer"]').count(),1);
+      await card.locator('.brief-checks').last().locator('summary').click();
+      assert.ok((await card.innerText()).includes('Security & Independent QA'));
     });
     await test(profile.name+': modular global sources and unverified candidate list',async()=>{
       await page.locator('[data-page="team"]:visible').first().click();
