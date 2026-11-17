@@ -47,10 +47,10 @@ export default {
       return new Response(JSON.stringify({error:"Method not allowed"}), {status:405, headers:corsHeaders});
     }
 
-    // Use HQ_ACCESS_KEY when installed as a Worker secret; support the existing
-    // preview CONTROL_TOKEN during migration. Never accept keys in URL query strings.
+    // Production authentication uses only the encrypted HQ_ACCESS_KEY secret.
+    // Never accept keys through query strings or legacy shared bindings.
     const clientKey = request.headers.get("X-Access-Key") || "";
-    const configuredKey = env.HQ_ACCESS_KEY || env.CONTROL_TOKEN;
+    const configuredKey = env.HQ_ACCESS_KEY;
     if (!configuredKey || !(await keysMatch(clientKey, configuredKey))) {
       return new Response(JSON.stringify({ error: "Unauthorized. Private access only." }), {
         status: 401,
