@@ -69,15 +69,61 @@ function historyReports(raw,nowMs){
     Math.min(1000,Math.max(0,row.failureStreak)):0};
  }).filter(Boolean).sort((a,b)=>Date.parse(b.checkedAt)-Date.parse(a.checkedAt));
 }
+/**
+ * Founder-facing deterministic triage. Two separate scheduled observations of
+ * the SAME failed probe are required for "sustained"; do not infer persistence
+ * from a generic failureStreak (which can span unrelated probes).
+ */
+export function assessWatchdogAlert(latest,history=[]){
+ const safe={severity:'none',actionable:false,kind:'none',affectedIds:[],incidentKey:null,firstObserved:null,summary:'No sustained website failures'};
+ if(!latest?.available){
+  return {...safe,severity:'caution',kind:'monitor-unverified',summary:'Independent monitoring could not be verified'};
+ }
+ if(latest.state==='stale'){
+  return {...safe,severity:'critical',actionable:true,kind:'monitor-stale',
+   incidentKey:'monitor-stale:'+latest.checkedAt,firstObserved:latest.checkedAt,
+   summary:'Website monitoring is delayed; last independent check is too old'};
+ }
+ if(latest.state==='healthy')return safe;
+ if(latest.state!=='degraded')return {...safe,severity:'caution',kind:'monitor-unverified',
+  summary:'Independent monitoring evidence is inconsistent'};
+ const failures=safeIds(latest.failedChecks),nowMs=Date.parse(latest.checkedAt);
+ if(!failures.length||!Number.isFinite(nowMs))return {...safe,severity:'caution',
+  kind:'unconfirmed-issue',summary:'Monitor reported a problem; check the evidence'};
+ const ordered=Array.isArray(history)?history.filter(x=>Number.isFinite(Date.parse(x?.checkedAt))).
+  slice().sort((a,b)=>Date.parse(b.checkedAt)-Date.parse(a.checkedAt)):[];
+ const latestRecord=ordered.find(x=>x.checkedAt===latest.checkedAt);
+ const previous=latestRecord&&ordered.find(x=>{
+  const delta=nowMs-Date.parse(x.checkedAt);
+  return delta>0&&delta<=30*60000;
+ });
+ const repeated=previous?failures.filter(id=>safeIds(previous.failedChecks).includes(id)):[];
+ if(!repeated.length)return {...safe,severity:'caution',kind:'first-observation',
+  affectedIds:failures,firstObserved:latest.checkedAt,
+  summary:'A website check failed; waiting for an independent repeat'};
+ // Preserve the incident ID throughout consecutive failures of these probes.
+ let first=previous.checkedAt,olderTime=Date.parse(first);
+ for(const x of ordered.filter(x=>Date.parse(x.checkedAt)<olderTime)){
+  const delta=olderTime-Date.parse(x.checkedAt);
+  if(delta<=0||delta>30*60000||!repeated.every(id=>safeIds(x.failedChecks).includes(id)))break;
+  first=x.checkedAt;olderTime=Date.parse(x.checkedAt);
+ }
+ return {...safe,severity:'critical',actionable:true,kind:'sustained-failure',
+  affectedIds:repeated.sort((a,b)=>CHECK_IDS.indexOf(a)-CHECK_IDS.indexOf(b)),
+  incidentKey:'repeat:'+repeated.join(',')+':'+first,firstObserved:first,
+  summary:'Repeated failure detected on '+repeated.length+' website check'+(repeated.length===1?'':'s')};
+}
+
 export async function loadWatchdogEvidence(env,{now=()=>Date.now()}={}){
  const source={source:'independent-edge-watchdog',readOnly:true,automaticRemediation:false};
  if(typeof env?.EDGE_WATCHDOG?.fetch!=='function')return {...source,available:false,state:'unavailable',
-  historyAvailable:false,history:[],reason:'watchdog-service-not-connected'};
+  historyAvailable:false,history:[],reason:'watchdog-service-not-connected',
+  alert:assessWatchdogAlert({available:false})};
  const nowMs=now();
  const [status,history]=await Promise.all([
   readJson(env.EDGE_WATCHDOG,'/status'),readJson(env.EDGE_WATCHDOG,'/history')
  ]);
  const latest=statusReport(status,nowMs),recent=historyReports(history,nowMs);
- return {...source,...latest,historyAvailable:recent!==null,history:recent||[]};
+ return {...source,...latest,historyAvailable:recent!==null,history:recent||[],alert:assessWatchdogAlert(latest,recent||[])};
 }
 export const WATCHDOG_CHECK_IDS=Object.freeze([...CHECK_IDS]);
