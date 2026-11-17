@@ -143,7 +143,7 @@
         }
 
         function renderDashboard(data) {
-            if (!data || data.message) {
+            if (!data || data.message || !data.health || !Array.isArray(data.security) || !Array.isArray(data.marketScout)) {
                 document.getElementById('health-content').textContent = "No audit data recorded yet. Click Run Full Audit Now.";
                 for (const id of ["security-content","scout-content","expansion-content","revenue-content"]) document.getElementById(id).textContent = "Awaiting first audit.";
                 return;
