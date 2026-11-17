@@ -1,5 +1,6 @@
 import {loadGrowthEvidence} from './growth-evidence.mjs';
 import {loadWatchdogEvidence} from './watchdog-evidence.mjs';
+import {loadAgentDemand} from './agent-demand-evidence.mjs';
 /**
  * YorpHives Headquarters — zero-additional-subscription Cloudflare adapter.
  * Observation and research ONLY. Never POST to websites, mutate repositories,
@@ -3983,6 +3984,11 @@ export default {
     if(route==="/api/growth-evidence"&&request.method==="GET"){
       try{return json(await loadGrowthEvidence());}
       catch{return json({available:false,reason:"production-growth-evidence-unavailable",readOnly:true},503);}
+    }
+    if(route==="/api/agent-demand"&&request.method==="GET"){
+      try{const d=await loadAgentDemand(env);return json(d,d.available?200:503);}
+      catch{return json({source:'yorphives-agent-api-aggregate',readOnly:true,available:false,
+       reason:'agent-demand-temporarily-unavailable',revenueVerified:false},503);}
     }
     if(route==="/api/edge-watchdog"&&request.method==="GET"){
       try{const r=await loadWatchdogEvidence(env);return json(r,r.state==='unavailable'?503:200);}
