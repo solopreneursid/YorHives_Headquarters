@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>YorpHives Headquarters — Control System</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0f172a;color:#f8fafc;padding:40px 20px;max-width:800px;margin:auto;line-height:1.55}
+h1{color:#38bdf8;font-size:clamp(23px,5vw,30px);line-height:1.2}h3{margin-top:0}p{color:#b6c6da}
+.card{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:20px;margin-bottom:20px}
+button{background:#0ea5e9;color:#fff;border:none;padding:12px 18px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:15px;min-height:44px}
+button:hover{background:#0284c7}button:focus-visible,input:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}button:disabled{opacity:.55;cursor:progress}
+button.secondary{background:#334155}button.secondary:hover{background:#475569}
+input{padding:12px;border:1px solid #64748b;background:#0f172a;color:white;border-radius:6px;min-height:44px;min-width:0;flex:1;font-size:15px}
+.actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+pre{background:#0f172a;padding:15px;border-radius:6px;overflow-x:auto;color:#38bdf8;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;min-height:110px}
+#notice{font-size:14px;color:#a9c5da;margin:10px 0 0}small{color:#94a3b8}#private{display:none}
+@media(max-width:480px){body{padding:22px 14px}.card{padding:16px}.actions>*{width:100%}}
+</style>
+</head>
+<body>
+<h1>🛡️ YorpHives Headquarters Control System</h1>
+<p>Private operational intelligence, website uptime, security-header checks and open-source product scouting.</p>
+<div class="card" id="login">
+  <h3>Private access</h3>
+  <form id="unlockForm" class="actions">
+    <input id="key" type="password" autocomplete="off" placeholder="Enter preview access key" aria-label="Preview access key" required>
+    <button type="submit">Unlock Dashboard</button>
+  </form>
+  <p id="loginNotice" role="status">Access key stays in this browser tab only.</p>
+</div>
+<div id="private">
+  <div class="card">
+    <h3>System Actions</h3>
+    <div class="actions">
+      <button id="run" type="button">Run Manual Audit Now</button>
+      <button class="secondary" id="refresh" type="button">Refresh Latest Report</button>
+      <button class="secondary" id="lock" type="button">Lock</button>
+    </div>
+    <p id="notice" role="status" aria-live="polite">Ready.</p>
+  </div>
+  <div class="card">
+    <h3>Latest Intelligence Report</h3>
+    <pre id="report" aria-live="polite">Loading status...</pre>
+    <small>Scheduled checks run every six hours (UTC). Reports are stored in private Cloudflare KV.</small>
+  </div>
+</div>
+<script>
+(function(){
+  const byId=(id)=>document.getElementById(id);
+  let accessKey=sessionStorage.getItem("yorp-control-token")||"";
+  function view(open){byId("login").style.display=open?"none":"block";byId("private").style.display=open?"block":"none"}
+  function notice(message){byId("notice").textContent=message}
+  function lock(message){accessKey="";sessionStorage.removeItem("yorp-control-token");byId("key").value="";view(false);byId("loginNotice").textContent=message||"Dashboard locked."}
+  async function requestAudit(path,method){
+    const response=await fetch(path,{method:method||"GET",cache:"no-store",headers:{"Authorization":"Bearer "+accessKey}});
+    let data;try{data=await response.json()}catch(e){throw new Error("Invalid server response")}
+    if(response.status===401){lock("Access key rejected. Enter a valid key.");throw new Error("Unauthorized")}
+    if(!response.ok)throw new Error(data.error||"Request failed ("+response.status+")");
+    return data;
+  }
+  async function refresh(){
+    notice("Loading latest report...");
+    try{const report=await requestAudit("/api/status");byId("report").textContent=JSON.stringify(report,null,2);notice(report.timestamp?"Report refreshed.":"No audits executed yet.")}
+    catch(e){byId("report").textContent=e.message;notice(e.message)}
+  }
+  byId("unlockForm").addEventListener("submit",function(e){
+    e.preventDefault();accessKey=byId("key").value.trim();sessionStorage.setItem("yorp-control-token",accessKey);view(true);refresh();
+  });
+  byId("run").addEventListener("click",async function(){
+    this.disabled=true;notice("Running fresh audit...");byId("report").textContent="Running fresh audit across the edge network...";
+    try{const result=await requestAudit("/api/run-audit","POST");byId("report").textContent=JSON.stringify(result.report,null,2);notice("Audit completed and stored.")}
+    catch(e){byId("report").textContent=e.message;notice(e.message)}
+    finally{this.disabled=false}
+  });
+  byId("refresh").addEventListener("click",refresh);
+  byId("lock").addEventListener("click",()=>lock());
+  if(accessKey){view(true);refresh()}else view(false);
+})();
+</script>
+</body>
+</html>
