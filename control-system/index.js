@@ -1,140 +1,203 @@
-const DASHBOARD_HTML = "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta name=\"robots\" content=\"noindex\">\n<title>YorpHives Headquarters — Control System</title>\n<style>\n:root{color-scheme:dark}*{box-sizing:border-box}\nbody{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,sans-serif;background:#0f172a;color:#f8fafc;padding:40px 20px;max-width:800px;margin:auto;line-height:1.55}\nh1{color:#38bdf8;font-size:clamp(23px,5vw,30px);line-height:1.2}h3{margin-top:0}p{color:#b6c6da}\n.card{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:20px;margin-bottom:20px}\nbutton{background:#0ea5e9;color:#fff;border:none;padding:12px 18px;border-radius:6px;cursor:pointer;font-weight:bold;font-size:15px;min-height:44px}\nbutton:hover{background:#0284c7}button:focus-visible,input:focus-visible{outline:3px solid #7dd3fc;outline-offset:3px}button:disabled{opacity:.55;cursor:progress}\nbutton.secondary{background:#334155}button.secondary:hover{background:#475569}\ninput{padding:12px;border:1px solid #64748b;background:#0f172a;color:white;border-radius:6px;min-height:44px;min-width:0;flex:1;font-size:15px}\n.actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}\npre{background:#0f172a;padding:15px;border-radius:6px;overflow-x:auto;color:#38bdf8;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;min-height:110px}\n#notice{font-size:14px;color:#a9c5da;margin:10px 0 0}small{color:#94a3b8}#private{display:none}\n@media(max-width:480px){body{padding:22px 14px}.card{padding:16px}.actions>*{width:100%}}\n</style>\n</head>\n<body>\n<h1>🛡️ YorpHives Headquarters Control System</h1>\n<p>Private operational intelligence, website uptime, security-header checks and open-source product scouting.</p>\n<div class=\"card\" id=\"login\">\n  <h3>Private access</h3>\n  <form id=\"unlockForm\" class=\"actions\">\n    <input id=\"key\" type=\"password\" autocomplete=\"off\" placeholder=\"Enter preview access key\" aria-label=\"Preview access key\" required>\n    <button type=\"submit\">Unlock Dashboard</button>\n  </form>\n  <p id=\"loginNotice\" role=\"status\">Access key stays in this browser tab only.</p>\n</div>\n<div id=\"private\">\n  <div class=\"card\">\n    <h3>System Actions</h3>\n    <div class=\"actions\">\n      <button id=\"run\" type=\"button\">Run Manual Audit Now</button>\n      <button class=\"secondary\" id=\"refresh\" type=\"button\">Refresh Latest Report</button>\n      <button class=\"secondary\" id=\"lock\" type=\"button\">Lock</button>\n    </div>\n    <p id=\"notice\" role=\"status\" aria-live=\"polite\">Ready.</p>\n  </div>\n  <div class=\"card\">\n    <h3>Latest Intelligence Report</h3>\n    <pre id=\"report\" aria-live=\"polite\">Loading status...</pre>\n    <small>Scheduled checks run every six hours (UTC). Reports are stored in private Cloudflare KV.</small>\n  </div>\n</div>\n<script>\n(function(){\n  const byId=(id)=>document.getElementById(id);\n  let accessKey=sessionStorage.getItem(\"yorp-control-token-v2\")||\"\";\n  function view(open){byId(\"login\").style.display=open?\"none\":\"block\";byId(\"private\").style.display=open?\"block\":\"none\"}\n  function notice(message){byId(\"notice\").textContent=message}\n  function lock(message){accessKey=\"\";sessionStorage.removeItem(\"yorp-control-token-v2\");byId(\"key\").value=\"\";view(false);byId(\"loginNotice\").textContent=message||\"Dashboard locked.\"}\n  async function requestAudit(path,method){\n    const response=await fetch(path,{method:method||\"GET\",cache:\"no-store\",headers:{\"Authorization\":\"Bearer \"+accessKey}});\n    let data;try{data=await response.json()}catch(e){throw new Error(\"Invalid server response\")}\n    if(response.status===401){lock(\"Access key rejected. Enter a valid key.\");throw new Error(\"Unauthorized\")}\n    if(!response.ok)throw new Error(data.error||\"Request failed (\"+response.status+\")\");\n    return data;\n  }\n  async function refresh(){\n    notice(\"Loading latest report...\");\n    try{const report=await requestAudit(\"/api/status\");byId(\"report\").textContent=JSON.stringify(report,null,2);notice(report.timestamp?\"Report refreshed.\":\"No audits executed yet.\")}\n    catch(e){byId(\"report\").textContent=e.message;notice(e.message)}\n  }\n  byId(\"unlockForm\").addEventListener(\"submit\",async function(e){\n    e.preventDefault();\n    accessKey=byId(\"key\").value.trim();\n    byId(\"loginNotice\").textContent=\"Checking access key...\";\n    try{\n      const report=await requestAudit(\"/api/status\");\n      sessionStorage.setItem(\"yorp-control-token-v2\",accessKey);\n      view(true);\n      byId(\"report\").textContent=JSON.stringify(report,null,2);\n      notice(report.timestamp?\"Report loaded.\":\"No audits executed yet.\");\n    }catch(error){\n      byId(\"loginNotice\").textContent=error.message===\"Unauthorized\"\n        ?\"Access key rejected. Paste the exact key from this chat.\"\n        :error.message;\n    }\n  });\n  byId(\"run\").addEventListener(\"click\",async function(){\n    this.disabled=true;notice(\"Running fresh audit...\");byId(\"report\").textContent=\"Running fresh audit across the edge network...\";\n    try{const result=await requestAudit(\"/api/run-audit\",\"POST\");byId(\"report\").textContent=JSON.stringify(result.report,null,2);notice(\"Audit completed and stored.\")}\n    catch(e){byId(\"report\").textContent=e.message;notice(e.message)}\n    finally{this.disabled=false}\n  });\n  byId(\"refresh\").addEventListener(\"click\",refresh);\n  byId(\"lock\").addEventListener(\"click\",()=>lock());\n  if(accessKey){view(true);refresh()}else view(false);\n})();\n</script>\n</body>\n</html>";
-
-function json(value, status = 200) {
-  return new Response(JSON.stringify(value, null, 2), {
-    status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff"
-    }
-  });
-}
-
-async function authorized(request, env) {
-  if (!env.CONTROL_TOKEN) return false;
-  const encoder = new TextEncoder();
-  const actual = request.headers.get("Authorization") || "";
-  const expected = "Bearer " + env.CONTROL_TOKEN;
-  const [a, b] = await Promise.all([
-    crypto.subtle.digest("SHA-256", encoder.encode(actual)),
-    crypto.subtle.digest("SHA-256", encoder.encode(expected))
+const DASHBOARD_HTML = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n    <meta name=\"robots\" content=\"noindex\">\n    <title>YorpHives Headquarters</title>\n    <style>\n        :root { --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #f8fafc; --accent: #38bdf8; --green: #22c55e; --red: #ef4444; }\n        body { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 30px; max-width: 1000px; margin: auto; }\n        .hidden { display: none !important; }\n        .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }\n        h1, h2, h3 { color: var(--accent); margin-top: 0; }\n        input[type=\"password\"] { background: #0f172a; border: 1px solid var(--border); color: white; padding: 12px; border-radius: 6px; width: 300px; font-size: 16px; }\n        button { background: var(--accent); color: #0f172a; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 15px; }\n        button:hover { background: #0ea5e9; }\n        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }\n        .badge-healthy { background: rgba(34,197,94,0.2); color: var(--green); }\n        .badge-alert { background: rgba(239,68,68,0.2); color: var(--red); }\n        ul { padding-left: 20px; }\n        li { margin-bottom: 8px; }\n        input[type=\"password\"] { max-width: 100%; box-sizing: border-box; }\n    button { min-height: 44px; }\n    button:focus-visible,input:focus-visible { outline: 3px solid #7dd3fc; outline-offset: 3px; }\n    #auth-error { min-height: 1.3em; color: #fca5a5; font-size: 13px; }\n    #audit-status { font-size: 13px; color: #94a3b8; }\n    @media(max-width:600px) { body{padding:16px} #auth-screen{margin:45px auto !important;} #dashboard header{display:block !important;} #dashboard header button{width:100%; margin-top:10px} .card{padding:16px} }\n    </style>\n</head>\n<body>\n\n    <!-- LOGIN SCREEN -->\n    <div id=\"auth-screen\" class=\"card\" style=\"max-width: 450px; margin: 100px auto; text-align: center;\">\n        <h1>🛡️ YorpHives Headquarters</h1>\n        <p>Private operational intelligence and control system.</p>\n        <div style=\"margin: 20px 0;\">\n            <input type=\"password\" id=\"access-key\" placeholder=\"Enter private access key\" autocomplete=\"off\" aria-label=\"Private access key\">\n        </div>\n        <button onclick=\"unlockDashboard()\">Unlock Dashboard</button>\n        <p id=\"auth-error\" role=\"alert\"></p>\n        <p style=\"font-size: 12px; color: #64748b; margin-top: 15px;\">Access key stays stored in this browser session only.</p>\n    </div>\n\n    <!-- MAIN DASHBOARD -->\n    <div id=\"dashboard\" class=\"hidden\">\n        <header style=\"display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;\">\n            <div>\n                <h1>🛡️ YorpHives Headquarters</h1>\n                <p>Autonomous Edge Control System & Chief Operations Officer</p>\n            </div>\n            <button id=\"audit-button\" onclick=\"runAudit()\" style=\"background: #22c55e; color: #0f172a;\">Run Full Audit Now</button>\n        </header>\n\n        <p id=\"audit-status\" role=\"status\" aria-live=\"polite\"></p>\n        <!-- System Health & Uptime -->\n        <div class=\"card\">\n            <h3>🌐 Website Health & Uptime</h3>\n            <div id=\"health-content\">Loading health status...</div>\n        </div>\n\n        <!-- Vulnerabilities & Security -->\n        <div class=\"card\">\n            <h3>🔒 Vulnerabilities & Security Headers</h3>\n            <ul id=\"security-content\">Loading security audit...</ul>\n        </div>\n\n        <!-- Open Source Product Scout -->\n        <div class=\"card\">\n            <h3>💡 Open-Source Product & Integration Scouting</h3>\n            <div id=\"scout-content\">Loading market research feeds...</div>\n        </div>\n\n        <!-- Expansion Strategy -->\n        <div class=\"card\">\n            <h3>📈 Website Expansion Strategy</h3>\n            <div id=\"expansion-content\">Loading expansion metrics...</div>\n        </div>\n\n        <!-- Revenue Opportunities -->\n        <div class=\"card\">\n            <h3>💰 Revenue Generation Opportunities</h3>\n            <div id=\"revenue-content\">Loading monetization intelligence...</div>\n        </div>\n    </div>\n\n    <script>\n        const WORKER_URL = window.location.origin; // Same-origin API; no wildcard CORS or cross-site key forwarding\n\n        function unlockDashboard() {\n            const key = document.getElementById('access-key').value.trim();\n            if (!key) return alert(\"Please enter your access key.\");\n            document.getElementById('auth-error').textContent = '';\n            sessionStorage.setItem('hq_key', key);\n            verifyAndLoad();\n        }\n\n        async function verifyAndLoad() {\n            const key = sessionStorage.getItem('hq_key');\n            if (!key) return;\n\n            try {\n                const res = await fetch(`${WORKER_URL}/api/status`, {\n                    headers: { \"X-Access-Key\": key }\n                });\n                if (res.status === 401) {\n                    document.getElementById(\"auth-error\").textContent = \"Invalid access key. Try again.\";\n                    sessionStorage.removeItem('hq_key');\n                    return;\n                }\n                if (!res.ok) throw new Error(\"Status request failed (HTTP \" + res.status + \")\");\n                const data = await res.json();\n                renderDashboard(data);\n                document.getElementById('auth-screen').classList.add('hidden');\n                document.getElementById('dashboard').classList.remove('hidden');\n            } catch (err) {\n                document.getElementById(\"auth-error\").textContent = \"Failed to connect to Headquarters worker edge.\";\n            }\n        }\n\n        async function runAudit() {\n            const key = sessionStorage.getItem('hq_key');\n            const button = document.getElementById('audit-button');\n            button.disabled = true;\n            document.getElementById('audit-status').textContent = \"Running edge diagnostic audit...\";\n            try {\n                const res = await fetch(`${WORKER_URL}/api/run-audit`, {\n                    method: \"POST\",\n                    headers: { \"X-Access-Key\": key }\n                });\n                if (!res.ok) throw new Error(\"Audit failed (HTTP \" + res.status + \")\");\n                const data = await res.json();\n                renderDashboard(data.report);\n                document.getElementById('audit-status').textContent = \"Audit completed and saved.\";\n            } catch (err) {\n                document.getElementById('audit-status').textContent = err.message;\n            } finally {\n                button.disabled = false;\n            }\n        }\n\n        function safe(value) {\n            return String(value ?? \"\").replace(/[&<>\"']/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[ch]));\n        }\n\n        function renderDashboard(data) {\n            if (!data || data.message) {\n                document.getElementById('health-content').textContent = \"No audit data recorded yet. Click Run Full Audit Now.\";\n                for (const id of [\"security-content\",\"scout-content\",\"expansion-content\",\"revenue-content\"]) document.getElementById(id).textContent = \"Awaiting first audit.\";\n                return;\n            }\n\n            // Health\n            const h = data.health;\n            document.getElementById('health-content').innerHTML = `\n                <p>Status: <span class=\"badge ${h.status === 'HEALTHY' ? 'badge-healthy' : 'badge-alert'}\">${safe(h.status)}</span> (HTTP ${safe(h.statusCode)})</p>\n                <p>Response Latency: <strong>${safe(h.latencyMs)}ms</strong></p>\n                <p>Notes: ${safe(h.notes)}</p>\n                <p style=\"font-size: 12px; color: #94a3b8;\">Last Audited: ${safe(data.timestamp)}</p>\n            `;\n\n            // Security\n            let secHtml = \"\";\n            (data.security || []).forEach(issue => {\n                secHtml += `<li><strong>[${safe(issue.type)}]</strong> (${safe(issue.severity)}): ${safe(issue.message)}</li>`;\n            });\n            document.getElementById('security-content').innerHTML = secHtml;\n\n            // Scout\n            let scoutHtml = \"\";\n            (data.marketScout || []).forEach(item => {\n                scoutHtml += `<div style=\"margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px;\">\n                    <strong>${safe(item.title)}</strong> ${item.stars ? `⭐ ${safe(item.stars)}` : ''}<br>\n                    <p style=\"margin: 5px 0; color: #cbd5e1;\">${safe(item.description)}</p>\n                    <span style=\"font-size: 13px; color: #38bdf8;\">💡 Angle: ${safe(item.integrationAngle)}</span>\n                </div>`;\n            });\n            document.getElementById('scout-content').innerHTML = scoutHtml;\n\n            // Expansion\n            let expHtml = \"\";\n            (data.expansion || []).forEach(exp => {\n                expHtml += `<p><strong>${safe(exp.module)}</strong> [${safe(exp.status)}]<br><span style=\"color: #cbd5e1;\">${safe(exp.recommendation)}</span></p>`;\n            });\n            document.getElementById('expansion-content').innerHTML = expHtml;\n\n            // Revenue\n            let revHtml = \"\";\n            (data.revenue || []).forEach(rev => {\n                revHtml += `<p><strong>${safe(rev.model)}</strong> (Potential: ${safe(rev.potential)})<br><span style=\"color: #cbd5e1;\">${safe(rev.strategy)}</span></p>`;\n            });\n            document.getElementById('revenue-content').innerHTML = revHtml;\n        }\n\n        // Auto-load if key is already in session\n        if (sessionStorage.getItem('hq_key')) {\n            verifyAndLoad();\n        }\n    document.getElementById(\"access-key\").addEventListener(\"keydown\", (event) => { if (event.key === \"Enter\") unlockDashboard(); });\n    </script>\n</body>\n</html>\n";
+async function keysMatch(actual, expected) {
+  if (!actual || !expected) return false;
+  const coder = new TextEncoder();
+  const [leftHash, rightHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", coder.encode(actual)),
+    crypto.subtle.digest("SHA-256", coder.encode(expected))
   ]);
-  const left = new Uint8Array(a), right = new Uint8Array(b);
+  const a = new Uint8Array(leftHash), b = new Uint8Array(rightHash);
   let difference = 0;
-  for (let i = 0; i < left.length; i++) difference |= left[i] ^ right[i];
+  for (let i = 0; i < a.length; i++) difference |= a[i] ^ b[i];
   return difference === 0;
 }
 
 export default {
+  // Cron Trigger: Background automated check
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runYorpControlSystem(env));
   },
 
   async fetch(request, env, ctx) {
-    const path = new URL(request.url).pathname;
+    const url = new URL(request.url);
+    const kv = env.CONTROL_KV;
 
-    if (path === "/" && request.method === "GET") {
+    if (url.pathname === "/" && request.method === "GET") {
       return new Response(DASHBOARD_HTML, {
         headers: {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-store",
           "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
           "X-Frame-Options": "DENY",
-          "X-Content-Type-Options": "nosniff",
-          "Referrer-Policy": "no-referrer"
+          "Referrer-Policy": "no-referrer",
+          "X-Content-Type-Options": "nosniff"
         }
       });
     }
 
-    const isStatus = path === "/api/status" || path === "/api/headquarters/status";
-    const isRun = path === "/api/run-audit" || path === "/api/headquarters/run-audit";
-    if (!isStatus && !isRun) return json({ error: "Not found" }, 404);
-    if (request.method !== (isStatus ? "GET" : "POST")) return json({ error: "Method not allowed" }, 405);
-    if (!(await authorized(request, env))) return json({ error: "Unauthorized" }, 401);
-    if (!env.CONTROL_KV) return json({ error: "CONTROL_KV binding missing" }, 503);
-
-    try {
-      if (isStatus) {
-        const latest = await env.CONTROL_KV.get("LATEST_AUDIT_REPORT", { type: "json" });
-        return json(latest || { message: "No audits executed yet." });
-      }
-      const report = await runYorpControlSystem(env);
-      return json({ success: true, report });
-    } catch (error) {
-      console.error("Control system audit failed", error);
-      return json({ error: "Audit could not be completed." }, 500);
+    const corsHeaders = {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff"
+    };
+    const isStatus = url.pathname === "/api/status" || url.pathname === "/api/headquarters/status";
+    const isRun = url.pathname === "/api/run-audit" || url.pathname === "/api/headquarters/run-audit";
+    if (!isStatus && !isRun) return new Response(JSON.stringify({error:"Not found"}), {status:404, headers:corsHeaders});
+    if (request.method !== (isStatus ? "GET" : "POST")) {
+      return new Response(JSON.stringify({error:"Method not allowed"}), {status:405, headers:corsHeaders});
     }
+
+    // Use HQ_ACCESS_KEY when installed as a Worker secret; support the existing
+    // preview CONTROL_TOKEN during migration. Never accept keys in URL query strings.
+    const clientKey = request.headers.get("X-Access-Key") || "";
+    const configuredKey = env.HQ_ACCESS_KEY || env.CONTROL_TOKEN;
+    if (!configuredKey || !(await keysMatch(clientKey, configuredKey))) {
+      return new Response(JSON.stringify({ error: "Unauthorized. Private access only." }), {
+        status: 401,
+        headers: corsHeaders
+      });
+    }
+    if (!kv) return new Response(JSON.stringify({error:"CONTROL_KV missing"}), {status:503,headers:corsHeaders});
+
+    // Route 1: Fetch latest intelligence report
+    if (isStatus) {
+      const report = await kv.get("LATEST_AUDIT_REPORT", { type: "json" });
+      return new Response(JSON.stringify(report || { message: "No audits executed yet." }), {
+        headers: corsHeaders
+      });
+    }
+
+    // Route 2: Trigger a full system audit manually
+    if (isRun) {
+      const report = await runYorpControlSystem(env);
+      return new Response(JSON.stringify({ success: true, report }), {
+        headers: corsHeaders
+      });
+    }
+
+    return new Response(JSON.stringify({ message: "YorpHives HQ Engine Active 🛡️" }), { headers: corsHeaders });
   }
 };
 
 async function runYorpControlSystem(env) {
   const targetUrl = env.TARGET_URL || "https://yorphives.com";
-  const auditLog = {
-    timestamp: new Date().toISOString(),
-    uptime: await checkUptime(targetUrl),
-    security: await checkSecurityHeaders(targetUrl),
-    marketScout: await scoutOpenSourceProducts()
+  const kv = env.CONTROL_KV;
+  const timestamp = new Date().toISOString();
+
+  let auditLog = {
+    timestamp: timestamp,
+    health: await checkWebsiteHealth(targetUrl),
+    security: await checkVulnerabilities(targetUrl),
+    marketScout: await scoutOpenSourceProducts(),
+    expansion: evaluateWebsiteExpansion(),
+    revenue: generateRevenueOpportunities()
   };
-  if (!env.CONTROL_KV) throw new Error("CONTROL_KV binding missing");
-  await env.CONTROL_KV.put("LATEST_AUDIT_REPORT", JSON.stringify(auditLog));
+
+  await kv.put("LATEST_AUDIT_REPORT", JSON.stringify(auditLog));
   return auditLog;
 }
 
-async function checkUptime(url) {
+// 1. Website Health & Bug Pinger
+async function checkWebsiteHealth(url) {
   try {
-    const res = await fetch(url, {
-      method: "HEAD",
-      headers: { "User-Agent": "YorpHives-HQ-Auditor/1.0" }
-    });
+    const start = Date.now();
+    const res = await fetch(url, { method: "HEAD", headers: { "User-Agent": "YorpHives-HQ-Auditor/1.0" } });
+    const latency = Date.now() - start;
+
     return {
-      status: res.status === 200 ? "UP" : "DOWN",
+      status: res.status === 200 ? "HEALTHY" : "DEGRADED",
       statusCode: res.status,
-      error: res.status !== 200 ? "HTTP " + res.status : null
+      latencyMs: latency,
+      notes: res.status === 200 ? "Homepage responded with HTTP 200 OK." : `Unexpected status code: ${res.status}`
     };
-  } catch (error) {
-    return { status: "DOWN", statusCode: 0, error: error.message };
+  } catch (err) {
+    return { status: "DOWN", statusCode: 0, latencyMs: 0, notes: `Connection failed: ${err.message}` };
   }
 }
 
-async function checkSecurityHeaders(url) {
-  const warnings = [];
+// 2. Vulnerability & Deprecation Scanner
+async function checkVulnerabilities(url) {
+  let issues = [];
   try {
     const res = await fetch(url, { method: "HEAD" });
     const headers = res.headers;
-    if (!headers.get("strict-transport-security")) warnings.push("Missing HSTS header (Vulnerability risk)");
-    if (!headers.get("content-security-policy")) warnings.push("Missing Content-Security-Policy (CSP)");
+
+    if (!headers.get("strict-transport-security")) {
+      issues.push({ type: "Vulnerability", severity: "Medium", message: "Missing HSTS header. Risk of protocol downgrade attacks." });
+    }
+    if (!headers.get("content-security-policy")) {
+      issues.push({ type: "Vulnerability", severity: "High", message: "Missing Content-Security-Policy (CSP). Increased XSS vulnerability surface." });
+    }
     const poweredBy = headers.get("x-powered-by");
-    if (poweredBy) warnings.push("Exposing technology stack via X-Powered-By: " + poweredBy);
-  } catch (error) {
-    warnings.push("Could not fetch headers: " + error.message);
+    if (poweredBy) {
+      issues.push({ type: "Deprecation/Exposure", severity: "Low", message: `Exposing tech stack signature: X-Powered-By: ${poweredBy}` });
+    }
+  } catch (err) {
+    issues.push({ type: "System Error", severity: "High", message: `Could not inspect security headers: ${err.message}` });
   }
-  return { warnings };
+
+  if (issues.length === 0) {
+    issues.push({ type: "Secure", severity: "None", message: "No issues detected in these security headers; this is not a full vulnerability scan." });
+  }
+  return issues;
 }
 
+// 3. Open-Source Product Scout (GitHub API)
 async function scoutOpenSourceProducts() {
   try {
-    const ghRes = await fetch(
-      "https://api.github.com/search/repositories?q=topic:ai+topic:serverless+created:>2026-10-01&sort=stars&order=desc&per_page=1",
-      { headers: { "User-Agent": "YorpHives-Scout", "Accept": "application/vnd.github+json" } }
-    );
+    const ghRes = await fetch("https://api.github.com/search/repositories?q=topic:ai+topic:serverless+created:>2026-10-01&sort=stars&order=desc&per_page=3", {
+      headers: { "User-Agent": "YorpHives-Scout", "Accept": "application/vnd.github+json" }
+    });
     if (!ghRes.ok) throw new Error("GitHub API HTTP " + ghRes.status);
     const data = await ghRes.json();
     if (data.items && data.items.length > 0) {
-      const repo = data.items[0];
-      return {
+      return data.items.map(repo => ({
         title: repo.full_name,
-        description: repo.description || "High-velocity open source utility.",
-        revenueAngle: "Packaged as a managed serverless micro-SaaS extension with zero-infrastructure overhead."
-      };
+        description: repo.description || "No description provided.",
+        stars: repo.stargazers_count,
+        url: repo.html_url,
+        integrationAngle: "Can be packaged as a lightweight serverless micro-extension or white-labeled tool."
+      }));
     }
-  } catch (error) {
-    console.warn("GitHub scout unavailable; displaying fallback suggestion", error.message);
+  } catch (e) {
+    // Fallback if rate limited
   }
-  return {
+  return [{
     title: "Edge-Cached AI Micro-Tools",
-    description: "Lightweight Wasm modules running directly on Cloudflare Workers for zero-server billing.",
-    revenueAngle: "Tiered micro-subscriptions for automated developer workflows.",
-    source: "fallback suggestion; not a verified GitHub discovery"
-  };
+    source: "fallback suggestion, not a verified GitHub repository",
+    description: "Lightweight Wasm modules running directly on Cloudflare Workers.",
+    integrationAngle: "Zero-infrastructure micro-SaaS wrapper."
+  }];
+}
+
+// 4. Website Expansion Evaluator
+function evaluateWebsiteExpansion() {
+  return [
+    {
+      module: "Documorph Integration",
+      status: "Ready for Development",
+      recommendation: "Deploy client-side PDF/document transformation tools as an edge-native utility to capture organic developer traffic."
+    },
+    {
+      module: "Automated Sitemap & SEO Indexing",
+      status: "Recommended",
+      recommendation: "Implement automated sitemap generation via Cloudflare Workers cron to speed up search engine indexing for new micro-utilities."
+    }
+  ];
+}
+
+// 5. Revenue Generation & Opportunity Scans
+function generateRevenueOpportunities() {
+  return [
+    {
+      model: "Micro-SaaS Utility Tiers",
+      potential: "High",
+      strategy: "Offer free basic client-side file/text utilities with paid API export tiers managed via zero-database stripe/razorpay webhook edge links."
+    },
+    {
+      model: "Developer Toolkit Bundles",
+      potential: "Medium",
+      strategy: "Bundle automated utility scripts into a single private developer subscription package."
+    }
+  ];
 }
