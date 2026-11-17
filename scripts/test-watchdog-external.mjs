@@ -28,6 +28,11 @@ assert.ok(body.records.every(r=>typeof r.checkedAt==='string'&&Array.isArray(r.f
 assert.equal(JSON.stringify(body).includes('sessionId'),false);
 const denied=await get(HQ+'/api/edge-watchdog');
 assert.ok([302,401,403].includes(denied.status),'Unauthenticated HQ endpoint exposed HTTP '+denied.status);
+const demand=await get(HQ+'/api/agent-demand');
+assert.ok([302,401,403].includes(demand.status),
+ 'Private aggregate agent demand exposed to unauthenticated request: '+demand.status);
+assert.equal(demand.headers.get('access-control-allow-origin'),null,
+ 'Private HQ agent demand must not be CORS-enabled');
 const unknown=await get(WATCHDOG+'/not-an-api');
 assert.equal(unknown.status,404);
-console.log('PASS: independent watchdog real Cron evidence, last '+body.records.length+' records, HQ guarded status '+denied.status+', no unauthenticated mutations.');
+console.log('PASS: independent watchdog real Cron evidence, last '+body.records.length+' records, HQ watchdog guarded '+denied.status+', agent usage guarded '+demand.status+', no unauthenticated mutations.');
