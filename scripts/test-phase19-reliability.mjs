@@ -95,7 +95,7 @@ assert.equal(ready.scheduler.observedCurrent,true);
 assert.equal(ready.scheduler.independentlyTested,false);
 assert.equal(ready.founder.signedInJourneyVerified,false);
 const atOld=ctx.readiness([candidate],[stored],[{kind:'nano_manifest_fetches',used:0}],
- [{key:'last_cron',checked_at:'2026-11-17T23:55:00Z'}],[],[],now);
+ [{key:'last_cron',checked_at:'2026-11-18T00:30:00Z'}],[],[],now);
 assert.equal(atOld.scheduler.observedCurrent,true);
 const stale=ctx.readiness([candidate],[stored],[],
  [{key:'last_cron',checked_at:'2026-11-17T20:00:00Z'}],[],[],now);
