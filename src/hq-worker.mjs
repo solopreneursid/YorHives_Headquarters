@@ -1297,6 +1297,84 @@ function nano12Report(checks){
 
 
 
+/* Phase 19 — derived operational readiness; never false production claims.
+ * No extra GET, AI inference, D1 writes, agent actions or subscriptions.
+ */
+const HQ19_VERSION="operational-evidence-v1";
+function hq19Readiness(checks,manifests,quotas,statuses,reviews,gateEvidence,at=nowIso()){
+ const clock=Date.parse(at);
+ const available=Array.isArray(checks)?checks:[];
+ const manifestMap=new Map((Array.isArray(manifests)?manifests:[]).map(x=>[x.paper_id,x]));
+ const sourceCandidates=available.filter(row=>row&&row.state==="repository-metadata-checked"&&nano14Candidate(row));
+ let observed=0,unparsed=0,parsed=0,withoutManifest=0,repoCount=sourceCandidates.length;
+ for(const row of sourceCandidates){
+  const match=manifestMap.get(row.paper_id);
+  const valid=Boolean(match&&match.repository_url===row.repository_url);
+  if(!valid){withoutManifest++;continue;}
+  const catalog=nano14Json(match.catalog_json),evidence=nano14Json(match.evidence_json);
+  const item=catalog.find(f=>f.kind==="manifest"&&/^[a-f0-9]{40}$/.test(f.sha||""));
+  const seen=item&&evidence.find(e=>e.path===item.path&&e.sha===item.sha);
+  if(!seen){withoutManifest++;continue;}
+  observed++;
+  if(seen.manifestParser==="manifest-observed-not-parsed")unparsed++;
+  else if(["pyproject-declared-subset-v1","package-json-names-only","requirements-name-candidates-only"].includes(seen.manifestParser))
+   parsed++;
+  else unparsed++;
+ }
+ const usage=Array.isArray(quotas)?quotas:[];
+ const dailyCount=usage.find(x=>x.kind==="nano_manifest_fetches");
+ const used=Number.isSafeInteger(Number(dailyCount?.used))?
+  Math.max(0,Math.min(2,Number(dailyCount.used))):0;
+ const status=Array.isArray(statuses)?statuses:[];
+ const last=status.find(x=>x.key==="last_cron");
+ const age=clock-Date.parse(last?.checked_at||"");
+ const fresh=Number.isFinite(age)&&age>=0&&age<=20*60000;
+ const manifestStatus=status.find(x=>x.key==="nano_manifest_evidence")?.value||"not-observed";
+ const reviewTotal=Array.isArray(reviews)?reviews.length:0;
+ const gateTotal=Array.isArray(gateEvidence)?gateEvidence.length:0;
+ const nowDay=String(at).slice(0,10);
+ // The actual next successful fetch depends on GitHub availability and
+ // shared public quota; this describes only the earliest eligible window.
+ const nextWindow=unparsed>0?(()=>{
+  const start=new Date(at);
+  for(let i=0;i<48;i++){
+   const utc=new Date(Date.UTC(start.getUTCFullYear(),start.getUTCMonth(),
+    start.getUTCDate(),start.getUTCHours()+i,45,0,0));
+   if(utc.getTime()<=clock)continue;
+   if([0,6,12,18].includes(utc.getUTCHours()))return utc.toISOString();
+  }
+  return null;
+ })():null;
+ return {version:HQ19_VERSION,
+  research:{repositories:repoCount,manifestsObserved:observed,
+   manifestsParsed:parsed,manifestsAwaitingParse:unparsed,
+   repositoriesWithoutManifest:withoutManifest,
+   dailyManifestFetchUsed:used,dailyManifestFetchLimit:2,
+   dailyManifestFetchRemaining:Math.max(0,2-used),
+   nextEligibleBackfillWindow:nextWindow,
+   backfillMeaning:"Eligible UTC window only, not a guaranteed fetch; respects daily source and shared public budgets.",
+   latestManifestStatus:manifestStatus,
+   sourceEvidenceOnly:true,licenseCleared:false,completeDependencyAudit:false},
+  scheduler:{lastObserved:last?.checked_at||null,observedCurrent:fresh,
+   observationAgeMinutes:Number.isFinite(age)&&age>=0?Math.floor(age/60000):null,
+   independentlyTested:false},
+  founder:{researchReviewEntries:reviewTotal,evidenceEntries:gateTotal,
+   signedInJourneyVerified:false},
+  openWorkstreams:[
+   {id:"authenticated-e2e",name:"Signed-in founder browser tests",status:"manual-required"},
+   {id:"research-evidence",name:"Repository, license and dependency verification",
+    status:unparsed||withoutManifest?"attention":"independent-review-required"},
+   {id:"website-functional",name:"Real tool, security and incident E2E monitoring",status:"pending"},
+   {id:"recovery-release",name:"Production restore and founder release verification",status:"pending"},
+   {id:"private-ai",name:"Persistent founder-owned inference server",status:"pending"},
+   {id:"experiment",name:"Isolated founder-authorized experiments and independent QA",status:"pending"},
+   {id:"market-revenue",name:"Verified market outcomes and financial reporting",status:"pending"},
+   {id:"portable-runtime",name:"Self-hosted runtime and source-independent deployment",status:"pending"}
+  ],productionReady:false,fullySelfHosted:false,
+  checksScope:"Read-only D1 report freshness and recorded artifacts, not an independent user journey or test of hardware/licensing/execution.",
+  observedAt:at,utcDay:nowDay};
+}
+
 /* Nano Phase 14 — bounded public repository-root manifests + license provenance.
  * Two GETs per UTC day, also charged to shared public quota. No checkout,
  * arbitrary paths, GitHub credentials, execution, installations or legal claims.
@@ -1480,9 +1558,20 @@ async function nano14Scheduled(env,scheduledTime){
    Date.parse(x.saved_next)<=Date.parse(at)||
    nano15BackfillFile(x.catalog_json,x.evidence_json)));
  if(!due.length)return "no-due-repositories";
- due.sort((a,b)=>Number(b.saved_state==="catalogued"||b.saved_state==="partial")-
-  Number(a.saved_state==="catalogued"||a.saved_state==="partial"));
- const inWindow=clock.getUTCMinutes()===45&&[6,18].includes(clock.getUTCHours());
+ // Put already-collected but unparsed SHA-pinned manifests first. Otherwise
+ // a newer partial repository can consume both free-tier GETs every UTC day.
+ const needsBackfill=x=>x.saved_repository_url===x.repository_url&&
+   Boolean(nano15BackfillFile(x.catalog_json,x.evidence_json));
+ due.sort((a,b)=>Number(needsBackfill(b))-Number(needsBackfill(a))||
+   Number(b.saved_state==="catalogued"||b.saved_state==="partial")-
+   Number(a.saved_state==="catalogued"||a.saved_state==="partial"));
+ const repairQueued=needsBackfill(due[0]);
+ // Backfill gets two additional low-frequency UTC opportunities without
+ // raising the existing strict two-GET/day limit; other catalogs retain
+ // their existing 06:45/18:45 windows.
+ const inWindow=clock.getUTCMinutes()===45&&
+   ([6,18].includes(clock.getUTCHours())||
+     (repairQueued&&[0,12].includes(clock.getUTCHours())));
  const bootstrap=Number(count?.n||0)===0||
   (Number(count?.n||0)===1&&["catalogued","partial"].includes(due[0].saved_state));
  if(!bootstrap&&!inWindow)return "outside-window";
@@ -3455,6 +3544,7 @@ async function report(env) {
     nanoPipeline:{status:metadata.find(x=>x.key==="nano_workflows")?.value||"not-attempted",
       checkedAt:metadata.find(x=>x.key==="nano_workflows")?.checked_at||""},
     dependencySignals:nano15Report(implementationRows.results||[],manifestRows.results||[]),
+    operationalReadiness:hq19Readiness(implementationRows.results||[],manifestRows.results||[],quota.results||[],metadata,researchReviewRows.results||[],gateEvidenceRows.results||[],now),
     founderResearchReviews:nano16Report(implementationRows.results||[],manifestRows.results||[],researchReviewRows.results||[],env.HQ_DECISIONS_ENABLED==="true"),
     experimentPlans:nano17Report(implementationRows.results||[],manifestRows.results||[],researchReviewRows.results||[]),
     experimentGateEvidence:nano18Report(implementationRows.results||[],manifestRows.results||[],researchReviewRows.results||[],gateEvidenceRows.results||[],env.HQ_DECISIONS_ENABLED==="true"),
