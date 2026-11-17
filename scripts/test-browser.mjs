@@ -28,6 +28,29 @@ function bundleFromSource() {
 const bundle=bundleFromSource();
 const report={
   schemaVersion:'yorphives.hq-intelligence.v1',
+  operationalReadiness:{version:'operational-evidence-v1',
+    research:{repositories:2,manifestsObserved:1,manifestsParsed:0,
+      manifestsAwaitingParse:1,repositoriesWithoutManifest:1,
+      dailyManifestFetchUsed:2,dailyManifestFetchLimit:2,dailyManifestFetchRemaining:0,
+      nextEligibleBackfillWindow:'2026-11-18T00:45:00Z',
+      latestManifestStatus:'budget-reached',
+      backfillMeaning:'Eligible UTC window only; quota and availability apply.',
+      sourceEvidenceOnly:true,licenseCleared:false,completeDependencyAudit:false},
+    scheduler:{lastObserved:'2026-11-17T08:00:00Z',observedCurrent:true,
+      observationAgeMinutes:5,independentlyTested:false},
+    founder:{researchReviewEntries:0,evidenceEntries:0,signedInJourneyVerified:false},
+    openWorkstreams:[
+      {id:'authenticated-e2e',name:'Signed-in founder browser tests',status:'manual-required'},
+      {id:'research-evidence',name:'Repository, license and dependency verification',status:'attention'},
+      {id:'website-functional',name:'Real tool, security and incident E2E monitoring',status:'pending'},
+      {id:'recovery-release',name:'Production restore and founder release verification',status:'pending'},
+      {id:'private-ai',name:'Persistent founder-owned inference server',status:'pending'},
+      {id:'experiment',name:'Isolated founder-authorized experiments and independent QA',status:'pending'},
+      {id:'market-revenue',name:'Verified market outcomes and financial reporting',status:'pending'},
+      {id:'portable-runtime',name:'Self-hosted runtime and source-independent deployment',status:'pending'}
+    ],productionReady:false,fullySelfHosted:false,
+    checksScope:'Read-only D1 report records, not an independent login, functionality or rights audit.'},
+
   generatedAt:'2026-11-16T10:00:00Z',
   assets:[{id:'site',name:'YorpHives.com',kind:'website',status:'healthy'}],
   products:[],
@@ -314,6 +337,26 @@ try{
       await page.locator('.incident-item').first().waitFor();
       assert.equal(await page.locator('.incident-item').count(),2);
       assert.ok((await page.locator('#page-root').innerText()).includes('Synthetic incident'));
+    });
+    await test(profile.name+': Phase 19 Control readiness is evidence-limited',async()=>{
+      await page.goto(origin+'/#control',{waitUntil:'domcontentloaded'});
+      const readiness=page.locator('.panel').filter({hasText:'Phase 19 · Reliability & readiness'});
+      await readiness.getByText('Phase 19 · Reliability & readiness',{exact:true}).waitFor();
+      const report=await readiness.innerText();
+      assert.ok(report.includes('PILOT · NOT PRODUCTION-READY'));
+      assert.ok(report.includes('Unparsed SHA-pinned manifests'));
+      assert.ok(report.includes('1 pending'));
+      assert.ok(report.includes('2 / 2'));
+      assert.ok(report.includes('Next eligible parser backfill slot'));
+      assert.ok(report.includes('two-GET daily cap is unchanged'));
+      assert.ok(report.includes('not independent monitoring'));
+      await readiness.locator('details.science-evidence-more summary').click();
+      const expanded=await readiness.innerText();
+      assert.ok(expanded.includes('Remaining HQ workstreams (8)'));
+      assert.ok(expanded.includes('Signed-in founder browser tests'));
+      assert.ok(expanded.includes('Production restore and founder release verification'));
+      assert.ok(expanded.includes('Persistent founder-owned inference server'));
+      await page.goto(origin+'/#home',{waitUntil:'domcontentloaded'});
     });
     await test(profile.name+': incident details and recovery evidence',async()=>{
       const incident=page.locator('.incident-item').nth(1);
