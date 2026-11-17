@@ -30,6 +30,7 @@ on:
       - 'scripts/test-growth-evidence.mjs'
       - 'scripts/test-watchdog-evidence.mjs'
       - 'scripts/test-watchdog-alerts.mjs'
+      - 'scripts/test-agent-demand.mjs'
       - '.github/workflows/hq-source-integrity.yml'
   workflow_dispatch:
 permissions:
@@ -71,6 +72,7 @@ jobs:
           node scripts/test-growth-evidence.mjs
           node scripts/test-watchdog-evidence.mjs
           node scripts/test-watchdog-alerts.mjs
+          node scripts/test-agent-demand.mjs
       - name: Record verification scope
         if: always()
         shell: bash
