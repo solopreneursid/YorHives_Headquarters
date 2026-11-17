@@ -50,10 +50,10 @@ pre{background:#0f172a;padding:15px;border-radius:6px;overflow-x:auto;color:#38b
 <script>
 (function(){
   const byId=(id)=>document.getElementById(id);
-  let accessKey=sessionStorage.getItem("yorp-control-token")||"";
+  let accessKey=sessionStorage.getItem("yorp-control-token-v2")||"";
   function view(open){byId("login").style.display=open?"none":"block";byId("private").style.display=open?"block":"none"}
   function notice(message){byId("notice").textContent=message}
-  function lock(message){accessKey="";sessionStorage.removeItem("yorp-control-token");byId("key").value="";view(false);byId("loginNotice").textContent=message||"Dashboard locked."}
+  function lock(message){accessKey="";sessionStorage.removeItem("yorp-control-token-v2");byId("key").value="";view(false);byId("loginNotice").textContent=message||"Dashboard locked."}
   async function requestAudit(path,method){
     const response=await fetch(path,{method:method||"GET",cache:"no-store",headers:{"Authorization":"Bearer "+accessKey}});
     let data;try{data=await response.json()}catch(e){throw new Error("Invalid server response")}
@@ -66,8 +66,21 @@ pre{background:#0f172a;padding:15px;border-radius:6px;overflow-x:auto;color:#38b
     try{const report=await requestAudit("/api/status");byId("report").textContent=JSON.stringify(report,null,2);notice(report.timestamp?"Report refreshed.":"No audits executed yet.")}
     catch(e){byId("report").textContent=e.message;notice(e.message)}
   }
-  byId("unlockForm").addEventListener("submit",function(e){
-    e.preventDefault();accessKey=byId("key").value.trim();sessionStorage.setItem("yorp-control-token",accessKey);view(true);refresh();
+  byId("unlockForm").addEventListener("submit",async function(e){
+    e.preventDefault();
+    accessKey=byId("key").value.trim();
+    byId("loginNotice").textContent="Checking access key...";
+    try{
+      const report=await requestAudit("/api/status");
+      sessionStorage.setItem("yorp-control-token-v2",accessKey);
+      view(true);
+      byId("report").textContent=JSON.stringify(report,null,2);
+      notice(report.timestamp?"Report loaded.":"No audits executed yet.");
+    }catch(error){
+      byId("loginNotice").textContent=error.message==="Unauthorized"
+        ?"Access key rejected. Paste the exact key from this chat."
+        :error.message;
+    }
   });
   byId("run").addEventListener("click",async function(){
     this.disabled=true;notice("Running fresh audit...");byId("report").textContent="Running fresh audit across the edge network...";
