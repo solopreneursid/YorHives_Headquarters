@@ -27,6 +27,7 @@ on:
       - 'scripts/test-phase19-reliability.mjs'
       - 'scripts/test-deep-links.mjs'
       - 'scripts/test-growth-evidence.mjs'
+      - 'scripts/test-watchdog-evidence.mjs'
       - '.github/workflows/hq-source-integrity.yml'
   workflow_dispatch:
 permissions:
@@ -66,6 +67,7 @@ jobs:
           node scripts/test-phase19-reliability.mjs
           node scripts/test-deep-links.mjs
           node scripts/test-growth-evidence.mjs
+          node scripts/test-watchdog-evidence.mjs
       - name: Record verification scope
         if: always()
         shell: bash
