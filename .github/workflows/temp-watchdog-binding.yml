@@ -1,0 +1,13 @@
+name: One-time watchdog service binding verification
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  first-party-fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify first-party service binding, not external proxy
+        run: node scripts/test-temporary-binding.mjs
