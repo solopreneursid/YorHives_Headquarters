@@ -1,0 +1,17 @@
+name: HQ watchdog live contract and Access boundary
+on:
+  pull_request:
+    paths:
+      - 'scripts/test-watchdog-external.mjs'
+      - '.github/workflows/hq-watchdog-external.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  read-only-network:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify real watchdog status, history, and HQ Access without writes
+        run: node scripts/test-watchdog-external.mjs
