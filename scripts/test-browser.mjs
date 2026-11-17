@@ -339,9 +339,7 @@ try{
       assert.ok((await page.locator('#page-root').innerText()).includes('Synthetic incident'));
     });
     await test(profile.name+': Phase 19 Control readiness is evidence-limited',async()=>{
-      await page.locator('[data-page="control"]:visible').first().click().catch(async()=>{
-        await page.goto(origin+'/#control',{waitUntil:'domcontentloaded'});
-      });
+      await page.goto(origin+'/#control',{waitUntil:'domcontentloaded'});
       const readiness=page.locator('.panel').filter({hasText:'Phase 19 · Reliability & readiness'});
       await readiness.getByText('Phase 19 · Reliability & readiness',{exact:true}).waitFor();
       const report=await readiness.innerText();
@@ -358,9 +356,7 @@ try{
       assert.ok(expanded.includes('Signed-in founder browser tests'));
       assert.ok(expanded.includes('Production restore and founder release verification'));
       assert.ok(expanded.includes('Persistent founder-owned inference server'));
-      await page.locator('[data-page="home"]:visible').first().click().catch(async()=>{
-       await page.goto(origin+'/#home',{waitUntil:'domcontentloaded'});
-      });
+      await page.goto(origin+'/#home',{waitUntil:'domcontentloaded'});
     });
     await test(profile.name+': incident details and recovery evidence',async()=>{
       const incident=page.locator('.incident-item').nth(1);
