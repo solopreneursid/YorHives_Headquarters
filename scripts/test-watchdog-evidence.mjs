@@ -46,7 +46,7 @@ assert.equal(statusOnly.state,'healthy');assert.equal(statusOnly.historyAvailabl
 const worker=readFileSync('src/hq-worker.mjs','utf8');
 assert.ok(worker.indexOf('await verifyAccess(request,env,ctx)')<worker.indexOf('if(route==="/api/edge-watchdog"'));
 assert.ok(worker.includes('loadWatchdogEvidence(env)'));
-assert.ok(worker.includes('EDGE_WATCHDOG'));
+assert.ok(readFileSync('src/watchdog-evidence.mjs','utf8').includes('EDGE_WATCHDOG'));
 assert.equal(/\b(?:put|delete|post|patch)\s*\(/i.test(readFileSync('src/watchdog-evidence.mjs','utf8')),false);
 const source=worker.slice(worker.indexOf('const PILOT_STATIC_BUNDLE = ')+ 'const PILOT_STATIC_BUNDLE = '.length);
 const bundled=JSON.parse(source.slice(0,source.indexOf(';\n')));
