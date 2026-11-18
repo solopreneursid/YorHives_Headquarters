@@ -1,87 +1,31 @@
-name: HQ source integrity
+name: HQ current four-button source integrity
 on:
   pull_request:
   push:
+    branches: [main]
     paths:
       - 'src/**'
-      - 'scripts/verify-hq.mjs'
-      - 'scripts/test-incidents.mjs'
-      - 'scripts/test-auth.mjs'
-      - 'scripts/test-private-ai.mjs'
-      - 'scripts/test-workers-ai.mjs'
-      - 'scripts/test-nano-workflows.mjs'
-      - 'scripts/test-nano-learning.mjs'
-      - 'scripts/test-nano-triage.mjs'
-      - 'scripts/test-nano-investigations.mjs'
-      - 'scripts/test-nano-global-sources.mjs'
-      - 'scripts/test-nano-source-quality.mjs'
-      - 'scripts/test-nano-opportunity-briefs.mjs'
-      - 'scripts/test-nano-journals.mjs'
-      - 'scripts/test-nano-science-reviews.mjs'
-      - 'scripts/test-nano-implementation.mjs'
-      - 'scripts/test-nano-feasibility.mjs'
-      - 'scripts/test-nano-manifests.mjs'
-      - 'scripts/test-nano-dependencies.mjs'
-      - 'scripts/test-nano-founder-reviews.mjs'
-      - 'scripts/test-nano-experiment-plans.mjs'
-      - 'scripts/test-nano-gate-evidence.mjs'
-      - 'scripts/test-phase19-reliability.mjs'
-      - 'scripts/test-deep-links.mjs'
-      - 'scripts/test-growth-evidence.mjs'
-      - 'scripts/test-watchdog-evidence.mjs'
-      - 'scripts/test-watchdog-alerts.mjs'
-      - 'scripts/test-agent-demand.mjs'
+      - 'hq-release.json'
+      - 'scripts/verify-current-hq.mjs'
       - '.github/workflows/hq-source-integrity.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  verify-hq:
+  verify-current-hq:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
-      - name: Check source and embedded dashboard
-        shell: bash
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact source blobs, access guard, 4-button UI, and read-only policy
         run: |
-          set -euo pipefail
-          node --version
-          node scripts/verify-hq.mjs
-          node scripts/test-incidents.mjs
-          node scripts/test-auth.mjs
-          node scripts/test-private-ai.mjs
-          node scripts/test-workers-ai.mjs
-          node scripts/test-nano-workflows.mjs
-          node scripts/test-nano-learning.mjs
-          node scripts/test-nano-triage.mjs
-          node scripts/test-nano-investigations.mjs
-          node scripts/test-nano-global-sources.mjs
-          node scripts/test-nano-source-quality.mjs
-          node scripts/test-nano-opportunity-briefs.mjs
-          node scripts/test-nano-journals.mjs
-          node scripts/test-nano-science-reviews.mjs
-          node scripts/test-nano-implementation.mjs
-          node scripts/test-nano-feasibility.mjs
-          node scripts/test-nano-manifests.mjs
-          node scripts/test-nano-dependencies.mjs
-          node scripts/test-nano-founder-reviews.mjs
-          node scripts/test-nano-experiment-plans.mjs
-          node scripts/test-nano-gate-evidence.mjs
-          node scripts/test-phase19-reliability.mjs
-          node scripts/test-deep-links.mjs
-          node scripts/test-growth-evidence.mjs
-          node scripts/test-watchdog-evidence.mjs
-          node scripts/test-watchdog-alerts.mjs
-          node scripts/test-agent-demand.mjs
-      - name: Record verification scope
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo '## HQ source integrity'
-            echo 'Checks: Worker syntax, embedded dashboard syntax, HQpulse UI,'
-            echo 'incident ledger references, access and read-only guards.\n            echo 'Lifecycle: detect, repeat, resolve, reopen and historical import.''
-            echo ''
-            echo 'This job does not verify authenticated browser flows,'
-            echo 'Cloudflare bindings, D1 data, or real incident recovery.'
-          } >> "$GITHUB_STEP_SUMMARY"
+          node --check src/hq-worker.mjs
+          node --check src/growth-evidence.mjs
+          node --check src/watchdog-evidence.mjs
+          node --check src/agent-demand-evidence.mjs
+          node scripts/verify-current-hq.mjs
+      - name: Confirm no automatic deployment
+        run: echo 'This CI is observation/testing only. It has no production token or deployment step.'
