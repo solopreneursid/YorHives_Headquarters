@@ -1,0 +1,59 @@
+# HQ release security and founder setup
+
+## Current status
+The `main` branch must match the Cloudflare Worker `yorphives-hq-free-pilot`
+and the approved version/source hash in `hq-release.json`.
+
+There is **no automatic deployment on Git pushes, PRs or merges**. The only
+supported HQ publisher is `.github/workflows/hq-production-release.yml`,
+triggered manually by the founder and protected by a GitHub environment.
+
+## One-time founder setup
+1. Keep this repository **private**. Ensure the old HQpulse pages never become
+   the deployment source.
+2. In GitHub repository **Settings → Environments**, create `hq-production`.
+   Configure **required reviewers** to include the founder, restrict deployment
+   branches to `main`, and prevent self-approval if the plan supports it.
+   Note: environment protections depend on GitHub plan/account eligibility.
+   If approvals cannot be enforced, **do not configure the release token**.
+3. Create a **narrow Cloudflare API token** able to read and publish **only the
+   intended HQ Worker**, if that resource scoping is available on your plan.
+   It should not grant D1 Write, Pages Write, zone configuration changes,
+   broader Workers scripts access or account administration. Cloudflare API
+   permission/resource constraints must be verified before granting it.
+   If it cannot be scoped to just HQ, document and accept that limitation
+   explicitly rather than pretending it is isolated.
+4. Store the token as GitHub **environment secret** `HQ_RELEASE_TOKEN` and the
+   account identifier as `HQ_CLOUDFLARE_ACCOUNT_ID` for `hq-production`.
+   Never paste token values into this repository, an issue, or the chat.
+5. Before revoking the current broad `YorpHives Account Integration` token,
+   independently confirm which current integrations use it. Rotate safely;
+   revoking it may disconnect legitimate Cloudflare management access.
+6. Review repository branches and GitHub Actions secrets. No old workflows may
+   hold production deployment credentials.
+7. Configure branch protection/ruleset for `main`: require current HQ integrity
+   and synthetic-browser workflows, disallow force pushes, and restrict direct
+   writes. The GitHub connector cannot enforce these account settings.
+
+## Deployment (after CI and founder review)
+1. Verify `node scripts/verify-current-hq.mjs` passes on the exact approved commit.
+2. Update `hq-release.json` module hashes through review whenever code changes.
+3. Open Actions → `HQ production release (manual, founder approved)` → Run.
+4. Supply `expected_current_version` (the **live** Worker version, which must
+   match the manifest); `approved_source_sha` (exact `main` commit SHA);
+   and `RELEASE_FOUR_BUTTON_HQ`.
+5. Approve the GitHub deployment environment review (if available).
+6. The script compares live Worker version, nine binding name/type pairs,
+   compatibility date and cron schedule; if anything differs it **aborts**.
+   If code already matches, the script reports no change.
+7. After authorized publishing, verify the founder-only Access gate, signed-in
+   browser self-test, 4 navigation pages, API/D1 status and independent watchdog.
+8. Record the resulting Worker version and source hashes in the private release
+   manifest. A successful Worker API response is not full production certification.
+
+## Limitations
+The Cloudflare account API currently has a broad connected integration token with
+Workers Write. A GitHub manifest or SHA check cannot prevent overwrites performed
+through that separate permission. The enforceable solution is founder-controlled
+credential scoping/revocation and GitHub production environment protection.
+No browser session or OTP credentials are stored in GitHub.
