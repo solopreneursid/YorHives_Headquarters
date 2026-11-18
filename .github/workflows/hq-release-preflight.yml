@@ -1,0 +1,35 @@
+name: HQ release credential preflight (read-only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: hq-production-preflight
+  cancel-in-progress: false
+jobs:
+  token-and-source-preflight:
+    name: Verify scoped token without deploying
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: hq-production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify current HQ source before any credentials are used
+        run: |
+          node --check scripts/hq-release-preflight.mjs
+          node scripts/verify-current-hq.mjs
+      - name: Confirm HQ token scope and Worker integrity using GET requests only
+        env:
+          HQ_RELEASE_TOKEN: ${{ secrets.HQ_RELEASE_TOKEN }}
+          HQ_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.HQ_CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/hq-release-preflight.mjs
+      - name: Document non-deployment boundary
+        if: always()
+        run: |
+          echo 'READ-ONLY. No Cloudflare PUT/POST/PATCH/DELETE, no code deployment, no secret printing. The founder must separately approve production publication.' >> "$GITHUB_STEP_SUMMARY"
