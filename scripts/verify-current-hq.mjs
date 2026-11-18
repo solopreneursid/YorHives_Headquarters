@@ -10,7 +10,7 @@ const root=dirname(dirname(fileURLToPath(import.meta.url)));
 const load=(p)=>readFileSync(join(root,p),'utf8');
 export function gitBlob(content){
  const bytes=Buffer.from(content,'utf8');
- return createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytes.length+' '),Buffer.from([0]),bytes])).digest('hex');
+ return createHash('sha1').update(Buffer.concat([Buffer.from('blob '+bytes.length),Buffer.from([0]),bytes])).digest('hex');
 }
 export function asset(src,path){
  const tag='PILOT_STATIC_BUNDLE['+JSON.stringify(path)+'] = ';
