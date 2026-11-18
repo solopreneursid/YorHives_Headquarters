@@ -1,0 +1,49 @@
+name: HQ production release (manual, founder approved)
+on:
+  workflow_dispatch:
+    inputs:
+      expected_current_version:
+        description: "Current live Worker version, copied from verified release manifest"
+        required: true
+        type: string
+      approved_source_sha:
+        description: "Exact SHA of main commit approved for HQ release (40 hex characters)"
+        required: true
+        type: string
+      founder_confirmation:
+        description: "Type RELEASE_FOUR_BUTTON_HQ"
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: hq-production-release
+  cancel-in-progress: false
+jobs:
+  deploy-private-hq:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: hq-production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify approved private source (does not deploy)
+        run: |
+          node --check scripts/release-hq-manual.mjs
+          node scripts/verify-current-hq.mjs
+      - name: Deploy ONLY with founder-approved environment and scoped Worker token
+        env:
+          HQ_RELEASE_TOKEN: ${{ secrets.HQ_RELEASE_TOKEN }}
+          HQ_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.HQ_CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_CURRENT_VERSION: ${{ inputs.expected_current_version }}
+          HQ_APPROVED_SOURCE_SHA: ${{ inputs.approved_source_sha }}
+          HQ_FOUNDER_CONFIRMATION: ${{ inputs.founder_confirmation }}
+        run: node scripts/release-hq-manual.mjs
+      - name: Scope notice
+        if: always()
+        run: echo 'Source/bindings checked. Cloudflare Access login and external uptime must be verified separately.' >> "$GITHUB_STEP_SUMMARY"

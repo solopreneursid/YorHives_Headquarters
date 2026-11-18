@@ -1,40 +1,59 @@
-# Archived HQ implementation — NOT the live YorpHives Headquarters
+# YorpHives HQ — Current Private Source of Truth
 
-> **RETIRED SOURCE (18 November 2026). Do not deploy this repository to the current HQ Worker.**
+**Current application: Home · Health · Products · Revenue.**
 
-This public repository contains an **older six-page YorpHives HQ implementation**.
-The active, founder-only Headquarters now uses **exactly four sections**:
-**Home, Health, Products, Revenue**.
+This private repository now contains the **exact four-module source** recovered from the running
+`yorphives-hq-free-pilot` Cloudflare Worker (verified on 18 November 2026). The old
+six-page HQpulse implementation is **retired** and must not be deployed. Its commits remain
+available in Git history for investigation, not as production source.
 
-The current working application is deployed separately as the Cloudflare Worker
-`yorphives-hq-free-pilot`. Its **verified source recovery snapshots and release
-manifest are kept in private, founder-controlled Cloudflare KV storage** rather
-than this public repository. A private, version-controlled source repository and
-single approved deployment pipeline must be established before calling HQ's
-source management production-certified.
+## Responsibilities (read only)
 
-## Important security and deployment boundaries
+- **Home:** concise status across Health, Products and Revenue.
+- **Health:** monitoring, bugs, broken links, dependency vulnerabilities, evidence and recommended fixes.
+- **Products:** internet/open-source discovery, evaluation and proposed integrations.
+- **Revenue:** research and recommendations; never pretend projections are verified earnings.
 
-- **Do not run deployment commands from this repository** against the live HQ.
-- Nothing here grants agents permission to edit the live website, HQ, repositories,
-  infrastructure, credentials, or deployment settings. HQ only observes and recommends.
-- Historical CI tests for this implementation do **not** certify the deployed HQ.
-- Do **not** upload owner emails, Cloudflare Access credentials, production D1 exports,
-  private Worker snapshots, API tokens or other secrets here.
-- The independent external HTTPS/Access-gate check, where enabled, is **read-only**
-  and does not constitute a signed-in HQ browser check.
-- Making this repository private protects future access, but does not revoke copies
-  or credentials that may already have been exposed.
+Deployed HQ workers and AI agents are **observation, research, analysis and recommendation only**.
+They may not change the website or HQ source, deploy, pay, or mutate infrastructure.
+The founder is the sole production release approver.
 
-## Retirement status
+## Ownership and deployment
 
-The obsolete Cloudflare Workers `yorphives-hq-control-preview`,
-`yorphiveshq-native-preview`, and `yorphiveshq-native-watchdog` were backed up
-in private KV, their schedules disabled, and the Workers deleted.
-The old Native Preview Access application was retired. The active four-button HQ,
-its D1 database, independent perimeter monitor and website watchdog remain in place.
+- The source of truth is `src/{hq-worker,growth-evidence,watchdog-evidence,agent-demand-evidence}.mjs`.
+- `hq-release.json` pins the source Git blobs, expected Cloudflare bindings, schedule and last verified version.
+- Run `node scripts/verify-current-hq.mjs` and the GitHub Actions browser smoke workflow.
+- New deployments must be **manual only** via the dedicated, founder-approved
+  `HQ production release (manual)` GitHub Action, after CI passes and a production
+  environment review. No push or merge deploys anything automatically.
+- The live Worker remains `yorphives-hq-free-pilot` protected by Cloudflare Access.
+- `ACCESS_OWNER_EMAIL` and all other binding **values** are intentionally absent from this repo.
+  The release adapter must read and preserve current bindings, refusing changed binding names/types.
+- Before use, founder must configure an **environment approval rule** for `hq-production`,
+  register narrow read/write Worker release credentials in GitHub environment secrets and
+  reduce/revoke broad legacy Cloudflare tokens. A manifest is not an API permission lock.
+- A verified current-source backup and release lock are also retained in private Cloudflare KV;
+  those backups are independent of this repository.
 
-**Founder action needed:** Change this repository to **Private** and **Archive** it
-from GitHub repository Settings when ready. That preserves its history without
-presenting it as the live deployment source. Any future release should start from
-the private verified current Worker snapshot, not `src/hq-worker.mjs` here.
+## Tests and scope
+
+`node scripts/verify-current-hq.mjs` checks the four pages, embedded frontend syntax,
+required Health/Products endpoints, module integrity, authentication guard and binding inventory.
+`scripts/test-four-button-browser.mjs` uses local mocked data to exercise the four pages
+in Chromium (desktop/mobile) without production credentials or writes.
+**Only** the signed-in browser's "Verify signed-in session" button checks a real
+founder-authenticated HQ API, collector and database. That self-test is not
+unattended authenticated uptime monitoring.
+
+## Historical content
+
+Older `docs/NANO_PHASE*`, old migrations and old `scripts/test-nano-*` files
+describe previous builds and are **not release inputs**. They remain available
+for audit/history until separately purged by the founder. Do not execute old tests
+as deployment gates or merge old changes into this current source.
+
+## Privacy and safety
+
+Do not commit Cloudflare API tokens, password values, owner identity details,
+D1 dumps or access cookies. GitHub repository visibility must remain **private**.
+Avoid pushing a source snapshot to any public website repository.
