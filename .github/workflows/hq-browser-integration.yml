@@ -1,36 +1,32 @@
-name: HQ browser integration
+name: HQ current four-button browser regression
 on:
-  push:
+  pull_request:
     paths:
       - 'src/**'
-      - 'scripts/test-browser.mjs'
+      - 'hq-release.json'
+      - 'scripts/verify-current-hq.mjs'
+      - 'scripts/test-four-button-browser.mjs'
       - '.github/workflows/hq-browser-integration.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  browser:
+  synthetic-browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install open-source test browser
+      - name: Install pinned test-only browser dependencies
         run: |
-          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npm install --no-save --package-lock=false --ignore-scripts --no-fund --no-audit playwright@1.56.1
           npx playwright install --with-deps chromium
-      - name: Test HQ desktop and mobile frontend using synthetic report
-        run: node scripts/test-browser.mjs
-      - name: Record verification scope
-        if: always()
+      - name: Test current HQ desktop and mobile, read-only mocked APIs
         run: |
-          {
-            echo '## HQ browser test'
-            echo 'Local isolated HTTP server serves the embedded HQ frontend.'
-            echo 'Synthetic API report: 2 incidents, 1 finding, 1 opportunity.'
-            echo 'Chromium desktop/mobile navigation, back behavior, filtering,'
-            echo 'incident details, overflow and browser exceptions.'
-            echo 'No production credentials, D1 writes, founder login or website changes.'
-          } >> "$GITHUB_STEP_SUMMARY"
+          node scripts/verify-current-hq.mjs
+          node scripts/test-four-button-browser.mjs
+      - name: State coverage boundary
+        if: always()
+        run: echo 'Synthetic four-button UI only; not a real founder-authenticated browser, no production writes.' >> "$GITHUB_STEP_SUMMARY"
