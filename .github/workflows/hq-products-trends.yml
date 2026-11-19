@@ -1,0 +1,35 @@
+name: HQ Products trend finder regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/hq-worker.mjs'
+      - 'hq-release.json'
+      - 'scripts/test-products-trends.mjs'
+      - '.github/workflows/hq-products-trends.yml'
+  pull_request:
+    paths:
+      - 'src/hq-worker.mjs'
+      - 'hq-release.json'
+      - 'scripts/test-products-trends.mjs'
+      - '.github/workflows/hq-products-trends.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-products:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify authorized HQ modules and complete Worker syntax
+        run: |
+          node --check src/hq-worker.mjs
+          node scripts/verify-current-hq.mjs
+      - name: Validate trend signals, sources and private Products UI offline
+        run: node scripts/test-products-trends.mjs
