@@ -28,6 +28,13 @@ const mock={
  '/api/hq-perimeter':{available:true,ok:true,checkedAt:now,readOnly:true},
  '/api/hq-perimeter-history':{available:true,checks:[]},
  '/api/legacy-route-review':{available:true,reviewed:22,open:0},
+ '/api/trending-products':{schemaVersion:1,readOnly:true,trafficVerified:false,
+   recommendations:[{id:'trend-demo',title:'Private PDF Studio',score:84,kind:'trend-measured',
+    action:'Promising — investigate',signal:'Source reports 850 total stars. Not verified traffic.',
+    opportunity:'Simpler private PDF workflow. Monetization: premium batch exports.',
+    evidenceUrl:'https://github.com/example/private-pdf-studio',observedAt:now}],
+   sources:[{name:'GitHub',site:'https://github.com/trending',status:'ok:1:recorded:1',checkedAt:now},
+    {name:'BetaList',site:'https://betalist.com/startups',status:'not-yet-scanned',checkedAt:null}]},
  '/api/tool-coverage':{available:true,declaredCanonicalPages:143,checkedCanonicalPages:143,
    pageResponding:143,brokenLegacyUrls:0}
 };
@@ -61,6 +68,11 @@ try{
   await page.getByText('Passed: signed-in API, D1, collector, dependency audit').waitFor({timeout:10000});
   await page.locator('nav button[data-tab="products"]').click();
   assert.equal(await page.locator('main h1').textContent(),'Products');
+  await page.getByText('Private PDF Studio').waitFor({timeout:10000});
+  await page.getByText('Not verified traffic.',{exact:false}).waitFor();
+  await page.getByRole('link',{name:'View original source'}).waitFor();
+  assert.equal(await page.getByRole('link',{name:'View original source'}).getAttribute('rel'),'noopener noreferrer');
+  await page.getByText('of 2 source types scanned',{exact:false}).waitFor();
   await page.locator('nav button[data-tab="revenue"]').click();
   assert.equal(await page.locator('main h1').textContent(),'Revenue');
   await page.goBack({waitUntil:'networkidle'});
