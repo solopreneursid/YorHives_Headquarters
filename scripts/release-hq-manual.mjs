@@ -83,9 +83,27 @@ if(Array.isArray(settings.compatibility_flags))metadata.compatibility_flags=sett
 for(const [name,content] of local)upload.append(name,new Blob([content],{type:'application/javascript+module'}),name);
 upload.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));
 await data(prefix,{method:'PUT',body:upload});
-// Never log settings, source or token. Re-fetch exact modules after write.
-const after=parseModules(await (await request(prefix+'/content/v2')).text());
-fail(sameSource(after),'Post-upload HQ modules do not match the reviewed Git source');
+console.log('Cloudflare upload accepted. Checking deployed content after propagation.');
+// Some Cloudflare regions briefly return 404 for /content/v2 immediately
+// after a successful Worker PUT. Only retry the verification GET, NEVER the PUT.
+// Do not retry an authorization failure or unexpected API response.
+async function verifyPublishedModules(){
+ const delays=[0,1500,2500,4000,6500,10000,15000];
+ for(let i=0;i<delays.length;i++){
+  if(delays[i])await new Promise(resolve=>setTimeout(resolve,delays[i]));
+  try{
+   const response=await request(prefix+'/content/v2');
+   if(sameSource(parseModules(await response.text())))return;
+   // Expected deployment may not have propagated yet; retry boundedly.
+  }catch(error){
+   if(!/^Error: Cloudflare GET request failed HTTP (404|408|429|500|502|503|504)$/.test(String(error)))
+    throw error;
+  }
+  console.log('Deployed Worker verification pending; checking read-only endpoint again.');
+ }
+ throw Error('Upload was accepted, but source verification remained unavailable or differed after retries. Do NOT rerun publication before checking the live Worker version and source.');
+}
+await verifyPublishedModules();
 const newSettings=await data(prefix+'/settings');
 const newSchedules=await data(prefix+'/schedules');
 fail(equalJson(sortedBindings(newSettings.bindings),sortedBindings(info.expectedBindings)),
