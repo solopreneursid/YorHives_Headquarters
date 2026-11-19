@@ -17,7 +17,7 @@ const contentTypes={'/':'text/html','/index.html':'text/html','/hq-simple.js':'t
 const now=new Date().toISOString();
 const mock={
  '/api/report':{schemaVersion:'yorphives.hq-intelligence.v1',findings:[],securityWatch:[],changes:[],
-   incidents:[],incidentEvents:[],opportunities:[],comparisons:[]},
+   incidents:[],incidentEvents:[],opportunities:[{id:'trend-mock-home',title:'Private PDF Studio',kind:'trend-measured',recommendation:'Monetization: Paid exports.',description:'GitHub attention'}],comparisons:[]},
  '/api/health-self-check':{schemaVersion:1,authenticated:true,healthy:true,api:'responding',
    database:'responding',collector:'current',lastHeartbeat:now,readOnly:true},
  '/api/dependency-audit':{schemaVersion:3,available:true,complete:true,provider:'OSV.dev',
@@ -60,6 +60,9 @@ try{
   const nav=await page.locator('nav button').evaluateAll(items=>items.map(x=>x.dataset.tab));
   assert.deepEqual(nav,['home','health','products','revenue']);
   assert.equal(await page.locator('main h1').textContent(),'Home');
+  const homeCopy=await page.locator('main').innerText();
+  assert.match(homeCopy,/Products[\s\S]*1 ideas/);
+  assert.match(homeCopy,/Revenue[\s\S]*0 ideas/,'Product monetization ideas must not contaminate Revenue');
   await page.locator('nav button[data-tab="health"]').click();
   await page.waitForFunction(()=>document.querySelector('main h1')?.textContent==='Health');
   await page.waitForLoadState('networkidle');
