@@ -5,7 +5,7 @@
   "sourceWorkerVersion": "0aa5ea9f-9d8d-4e56-966d-8920ffc5fff1",
   "workerContentSha256": "8bf693892b1256beae37942688061953e5f17eb38b5d68344d2002f91c0e9e66",
   "moduleGitBlobs": {
-    "hq-worker.mjs": "c06e2111d78d5f289d28d804b6b3ccb0af16291c",
+    "hq-worker.mjs": "759c0fdacbc46e25bdb86d5f953a0c1635e43b7b",
     "watchdog-evidence.mjs": "f3c47a3fad7589f0c9b6aadd5ff613e528ef40e7",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867"
@@ -60,5 +60,7 @@
   ],
   "releaseMethod": "founder-reviewed workflow_dispatch only, no automatic deployment",
   "readOnlyRuntime": true,
-  "notes": "Source bytes verified against the live Worker on 2026-11-18. Binding values and secrets are NOT stored in this repository; publisher must preserve live bindings. A manifest is an evidence/policy gate, not protection from other Cloudflare API tokens."
+  "notes": [
+    "Proposed Products trend scanner and founder-only Products view committed to source. Deployment pending founder-approved workflow; live Worker still on previously approved version. GitHub public development repo, no secrets."
+  ]
 }
