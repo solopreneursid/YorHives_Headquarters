@@ -1,8 +1,8 @@
-# YorpHives HQ — Current Private Source of Truth
+# YorpHives HQ — Four-Button Source of Truth
 
 **Current application: Home · Health · Products · Revenue.**
 
-This private repository now contains the **exact four-module source** recovered from the running
+This repository contains the **exact four-module source** recovered from the running
 `yorphives-hq-free-pilot` Cloudflare Worker (verified on 18 November 2026). The old
 six-page HQpulse implementation is **retired** and must not be deployed. Its commits remain
 available in Git history for investigation, not as production source.
@@ -55,5 +55,5 @@ as deployment gates or merge old changes into this current source.
 ## Privacy and safety
 
 Do not commit Cloudflare API tokens, password values, owner identity details,
-D1 dumps or access cookies. GitHub repository visibility must remain **private**.
+D1 dumps or access cookies. The repository is **public during development by founder choice**; do not commit secrets. Make it private before launch.
 Avoid pushing a source snapshot to any public website repository.
