@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "application": "YorpHives HQ",
   "productionWorker": "yorphives-hq-free-pilot",
-  "sourceWorkerVersion": "0aa5ea9f-9d8d-4e56-966d-8920ffc5fff1",
-  "workerContentSha256": "8bf693892b1256beae37942688061953e5f17eb38b5d68344d2002f91c0e9e66",
+  "sourceWorkerVersion": "b2fa6a0a-b872-48f4-888f-e675e84fa0a5",
+  "workerContentSha256": "f829b9ea82cd4fca54f40a206ddce19cfb3c03b2b907bf075fa1b81d8f60fa8e",
   "moduleGitBlobs": {
     "hq-worker.mjs": "2085f8541bd342754a007f568ce747b8a6b94102",
     "watchdog-evidence.mjs": "f3c47a3fad7589f0c9b6aadd5ff613e528ef40e7",
@@ -61,6 +61,24 @@
   "releaseMethod": "founder-reviewed workflow_dispatch only, no automatic deployment",
   "readOnlyRuntime": true,
   "notes": [
-    "Proposed Products trend scanner and founder-only Products view committed to source. Deployment pending founder-approved workflow; live Worker still on previously approved version. GitHub public development repo, no secrets."
-  ]
+    "Founder-approved Products finder deployed on 2026-11-19; all 4 live modules verified equal to main source, nine bindings and five-minute cron intact.",
+    "GitHub release run 44484972166 uploaded successfully, but the immediate post-upload /content/v2 GET returned HTTP 404; publisher fixed to retry only read-only verification requests.",
+    "Seven public trend scouts are scheduled but source-by-source unattended scans have not been independently confirmed; URLs can fail or be disallowed.",
+    "GitHub source repo remains public by founder choice; live HQ remains behind Cloudflare Access. Do not store credentials in repository."
+  ],
+  "previousWorkerVersion": "0aa5ea9f-9d8d-4e56-966d-8920ffc5fff1",
+  "workerContentSha256Method": "SHA-256 of JSON-stringified, alphabetically sorted [module filename, Git blob SHA-1] pairs; excludes random multipart boundary",
+  "releaseVerification": {
+    "githubWorkflowRun": 44484972166,
+    "acceptedAt": "2026-11-19T08:15:46.870Z",
+    "outcome": "Source upload accepted; post-upload GET returned transient HTTP 404, so Actions reported failure; separately inspected deployed modules and settings",
+    "verifiedBy": "Cloudflare live API GET /content/v2, /settings, /schedules and /deployments",
+    "modulesMatched": 4,
+    "bindingsMatched": 9,
+    "cron": "*/5 * * * *",
+    "manualFounderApproved": true,
+    "productionBrowserSessionVerified": false,
+    "sourceCollectorsVerified": false,
+    "noImmediateRerunRequired": true
+  }
 }
