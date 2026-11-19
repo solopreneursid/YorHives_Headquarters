@@ -39,7 +39,6 @@ jobs:
         env:
           HQ_RELEASE_TOKEN: ${{ secrets.HQ_RELEASE_TOKEN }}
           HQ_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.HQ_CLOUDFLARE_ACCOUNT_ID }}
-          EXPECTED_CURRENT_VERSION: ${{ env.EXPECTED_CURRENT_VERSION }}
           HQ_APPROVED_SOURCE_SHA: ${{ github.sha }}
           HQ_FOUNDER_CONFIRMATION: ${{ inputs.founder_confirmation }}
         run: node scripts/release-hq-manual.mjs
