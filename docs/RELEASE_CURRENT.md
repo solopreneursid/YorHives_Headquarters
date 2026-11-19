@@ -70,11 +70,29 @@ through that separate permission. The enforceable solution is founder-controlled
 credential scoping/revocation and GitHub production environment protection.
 No browser session or OTP credentials are stored in GitHub.
 
-## Current pending release: Products trending finder (19 November 2026)
-The GitHub `main` source includes the evidence-led Products tab, scheduled
-seven-source scan registry and private `/api/trending-products` endpoint.
-Source integrity and offline Products tests passed. Browser regression exercises
-both mobile and desktop without accessing production. These changes remain
-**unpublished** while the live version is `0aa5ea9f-9d8d-4e56-966d-8920ffc5fff1`.
-Founder approval through the protected manual release workflow is mandatory.
-Do not overwrite production with a broad account token to bypass that approval.
+## Products finder release and validation (19 November 2026)
+
+GitHub Actions run **44484972166** passed source and Products regression checks.
+The founder-approved Cloudflare upload succeeded and created live Worker version
+`b2fa6a0a-b872-48f4-888f-e675e84fa0a5` at 08:15:46 UTC.
+
+The workflow was marked **failed** because the first post-upload
+`GET /content/v2` returned HTTP **404** during publication propagation.
+Independent Cloudflare API reads afterward confirmed:
+- All **four live module Git blob SHA-1 hashes** equal the reviewed GitHub source;
+- All **nine Worker binding names/types** and the compatibility date match;
+- The **five-minute Cron** remains enabled;
+- The latest live deployment is the new version above.
+
+The publisher now retries **only read-only post-upload verification GETs** for
+a bounded interval. It never retries the Worker PUT. A new source snapshot
+was saved to private Cloudflare KV, while the previous snapshot was preserved.
+
+**Do not rerun** the failed upload job. Production already contains the intended
+Products finder source. Its seven live source feeds still need independent
+unattended scan validation; dashboard owner-session UX is not automatically
+certified by these source comparisons.
+
+The old account-wide Cloudflare integration credential remains a separate
+governance concern. The published repository remains public by founder choice,
+while the HQ dashboard remains gated by Cloudflare Access.
