@@ -1,5 +1,13 @@
 name: HQ current four-button browser regression
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'hq-release.json'
+      - 'scripts/verify-current-hq.mjs'
+      - 'scripts/test-four-button-browser.mjs'
+      - '.github/workflows/hq-browser-integration.yml'
   pull_request:
     paths:
       - 'src/**'
