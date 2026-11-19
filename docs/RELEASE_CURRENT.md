@@ -8,9 +8,20 @@ There is **no automatic deployment on Git pushes, PRs or merges**. The only
 supported HQ publisher is `.github/workflows/hq-production-release.yml`,
 triggered manually by the founder and protected by a GitHub environment.
 
+## Verified security status (19 November 2026)
+
+- Founder-approved **read-only** token preflight passed: GitHub Actions run **44365780915** (attempt 2).
+- The scoped account-owned `Individual Workers → Editor` token could read `yorphives-hq-free-pilot` and **could not read a different Worker**.
+- All four current source modules, nine bindings, approved Worker version and five-minute cron passed comparison.
+- `hq-production` required founder approval before the test could execute; the founder configured a main-only deployment branch restriction.
+- The CI test made GET requests only; it did **not deploy** or change production. Editing/deployment ability has not been exercised.
+- **Open risk:** the existing `YorpHives Account Integration` Cloudflare account token remains active with broad Workers Write rights. It must not be revoked before checking which integrations depend on it. Protected GitHub approvals do not constrain this second token.
+- **Visibility:** the repository is currently **public at the founder's request**. The HQ dashboard remains founder-gated by Cloudflare Access; public source code is not private and must contain no credentials. Make the repository private when the founder chooses to launch.
+
 ## One-time founder setup
-1. Keep this repository **private**. Ensure the old HQpulse pages never become
-   the deployment source.
+1. Keep deployed HQ private behind Cloudflare Access. The source repository is
+   currently public by founder choice; do not commit secrets or private data,
+   and restrict repository visibility before launch.
 2. In GitHub repository **Settings → Environments**, create `hq-production`.
    Configure **required reviewers** to include the founder, restrict deployment
    branches to `main`, and prevent self-approval if the plan supports it.
