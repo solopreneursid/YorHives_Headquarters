@@ -825,9 +825,28 @@ async function trendGet(env,url,type="html"){
  const response=await fetch(url,{method:"GET",redirect:"manual",signal:AbortSignal.timeout(12000),
   headers:{"user-agent":"YorpHivesHQ-ReadOnly/1.0","accept":type==="api"?"application/json":"text/html, application/rss+xml, application/xml"}});
  if(response.status!==200){await response.body?.cancel();throw Error("source-http-"+response.status);}
- const body=await boundedText(response,90000);
- if(body===null)throw Error("source-too-large");
- return body;
+ if(type==="api"){
+  const apiBody=await boundedText(response,180000);
+  if(apiBody===null)throw Error("source-api-too-large");
+  return apiBody;
+ }
+ // Directory homepages can exceed 1 MB. Read only the first bounded 90 KB,
+ // then cancel: low cost and enough for newest public listing cards.
+ if(!response.body)return "";
+ const reader=response.body.getReader(),chunks=[];
+ let used=0;
+ try{
+  while(used<90000){
+   const chunk=await reader.read();if(chunk.done)break;
+   const slice=chunk.value.slice(0,90000-used);
+   chunks.push(slice);used+=slice.byteLength;
+   if(slice.byteLength<chunk.value.byteLength)break;
+  }
+  await reader.cancel();
+ }finally{try{reader.releaseLock();}catch{}}
+ const bytes=new Uint8Array(used);let offset=0;
+ for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength}
+ return new TextDecoder().decode(bytes);
 }
 async function scanTrendSource(env,source,at=nowIso()){
  const key="trend_source_"+source.id;
