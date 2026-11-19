@@ -50,9 +50,10 @@ triggered manually by the founder and protected by a GitHub environment.
 1. Verify `node scripts/verify-current-hq.mjs` passes on the exact approved commit.
 2. Update `hq-release.json` module hashes through review whenever code changes.
 3. Open Actions → `HQ production release (manual, founder approved)` → Run.
-4. Supply `expected_current_version` (the **live** Worker version, which must
-   match the manifest); `approved_source_sha` (exact `main` commit SHA);
-   and `RELEASE_FOUR_BUTTON_HQ`.
+4. The manual workflow derives the expected live Worker version from the reviewed
+   `hq-release.json` and takes the checked-out `main` commit SHA automatically.
+   Confirm the one prefilled `RELEASE_FOUR_BUTTON_HQ` field. Never paste a token
+   or account ID into the workflow form.
 5. Approve the GitHub deployment environment review (if available).
 6. The script compares live Worker version, nine binding name/type pairs,
    compatibility date and cron schedule; if anything differs it **aborts**.
@@ -68,3 +69,12 @@ Workers Write. A GitHub manifest or SHA check cannot prevent overwrites performe
 through that separate permission. The enforceable solution is founder-controlled
 credential scoping/revocation and GitHub production environment protection.
 No browser session or OTP credentials are stored in GitHub.
+
+## Current pending release: Products trending finder (19 November 2026)
+The GitHub `main` source includes the evidence-led Products tab, scheduled
+seven-source scan registry and private `/api/trending-products` endpoint.
+Source integrity and offline Products tests passed. Browser regression exercises
+both mobile and desktop without accessing production. These changes remain
+**unpublished** while the live version is `0aa5ea9f-9d8d-4e56-966d-8920ffc5fff1`.
+Founder approval through the protected manual release workflow is mandatory.
+Do not overwrite production with a broad account token to bypass that approval.
