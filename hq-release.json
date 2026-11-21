@@ -5,8 +5,8 @@
   "sourceWorkerVersion": "6057bd41-ca23-46ae-bc7a-472fa7832a2a",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "b536a5d4aa487f3e86861a93f8ce26142f52a2a0",
-    "watchdog-evidence.mjs": "f3c47a3fad7589f0c9b6aadd5ff613e528ef40e7",
+    "hq-worker.mjs": "a53d3bdca9fe2a28a6078bfdd53d23e28c2676aa",
+    "watchdog-evidence.mjs": "8418636a57b674a863f471b2579ccfdf5bb14b7b",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
     "product-intelligence.mjs": "1afd4abb92978bda8abc97287bbbf760534e9e72",
@@ -119,5 +119,5 @@
     "revenue-intelligence.mjs": "2d17ba692a89dd517f62233eb4f8092171158e69",
     "revenue-research.mjs": "25a851ad90db88876b51adb1e60b714b9196899c"
   },
-  "candidateStatus": "Revenue discovery candidate: ads, affiliates, clients, sponsorships, partnerships plus India/Jharkhand government tenders and payer/why/next-step guidance. Sensitive backend/collector addition requires founder-reviewed manual release. LIVE stays pinned."
+  "candidateStatus": "Founder-reviewed Free Tools Operations HQ candidate: read-only GitHub watchdog/SEO incident inbox and evidence classifications; private API and UI; manual HQ release required for backend changes."
 }
