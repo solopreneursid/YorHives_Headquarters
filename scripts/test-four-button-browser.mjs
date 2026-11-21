@@ -36,6 +36,15 @@ const mock={
    leads:[{title:'Permitted public launch discovery',productUrl:'https://example.org/public-product',status:'link-only-unverified',observedAt:now}],
    sources:[{name:'GitHub',site:'https://github.com/trending',status:'ok:1:recorded:1',checkedAt:now},
     {name:'BetaList',site:'https://betalist.com/startups',status:'not-yet-scanned',checkedAt:null}]},
+ '/api/revenue-intelligence':{schemaVersion:1,readOnly:true,
+  verifiedEarnings:{available:false,amount:null,currency:null,reason:'No actual payout data connected.'},
+  activity:{available:false,status:'Not connected'},
+  opportunities:[
+   {id:'hqventures-product-sales',rank:1,channel:'HQventures',title:'Validate a paid HQventures product',stage:'Research first',evidenceStatus:'No customers verified',evidence:'No verified orders.',nextAction:'Review one approved product.',risk:'Payment handling.',sourceUrl:'https://yorphives.com/hqventures/'},
+   {id:'free-tools-advertising',rank:2,channel:'Free Tools only',title:'Evaluate advertising on Free Tools',stage:'Research first',evidenceStatus:'AdSense not verified',evidence:'Ads not enabled.',nextAction:'Review page evidence.',risk:'Publisher compliance.',sourceUrl:'https://yorphives.com/free-tools/'},
+   {id:'free-tools-sponsorship',rank:3,channel:'Free Tools only',title:'Research relevant tool sponsorship',stage:'Research first',evidenceStatus:'No sponsor',evidence:'Hypothesis.',nextAction:'Test sponsor interest.',risk:'Disclosure.',sourceUrl:'https://yorphives.com/free-tools/'}
+  ],marketSignals:[{title:'External reported startup earnings',classification:'Third-party reported claim · not independently verified',summary:'Reported third-party earnings.',nextAction:'Investigate only',sourceUrl:'https://trustmrr.com/newsletter',yorphivesRevenue:false}]
+ },
  '/api/tool-coverage':{available:true,declaredCanonicalPages:143,checkedCanonicalPages:143,
    pageResponding:143,brokenLegacyUrls:0}
 };
@@ -63,7 +72,7 @@ try{
   assert.equal(await page.locator('main h1').textContent(),'Home');
   const homeCopy=await page.locator('main').innerText();
   assert.match(homeCopy,/Products[\s\S]*1 ideas/);
-  assert.match(homeCopy,/Revenue[\s\S]*0 ideas/,'Product monetization ideas must not contaminate Revenue');
+  assert.match(homeCopy,/Revenue[\s\S]*Research/,'Revenue shows research, not generic product keyword matches');
   await page.locator('nav button[data-tab="health"]').click();
   await page.waitForFunction(()=>document.querySelector('main h1')?.textContent==='Health');
   await page.waitForLoadState('networkidle');
@@ -84,6 +93,15 @@ try{
   assert.equal(await lead.getAttribute('rel'),'noopener noreferrer');
   await page.locator('nav button[data-tab="revenue"]').click();
   assert.equal(await page.locator('main h1').textContent(),'Revenue');
+  await page.getByText('Verified YorpHives earnings: Not connected.',{exact:false}).waitFor({timeout:10000});
+  await page.getByText('Validate a paid HQventures product').waitFor({timeout:10000});
+  await page.getByText('Evaluate advertising on Free Tools').waitFor({timeout:10000});
+  await page.getByText('Research relevant tool sponsorship').waitFor({timeout:10000});
+  await page.getByText('External reported startup earnings').waitFor({timeout:10000});
+  const external=page.getByRole('link',{name:'Original report'});
+  assert.equal(await external.getAttribute('href'),'https://trustmrr.com/newsletter');
+  assert.equal(await external.getAttribute('rel'),'noopener noreferrer');
+  assert.equal(await page.locator('main .revenue-row').count(),4,'Three opportunities plus one external source');
   await page.goBack({waitUntil:'networkidle'});
   assert.equal(await page.locator('main h1').textContent(),'Products','Browser Back must restore Products');
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
