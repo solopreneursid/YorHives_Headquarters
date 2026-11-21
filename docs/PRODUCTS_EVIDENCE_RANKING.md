@@ -21,12 +21,20 @@ Sources that disallow automated access are **not bypassed**. Their original dire
 
 The implementation works on plain result rows and stays portable between D1 and SQLite. The read-only endpoint uses bounded query sizes (250 opportunity rows, 2,500 dated metrics, 20 link-only leads). No paid API, headless-browser evasion, new secrets, third-party agent network, remote code execution, or auto-deployment capability is introduced.
 
+## Discovery efficiency and business-quality gates (next candidate, 2026-11-21)
+
+The collector keeps its existing independent 30-minute public intelligence opportunity within the 5-minute HQ scheduler. It selects from up to 90 due sources and processes **one source per eligible run**, preserving API/fetch budgets. Productive seed feeds are considered first; automatically discovered GitHub topics are exploratory, with higher priority only when relevant to user-facing applications and they produce results. New unrelated vendor-language and SDK topics are not continually promoted into the scan queue. Existing sources and historical records remain intact.
+
+After a successful scan, seeded sources are checked again at most every 24 hours, focused auto-discovered topics at 48 hours, and unrelated exploratory topics at 120 hours. Empty public listings back off for 72 hours, other failures 48 hours, too-large API responses 72 hours, and robots-disallowed sources 168 hours. These intervals are conservative cost limits, not uptime or availability guarantees. The Firefox search response page size is reduced from five to three to respect the read-size limit. Restricted sources are **not bypassed**.
+
+An increase between two days remains early evidence only. Tiny increases that fail both significant absolute and relative growth cutoffs are ranked below meaningful early movement; 3+ observations and rising intervals are still required to label sustained momentum. A GitHub SDK or curated link collection is treated as a technical reference, not an independently launchable product. Product-specific commercial hypotheses include the likely customer, narrow MVP, possible revenue experiment and rough build effort. Demand, customers, traffic, revenue, costs and code-license clearance remain **unverified**; the model cannot approve a new business.
+
 ## Release boundary
 
-The branch is a **candidate only**. Baseline live Worker: `yorphives-hq-free-pilot`, version `8ef0a04b-645a-4a9e-aa39-a95b0b1700d2`, five modules. Candidate: six modules with an isolated `products-ranker.mjs` and an updated private Products UI. Source SHA locks and release preflight must match the existing live five-module baseline before uploading the candidate.
+The prior Products release is live and GitHub/manual-release verified: `yorphives-hq-free-pilot` version `de401248-ba02-42b7-8cd1-cc3de55a0f78`, six modules. The **next candidate** adds source-quality cadence and commercial hypothesis improvements in the same modular files. Its source SHAs are pinned separately. Manual release checks current live six-module source, bindings and schedule before uploading candidate code. No continuous deployment is introduced.
 
 GitHub Actions may run read-only CI on a PR; production remains behind a separate founder-authorized, manual-only `hq-production` environment. Cloudflare Access and the HQ agent's observation/research/recommendation-only authority remain unchanged. Unauthenticated access and signed-in browser checks are separate release acceptance gates. Production live source and D1 data remain untouched by this PR.
 
 ## Automated checks
 
-`node scripts/verify-current-hq.mjs`, `node scripts/test-products-trends.mjs` and `node scripts/test-products-evidence.mjs`. Browser integration should be rerun at normal release review. After founder-approved deployment, check the private `/api/trending-products` payload for `schemaVersion: 2`, evidence grades, fallbacks and source statuses.
+`node scripts/verify-current-hq.mjs`, `node scripts/test-products-trends.mjs` and `node scripts/test-products-evidence.mjs`. Browser integration should be rerun at normal release review. After founder-approved deployment, check the private `/api/trending-products` payload for `schemaVersion: 2`, evidence grades, fallbacks and source statuses. Check the 24-hour seed source revisit behavior, HN conflict quarantine, and `commercialFit`/`buyerDemandVerified`/`licenseVerified` fields; verified demand and revenue should remain `false`.

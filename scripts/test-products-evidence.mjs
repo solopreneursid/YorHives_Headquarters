@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {rankProducts} from '../src/products-ranker.mjs';
+import {isProductFocusedTopic,sourcePriority,revisitHours} from '../src/product-intelligence.mjs';
 import {verify} from './verify-current-hq.mjs';
 verify();
 const at='2026-11-20T09:00:00Z',now=Date.parse('2026-11-21T09:00:00Z');
@@ -50,4 +51,45 @@ assert.doesNotMatch(ranker,/\bfetch\s*\(|\bPOST\b|\bPUT\b|\bDELETE\b/);
 const hnDuplicate={...h,id:'h-other',title:'Show HN: Incorrect unrelated launch'};
 assert.equal(rankProducts([h,hnDuplicate],data,now).length,0,'conflicting HN labels for one discussion must be quarantined');
 assert.equal(rankProducts([h],data,now).length,1,'a single verified-source HN title remains eligible');
-console.log('PASS Products: repeat observations, one-shot downgrade, decline, diverse links, no false revenue/traffic, HN conflict quarantine, private read-only contract');
+const strong=rankProducts([item('strong','https://github.com/test/strong','Career job matching app')],[
+ signal('gh:test/strong','2026-11-19',100),
+ signal('gh:test/strong','2026-11-20',170)
+],now)[0];
+const small=rankProducts([item('small','https://github.com/test/small','Career job matching app')],[
+ signal('gh:test/small','2026-11-19',100),
+ signal('gh:test/small','2026-11-20',101)
+],now)[0];
+const sdk=rankProducts([item('sdk','https://github.com/test/sdk','alibabacloud java sdk')],[
+ signal('gh:test/sdk','2026-11-19',100),
+ signal('gh:test/sdk','2026-11-20',101)
+],now)[0];
+assert.ok(strong.score>small.score,'meaningful early growth must outrank tiny movement');
+assert.ok(small.score>sdk.score,'reference SDK must not outrank a user-facing application');
+assert.equal(strong.commercialFit,'existing-product');
+assert.match(strong.opportunity,/GovRadar/);
+assert.equal(rankProducts([item('pdf-generic','https://github.com/test/pdf-generic','Stirling PDF Application on any device')],[],now)[0].commercialFit,'existing-tools','generic Application must not imply job-application use');
+assert.equal(rankProducts([item('agent-memory','https://github.com/test/agent-memory','ClickHouse loom document search for AI agents')],[],now)[0].commercialFit,'new-market','agent memory is not a free PDF tool');
+assert.equal(strong.licenseVerified,false);
+assert.equal(strong.buyerDemandVerified,false);
+assert.equal(strong.trafficVerified,false);
+assert.equal(strong.revenueVerified,false);
+assert.ok(isProductFocusedTopic('agent-memory'));
+assert.ok(isProductFocusedTopic('pdf-tools'));
+assert.ok(!isProductFocusedTopic('alibaba-cloud'),'unrelated vendor topic should not consume prime research slots');
+const seeded={discovered_by:'seed',checked_at:'2026-11-20T10:00:00Z',last_status:'ok:8:recorded:8',query_text:'github'};
+const rejected={...seeded,last_status:'unavailable:robots-disallows-source'};
+const broad={...seeded,discovered_by:'github:topic-aliyun',query_text:'alibaba-cloud'};
+assert.ok(sourcePriority(seeded)<sourcePriority(rejected));
+assert.ok(sourcePriority(rejected)<sourcePriority(broad));
+assert.equal(revisitHours(seeded,'ok:8:recorded:8'),24,'successful seed source: one dated observation each day');
+assert.equal(revisitHours(seeded,'empty-public-listing:0:recorded:0'),72,'empty source gets 3-day cooling period');
+assert.equal(revisitHours(seeded,'unavailable:robots-disallows-source'),168,'restricted source gets 7-day backoff');
+assert.equal(revisitHours(seeded,'unavailable:daily-free-fetch-budget-exhausted'),48);
+assert.equal(revisitHours(broad,'ok:8:recorded:8'),120,'unrelated auto-topic uses lower frequency');
+assert.equal(revisitHours({...broad,query_text:'agent-memory'},'ok:8:recorded:8'),48);
+const sourceScript=readFileSync(new URL('../src/product-intelligence.mjs',import.meta.url),'utf8');
+assert.match(sourceScript,/sourcePriority\(a\)-sourcePriority\(b\)/);
+assert.match(sourceScript,/revisitHours\(src,result\)/);
+assert.match(sourceScript,/!isProductFocusedTopic\(topic\)/);
+assert.match(sourceScript,/page_size=3/);
+console.log('PASS Products: repeat observations, one-shot downgrade, decline, diverse links, no false revenue/traffic, HN conflict quarantine, source cadence, business gates, private read-only contract');
