@@ -9,6 +9,17 @@ const valid={schemaVersion:1,available:true,periodDays:30,generatedAt:'2026-11-1
  ranked:[{url:'tools/word-counter/',name:'Word Counter',completedActions30d:4,completedActions7d:3,previous7d:1}],
  opportunities:[{url:'tools/word-counter/',name:'Word Counter',signal:'increasing-completions',recent7d:3,previous7d:1,requiresFounderReview:true}],
  revenue:{available:false,amount:null}};
+const withToolViews={...valid,toolPageViews:[{url:'tools/word-counter/',name:'Word Counter',
+ pageViews30d:18,pageViews7d:11,previous7d:7}]};
+const pageViewReport=validateGrowth(withToolViews);
+assert.equal(pageViewReport.toolPageViews.length,1);
+assert.equal(pageViewReport.toolPageViews[0].pageViews7d,11);
+assert.equal(pageViewReport.toolPageViews[0].previous7d,7);
+assert.equal(validateGrowth(valid).toolPageViews.length,0,'Old public reports remain accepted');
+for(const bad of [
+ {url:'tools/../../private/',name:'Invalid',pageViews30d:10,pageViews7d:8,previous7d:2},
+ {url:'tools/word-counter/',name:'Invalid',pageViews30d:2,pageViews7d:8,previous7d:1}
+])assert.throws(()=>validateGrowth({...valid,toolPageViews:[bad]}));
 const report=validateGrowth(valid);
 assert.equal(report.readOnly,true);
 assert.equal(report.ranked[0].url,'tools/word-counter/');
