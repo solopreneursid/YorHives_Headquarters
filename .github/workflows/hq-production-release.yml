@@ -38,7 +38,9 @@ jobs:
           node scripts/test-products-trends.mjs
           node scripts/test-products-evidence.mjs
       - name: Verify Revenue evidence and founder-only rules before release (offline)
-        run: node scripts/test-revenue-intelligence.mjs
+        run: |
+          node scripts/test-revenue-intelligence.mjs
+          node scripts/test-revenue-research.mjs
       - name: Deploy ONLY with founder-approved environment and scoped Worker token
         env:
           HQ_RELEASE_TOKEN: ${{ secrets.HQ_RELEASE_TOKEN }}
