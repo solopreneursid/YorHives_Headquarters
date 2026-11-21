@@ -5,13 +5,13 @@
   "sourceWorkerVersion": "9396a967-e8a7-4814-9232-d3eabda774d3",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "08ad013afd9900a20d24f2f8cc25a97e2efbb6c0",
+    "hq-worker.mjs": "a6ab75b18cab251408423b6461833569216024b0",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
-    "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
+    "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
     "product-intelligence.mjs": "1afd4abb92978bda8abc97287bbbf760534e9e72",
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
-    "revenue-intelligence.mjs": "2dee923a45b1537e930bb1004c7f743543478635",
+    "revenue-intelligence.mjs": "18fda8b95f716a15a43364cca09d407104a89bdf",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
   "navigation": [
@@ -119,5 +119,5 @@
     "revenue-intelligence.mjs": "990c94539ee4672c31854cfbf0e38933428ba4bd",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "Founder-reviewed Free Tools revenue-readiness baseline: 7-day sitewide browser-reported pageviews and actions, no visitor/impression/income claims, read-only HQ Revenue panel; publication gated by source-scope CI."
+  "candidateStatus": "Founder-review-gated Free Tools Revenue Intelligence candidate: catalog-validated individual pageviews and first-party tool actions, never unique people, ad impressions or earnings. Existing private HQ Access, eight modules, schedules and bindings preserved."
 }
