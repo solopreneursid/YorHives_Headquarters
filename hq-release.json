@@ -10,7 +10,7 @@
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
     "product-intelligence.mjs": "b0f21738244fe1c620303229c5d5b67686dbb5a6",
-    "products-ranker.mjs": "6551386c28cfd2db8ca14e9a2c980f90a7f74def"
+    "products-ranker.mjs": "46dbe25e83d8fdae35e2e52c8715931da21f715a"
   },
   "navigation": [
     "home",
@@ -66,7 +66,8 @@
     "Products ranking candidate uses repeated UTC-day public signal evidence; does not present stars, upvotes or installs as verified traffic, revenue or profit.",
     "Source directories that restrict collection remain respected; dashboard shows links from permitted public launch feeds as link-only unverified candidates.",
     "Current live HQ version and five module hashes are pinned separately from the six-module release candidate.",
-    "No automatic release and no autonomous HQ deploy permissions; founder approval required."
+    "No automatic release and no autonomous HQ deploy permissions; founder approval required.",
+    "Source conflict guard: a Hacker News item ID with contradictory product titles is quarantined from ranked recommendations; link-only source leads remain separately labeled."
   ],
   "previousWorkerVersion": "0aa5ea9f-9d8d-4e56-966d-8920ffc5fff1",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
