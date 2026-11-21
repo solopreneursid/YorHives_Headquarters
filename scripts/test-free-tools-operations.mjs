@@ -18,6 +18,6 @@ const fakeFetch=async address=>new Response(JSON.stringify(address.includes('/ru
 x=await loadFreeToolsOperations({fetcher:fakeFetch,now:()=>NOW});
 assert.equal(x.summary.improvements,1);assert.equal(x.status,'healthy');
 await assert.rejects(()=>readPublicEvidence('https://example.org/private',{fetcher:fakeFetch}),/Unexpected/);
-const large=async()=>new Response('x'.repeat(66000),{headers:{'content-type':'application/json'}});
+const large=async()=>new Response('{}',{headers:{'content-type':'application/json','content-length':'350001'}});
 await assert.rejects(()=>readPublicEvidence('https://api.github.com/repos/solopreneursid/YorpHives_Website/issues',{fetcher:large}),/oversized/);
 console.log('PASS Free Tools HQ read-only evidence, stale and incident classification');
