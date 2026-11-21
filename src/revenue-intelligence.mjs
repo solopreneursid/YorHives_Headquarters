@@ -21,6 +21,59 @@ function growthEvidence(growth){
   observedAt:validDay(String(growth.generatedAt||'').slice(0,10))?growth.generatedAt:null,
   topFreeTool:best?{name:text(best.name,100),path:best.url,completedActions7d:best.completedActions7d}:null};
 }
+/** First-party browser-reported signals, not AdSense, Search Console or visitors.
+ * No modeled RPM, earnings, invented impressions or user-identifying telemetry.
+ * Null means not connected, never 0.
+ */
+export function freeToolsRevenueReadiness(growth,{now=new Date().toISOString()}={}){
+ const base={schemaVersion:1,readOnly:true,source:'https://yorphives.com/api/insights/growth',
+  measurement:'first-party aggregate browser events; not independently verified people or advertising',
+  available:false,status:'not-connected',observedAt:null,
+  pageViews7d:null,previousPageViews7d:null,sitewidePageViews:true,
+  completedActions7d:null,previousCompletedActions7d:null,
+  topToolActions:[],uniqueVisitors:null,adImpressions:null,adSenseEarnings:null,
+  currency:null,adsApproved:null,recommendations:[],
+  disclaimer:'Pageviews are sitewide browser-reported events, not unique visitors, free-tool-only traffic, ad impressions or income.'};
+ if(growth?.available!==true||growth.source!==base.source||!Array.isArray(growth.ranked)||
+    !Number.isFinite(Date.parse(growth.generatedAt||''))||!Number.isFinite(Date.parse(now)))return {
+  ...base,recommendations:[{priority:'important',title:'Confirm first-party activity feed',
+   nextAction:'Check read-only public growth endpoint availability; do not infer visitors or ad earnings from missing data.'}]};
+ const c=growth.comparison||{};
+ if(!['recent7dPageViews','previous7dPageViews','recent7dCompletedActions','previous7dCompletedActions']
+   .every(k=>validCount(c[k])))return {...base,status:'invalid-data'};
+ const timestamp=Date.parse(growth.generatedAt),age=Date.parse(now)-timestamp;
+ if(age < -300000||age > 36*3600000)return {...base,status:'stale',observedAt:growth.generatedAt,
+  recommendations:[{priority:'important',title:'Refresh traffic evidence',
+    nextAction:'Investigate why aggregate browser activity is stale before interpreting search or revenue performance.'}]};
+ const tools=growth.ranked.filter(x=>/^tools\/[a-z0-9-]+\/$/.test(String(x.url||''))&&
+    validCount(x.completedActions7d)&&validCount(x.previous7d))
+  .sort((a,b)=>b.completedActions7d-a.completedActions7d).slice(0,5)
+  .map(x=>({name:text(x.name,90),path:x.url,
+   completedActions7d:x.completedActions7d,previousCompletedActions7d:x.previous7d}));
+ const recommendations=[];
+ if(c.recent7dCompletedActions===0)recommendations.push({
+  priority:'important',title:'Verify Free Tools usage instrumentation',
+  evidence:c.recent7dPageViews+' reported sitewide pageviews and no recorded tool completions in the recent seven-day window.',
+  nextAction:'Check a representative tool-completion event end-to-end and confirm privacy protections; do not infer zero tool use from missing completions.'});
+ if(!tools.length)recommendations.push({
+  priority:'improvement',title:'Wait for meaningful per-tool evidence',
+  evidence:'The public aggregate feed contains no ranked Free Tools with recorded completions.',
+  nextAction:'Continue uptime/SEO audits and collect genuine anonymous actions before prioritizing tools by demand.'});
+ else recommendations.push({
+  priority:'improvement',title:'Review tools with observed repeat usage',
+  evidence:'The top-five list is based on browser-reported tool actions, not people, customer purchases or advertiser value.',
+  nextAction:'Review real user experience and search intent for these tools before choosing editorial improvements.'});
+ recommendations.push({
+  priority:'approval-gated',title:'Keep AdSense optimization in research mode',
+  evidence:'Verified earnings, advertiser impressions, publisher approval and consent state are not connected to this feed.',
+  nextAction:'After AdSense Ready and privacy/consent verification, connect aggregate reporting before testing any Free Tools-only ad placements.'});
+ return {...base,available:true,status:'browser-reported-only',observedAt:growth.generatedAt,
+  pageViews7d:c.recent7dPageViews,previousPageViews7d:c.previous7dPageViews,
+  completedActions7d:c.recent7dCompletedActions,
+  previousCompletedActions7d:c.previous7dCompletedActions,
+  topToolActions:tools,recommendations};
+}
+
 function revenueFit(title){
  const s=String(title||'').toLowerCase();
  if(/\b(job|career|resume|cv|recruit|interview)\b/.test(s))return {lane:'HQventures · research',category:'govradar',audience:'GovRadar jobseekers',effort:'medium',next:'Verify repeat GovRadar use and interview jobseekers about one useful paid application workflow.',risk:'Candidate privacy, job-source rights and ongoing data accuracy.'};
@@ -238,7 +291,7 @@ export function buildRevenueIntelligence({growth=null,externalRows=[],researchRo
   constraints:{advertisingScope:'Free Tools only',adFreeAreas:['Home','HQventures','HQconnect','YorpHivesHQ'],
    freeToolsRemainFree:true,hqventuresOnlyFounderApprovedProducts:true,supportButton:'remains disabled',
    noAutomaticPublishing:true,noAutomaticMonetization:true,noPurchases:true},
-  activity,opportunities:ranked,marketSignals:marketSignals.filter(x=>!filtered.some(f=>f.sourceUrl===x.sourceUrl&&f.title==='Investigate: '+x.title)).slice(0,10),sources,
+  activity,freeToolsReadiness:freeToolsRevenueReadiness(growth,{now}),opportunities:ranked,marketSignals:marketSignals.filter(x=>!filtered.some(f=>f.sourceUrl===x.sourceUrl&&f.title==='Investigate: '+x.title)).slice(0,10),sources,
   researchedOpportunities:filtered.length,sourceScansCompleted:sources.filter(x=>x.checkedAt!==null).length,
   disclaimer:'Opportunity cards and third-party claims are research hypotheses, not verified YorpHives earnings, customer demand or projections.'};
 }
