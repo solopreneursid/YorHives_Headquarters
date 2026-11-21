@@ -122,21 +122,21 @@ function rankedPrograms(){
 // Verified FIRST-PARTY procurement portals: these are search channels, NOT confirmed open bids.
 const officialGovernmentPortals=Object.freeze([
  {id:'central-procurement-india',title:'Find central-government software and digital-service tenders',
-  channel:'Government contracts · India',priorityScore:76,sourceUrl:'https://eprocure.gov.in/eprocure/app',
+  channel:'Government contracts · India',priorityScore:39,sourceUrl:'https://eprocure.gov.in/eprocure/app',
   whoMightPay:'Indian ministries, central public institutions and other eligible government buyers — specific buyer not yet identified.',
   whyPay:'Government entities publish competitive procurements for software, systems and services; the presence of a portal does not mean YorpHives is eligible.',
   nextAction:'Search the official portal for software, web application, digital documents or automation tenders; record bid reference, buyer, scope, deadline, bidder qualifications, EMD/fees and corrigenda before considering a bid.',
   evidence:'Official Indian government eProcurement search portal. This is a discovery channel, not an individually verified tender or award.',
   risk:'Experience, turnover, certificates, eligibility, bidder registration, digital signature, tax obligations, project delivery and contract conditions may disqualify a sole founder.'},
  {id:'jharkhand-procurement',title:'Explore Jharkhand government IT and automation projects',
-  channel:'Government contracts · Jharkhand',priorityScore:72,sourceUrl:'https://jharkhandtenders.gov.in/nicgep/app',
+  channel:'Government contracts · Jharkhand',priorityScore:37,sourceUrl:'https://jharkhandtenders.gov.in/nicgep/app',
   whoMightPay:'Jharkhand departments, boards and state institutions with issued tenders — issuing body to be verified.',
   whyPay:'State procurement can commission websites, records digitization, software operations and similar services, but individual notices must be checked.',
   nextAction:'Search the official Jharkhand portal for relevant current IT tenders; check the exact tender ID, closing date, specifications, local eligibility, DSC, fees, and past-experience conditions.',
   evidence:'Official Government of Jharkhand eProcurement portal. No particular award, contract value or active tender is asserted.',
   risk:'State-specific conditions, qualifications, guarantee/EMD and execution scope are unknown until the tender documents are read.'},
  {id:'gem-government-marketplace',title:'Investigate GeM software and IT service bids',
-  channel:'Government contracts · GeM',priorityScore:64,sourceUrl:'https://bidplus.gem.gov.in/all-bids',
+  channel:'Government contracts · GeM',priorityScore:35,sourceUrl:'https://bidplus.gem.gov.in/all-bids',
   whoMightPay:'Public-sector GeM buyers seeking eligible goods or services — individual buyer not yet selected.',
   whyPay:'The government marketplace publishes bids for services and products; the existence of listings is not evidence of a suitable active opportunity.',
   nextAction:'Search GeM for software development, websites, cloud-adjacent services and digitization; independently verify bid ID, deadline, GeM seller eligibility, categories, taxes and contract terms.',
@@ -232,9 +232,18 @@ function revenueSourceHealth(rows){
   ['revenue_research_hn_pricing','Hacker News · pricing'],
   ['revenue_research_gov_jharkhand','Jharkhand · official state eProcurement']];
  const byKey=new Map((Array.isArray(rows)?rows:[]).map(x=>[x.key,x]));
- return specs.map(([id,name])=>{const r=byKey.get(id),status=String(r?.value||'not-yet-checked');
-  return {name,status,checkedAt:r?.checked_at||null,available:status.startsWith('ok:'),
-   note:status.startsWith('unavailable:')?'Public source unavailable; no restrictions bypassed.':'Public attention is not proof of income.'};
+ return specs.map(([id,name])=>{
+  const r=byKey.get(id),status=String(r?.value||'not-yet-checked');
+  const leads=Number(status.match(/^ok:(\d+)/)?.[1]||0);
+  const empty=status.startsWith('empty-public-evidence:')||status.startsWith('empty-public-listing:');
+  const blocked=status.startsWith('unavailable:');
+  const state=blocked?'source-unavailable':empty?'checked-no-match':status.startsWith('ok:')?'leads-found':'not-yet-checked';
+  return {name,status,checkedAt:r?.checked_at||null,available:empty||state==='leads-found',
+   state,qualifyingLeads:state==='leads-found'?leads:0,
+   note:blocked?'Source unavailable or restricted; no access bypassed.':
+    empty?'Source checked successfully but no matching qualified leads found.':
+    state==='not-yet-checked'?'Scheduled scan not recorded yet.':
+    'Public attention is not proof of company revenue or confirmed contracts.'};
  });
 }
 export function buildRevenueIntelligence({growth=null,externalRows=[],researchRows=[],sourceStatuses=[],now=new Date().toISOString()}={}){
@@ -273,7 +282,7 @@ export function buildRevenueIntelligence({growth=null,externalRows=[],researchRo
  const filtered=[],byCategory=new Map(),byType=new Map();
  for(const lead of marketSignals){
   // Source-reported revenue stays in Market Intelligence; never auto-promote a claim to an investment priority.
-  if(!['official-tender-listing','public-discussion','public-client-intent','community-partner-mention','community-sponsorship-mention'].includes(lead.sourceType)||lead.category==='unclassified'||(byCategory.get(lead.category)||0)>=3||
+  if(!['official-tender-listing','public-discussion','public-client-intent','community-partner-mention','community-sponsorship-mention'].includes(lead.sourceType)||lead.category==='unclassified'||(byCategory.get(lead.category)||0)>=(lead.category==='government'?2:3)||
      (byType.get(lead.sourceType)||0)>=5)continue;
   filtered.push({id:'revenue-lead-'+filtered.length+'-'+lead.sourceUrl.slice(-18),
    channel:lead.channel,title:'Investigate: '+lead.title,stage:'Founder research',
@@ -281,7 +290,7 @@ export function buildRevenueIntelligence({growth=null,externalRows=[],researchRo
    evidenceStatus:lead.classification,evidence:lead.summary,nextAction:lead.nextValidation,
    risk:lead.risk,sourceUrl:lead.sourceUrl,observedAt:lead.observedAt,
    bidDeadline:lead.bidDeadline||null,
-   priorityScore:lead.sourceType==='official-tender-listing'?Math.min(91,lead.relevanceScore+24):
+   priorityScore:lead.sourceType==='official-tender-listing'?Math.min(77,lead.relevanceScore+9):
     lead.sourceType==='public-client-intent'?Math.min(86,lead.relevanceScore+20):
     ['community-partner-mention','community-sponsorship-mention'].includes(lead.sourceType)?
       Math.min(69,lead.relevanceScore+12):lead.relevanceScore,
