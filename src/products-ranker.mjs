@@ -25,9 +25,20 @@ export function rankProducts(rows,signals,now=Date.now()){
   if(!measurements.has(key))measurements.set(key,new Map());
   measurements.get(key).set(v.observed_day,Number(v.value));
  }
+ // A Hacker News discussion ID must refer to one launch. Exclude inconsistent
+ // historical labels rather than attributing another product's points to a title.
+ const hnTitles=new Map(),conflictingHnUrls=new Set();
+ for(const x of rows||[]){
+  const u=String(x?.source_url||'');
+  if(!/^https:\/\/news\.ycombinator\.com\/item\?id=\d+$/.test(u))continue;
+  const title=String(x.title||'').trim().replace(/\s+/g,' ').toLowerCase();
+  if(!title)continue;
+  if(hnTitles.has(u)&&hnTitles.get(u)!==title)conflictingHnUrls.add(u);
+  else if(!hnTitles.has(u))hnTitles.set(u,title);
+ }
  const rowsOut=[];
  for(const x of rows||[]){
-  if(!x?.source_url||!stamp(x.observed_at))continue;
+  if(!x?.source_url||conflictingHnUrls.has(x.source_url)||!stamp(x.observed_at))continue;
   const id=productId(x.source_url);let best=[],metric=null;
   for(const m of ['github_stars','hn_points','firefox_daily_users','npm_downloads_7d']){
    const a=[...(measurements.get(id+'|'+m)?.entries()||[])].sort((a,b)=>a[0].localeCompare(b[0]));
