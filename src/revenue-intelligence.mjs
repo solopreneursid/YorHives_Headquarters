@@ -141,14 +141,16 @@ export function buildRevenueIntelligence({growth=null,externalRows=[],researchRo
  const filtered=[],byCategory=new Map(),byType=new Map();
  for(const lead of marketSignals){
   // Source-reported revenue stays in Market Intelligence; never auto-promote a claim to an investment priority.
-  if(!['public-discussion','public-client-intent'].includes(lead.sourceType)||lead.category==='unclassified'||(byCategory.get(lead.category)||0)>=3||
+  if(!['public-discussion','public-client-intent','community-partner-mention','community-sponsorship-mention'].includes(lead.sourceType)||lead.category==='unclassified'||(byCategory.get(lead.category)||0)>=3||
      (byType.get(lead.sourceType)||0)>=5)continue;
   filtered.push({id:'revenue-lead-'+filtered.length+'-'+lead.sourceUrl.slice(-18),
    channel:lead.channel,title:'Investigate: '+lead.title,stage:'Founder research',
    method:'Research one narrow buyer problem before deciding on monetization',
    evidenceStatus:lead.classification,evidence:lead.summary,nextAction:lead.nextValidation,
    risk:lead.risk,sourceUrl:lead.sourceUrl,observedAt:lead.observedAt,
-   priorityScore:lead.sourceType==='public-client-intent'?Math.min(86,lead.relevanceScore+20):lead.relevanceScore,
+   priorityScore:lead.sourceType==='public-client-intent'?Math.min(86,lead.relevanceScore+20):
+    ['community-partner-mention','community-sponsorship-mention'].includes(lead.sourceType)?
+      Math.min(69,lead.relevanceScore+12):lead.relevanceScore,
    buildEffortHypothesis:lead.effortHypothesis,buyerDemandVerified:false,trafficVerified:false,
    revenueVerified:false,approvalRequired:true,autoExecute:false});
   byCategory.set(lead.category,(byCategory.get(lead.category)||0)+1);
