@@ -28,6 +28,7 @@ jobs:
           node --check src/product-intelligence.mjs
           node --check src/products-ranker.mjs
           node --check src/revenue-intelligence.mjs
+          node --check src/revenue-research.mjs
           node --check src/growth-evidence.mjs
           node --check src/watchdog-evidence.mjs
           node --check src/agent-demand-evidence.mjs
