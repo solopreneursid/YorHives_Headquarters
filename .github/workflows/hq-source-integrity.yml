@@ -28,7 +28,6 @@ jobs:
           node --check src/product-intelligence.mjs
           node --check src/products-ranker.mjs
           node --check src/revenue-intelligence.mjs
-          node --check src/revenue-research.mjs
           node --check src/growth-evidence.mjs
           node --check src/watchdog-evidence.mjs
           node --check src/agent-demand-evidence.mjs
@@ -36,5 +35,6 @@ jobs:
           node --check scripts/release-hq-manual.mjs
           node scripts/test-release-post-upload.mjs
           node scripts/test-revenue-intelligence.mjs
+          node scripts/test-revenue-research.mjs
       - name: Confirm no automatic deployment
         run: echo 'This CI is observation/testing only. It has no production token or deployment step.'
