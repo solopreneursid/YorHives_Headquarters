@@ -11,7 +11,7 @@ Sources that disallow automated access are **not bypassed**. Their original dire
 * **One public listing** — unverified attention, low priority.
 * **One dated metric** — raw popularity snapshot, growth **not measured**.
 * **Two dated metrics** — early movement; require more observations before treating it as sustained.
-* **Three or more dated metrics across at least two UTC days** — repeated growth signal, still only a public proxy.
+* **Three or more dated metrics across at least two UTC days, with at least two rising intervals and meaningful daily absolute and percentage increases** — repeated growth signal, still only a public proxy. GitHub: ≥10 stars/day and ≥3%/day; HN: ≥12 points/day and ≥20%/day; Mozilla: ≥25 daily users/day and ≥5%/day; npm: ≥200 rolling weekly downloads/day and ≥20%/day. These are investigation heuristics, not empirical estimates of market demand.
 * Flat/falling metrics are marked as such. A 7-day freshness penalty and source-family caps prevent stale or same-source results from monopolizing the page.
 * GitHub stars, Hacker News points, Mozilla daily add-on users, and npm rolling downloads are never portrayed as independently verified visitors, revenue, profit, or launch approval.
 * Priority scores are deterministic **investigation rankings**, not forecasts.
