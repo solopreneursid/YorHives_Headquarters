@@ -67,6 +67,8 @@ assert.ok(strong.score>small.score,'meaningful early growth must outrank tiny mo
 assert.ok(small.score>sdk.score,'reference SDK must not outrank a user-facing application');
 assert.equal(strong.commercialFit,'existing-product');
 assert.match(strong.opportunity,/GovRadar/);
+assert.equal(rankProducts([item('pdf-generic','https://github.com/test/pdf-generic','Stirling PDF Application on any device')],[],now)[0].commercialFit,'existing-tools','generic Application must not imply job-application use');
+assert.equal(rankProducts([item('agent-memory','https://github.com/test/agent-memory','ClickHouse loom document search for AI agents')],[],now)[0].commercialFit,'new-market','agent memory is not a free PDF tool');
 assert.equal(strong.licenseVerified,false);
 assert.equal(strong.buyerDemandVerified,false);
 assert.equal(strong.trafficVerified,false);
