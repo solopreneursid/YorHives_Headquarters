@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {assessFreeToolsEvidence,loadFreeToolsOperations,readPublicEvidence} from '../src/free-tools-operations.mjs';
+import {assessFreeToolsEvidence,loadFreeToolsOperations,readPublicEvidence} from '../src/watchdog-evidence.mjs';
 const NOW=Date.parse('2026-11-21T10:00:00Z');
 const url='https://github.com/solopreneursid/YorpHives_Website';
 const goodRun={id:777,status:'completed',conclusion:'success',updated_at:'2026-11-21T09:00:00Z',html_url:url+'/actions/runs/777'};
