@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "application": "YorpHives HQ",
   "productionWorker": "yorphives-hq-free-pilot",
-  "sourceWorkerVersion": "6057bd41-ca23-46ae-bc7a-472fa7832a2a",
+  "sourceWorkerVersion": "c94c89a0-e314-4a43-bd8b-da879e3bab1d",
   "workerContentSha256": null,
   "moduleGitBlobs": {
     "hq-worker.mjs": "a53d3bdca9fe2a28a6078bfdd53d23e28c2676aa",
@@ -91,7 +91,7 @@
     "All ranked Revenue opportunities expose whoMightPay, whyPay, nextAction, verified earnings null and founder approval required; HQ cannot register/bid/contact/pay.",
     "Monetization follow-up: never claim a government award or supplier eligibility from a tender portal homepage; all proposals/tenders require founder review."
   ],
-  "previousWorkerVersion": "efdb1d2a-2d56-4a4f-89c2-8505fa4dfa1c",
+  "previousWorkerVersion": "6057bd41-ca23-46ae-bc7a-472fa7832a2a",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
   "releaseVerification": {
     "githubWorkflowRun": 44868381659,
@@ -110,14 +110,14 @@
   "privateSnapshotKey": "hq-authoritative-snapshot__2026-11-19__b2fa6a0a-b872-48f4-888f-e675e84fa0a5",
   "moduleTreeSha256": null,
   "liveModuleGitBlobs": {
-    "hq-worker.mjs": "3231451698945d416c880e6690802619060684b9",
+    "hq-worker.mjs": "b536a5d4aa487f3e86861a93f8ce26142f52a2a0",
     "watchdog-evidence.mjs": "f3c47a3fad7589f0c9b6aadd5ff613e528ef40e7",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
     "product-intelligence.mjs": "1afd4abb92978bda8abc97287bbbf760534e9e72",
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
-    "revenue-intelligence.mjs": "2d17ba692a89dd517f62233eb4f8092171158e69",
-    "revenue-research.mjs": "25a851ad90db88876b51adb1e60b714b9196899c"
+    "revenue-intelligence.mjs": "990c94539ee4672c31854cfbf0e38933428ba4bd",
+    "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "Founder-reviewed Free Tools Operations HQ candidate: read-only GitHub watchdog/SEO incident inbox and evidence classifications; private API and UI; manual HQ release required for backend changes."
+  "candidateStatus": "Private Free Tools Operations integration prepared; live baseline verified from eight deployed modules. Sensitive backend extension requires founder-reviewed manual release; website and HQ remain read-only."
 }
