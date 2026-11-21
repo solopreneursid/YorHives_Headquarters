@@ -72,3 +72,16 @@ Status: 2026-11-16. This is an operational guide, **not** proof that a full rest
 - Run a controlled incident detection/recovery test in staging; confirm history is not erased.
 - Complete an end-to-end isolated HQ environment restoration, including real table schema, bindings, and application authentication, before claiming full disaster-recovery readiness.
 - Verify notifications actually reach the founder when the independent monitor fails.
+
+## Isolated D1 restoration drill (21 November 2026)
+
+**Observed result: PASS, isolated synthetic database only.** No production SQL writes, production database restoration, changes to HQ bindings or website source were involved.
+
+- Retrieved the **production D1 Time Travel bookmark**, confirming a recovery bookmark is available (bookmark value not copied to public source).
+- Created disposable D1 database `yorphives-hq-recovery-drill-20261121-1804`; inserted entirely fictitious rows in lightweight `status`, `opportunities` and `incident_events` tables.
+- At initial bookmark: `status.last_cron=before-restore`, 1 opportunity, 1 incident event.
+- Applied test-only mutation: `status.last_cron=after-change`, removed the opportunity, added a second event.
+- Sent Time Travel restore for the disposable database to its pre-mutation bookmark; a follow-up independent SELECT verified `before-restore`, **1 opportunity**, **1 incident event**.
+- Deleted the disposable drill database and verified successful deletion. Existing HQ D1 ID and Worker bindings were not changed.
+
+**Remaining recovery blockers:** (1) a secure **independent encrypted backup/export** under founder control is not yet proved; a Time Travel bookmark is not an off-provider backup; (2) complete non-production restoration of actual HQ schema/data, Worker code, Cloudflare Access and bindings has not been exercised; (3) founder-signed-in browser and external failure-notification delivery still require acceptance tests. Do not mark production disaster recovery fully ready based on the synthetic drill.

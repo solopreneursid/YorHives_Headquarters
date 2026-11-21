@@ -55,6 +55,26 @@ assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://www.namecheap.com/af
 assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://www.digitalocean.com/affiliates'));
 assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://www.cloudflare.com/partners/power-up-program/'));
 assert.equal(base.sources.length,9);
+const checked=buildRevenueIntelligence({now,sourceStatuses:[
+ {key:'revenue_research_hn_clients',value:'empty-public-evidence:0',checked_at:now},
+ {key:'revenue_research_hn_affiliates',value:'ok:2',checked_at:now},
+ {key:'revenue_research_gov_cppp',value:'unavailable:robots-disallows-source',checked_at:now}
+]});
+const emptySource=checked.sources.find(x=>x.name.includes('client requests'));
+assert.equal(emptySource.available,true,'Reachable public source with zero leads must not be labeled inaccessible');
+assert.equal(emptySource.state,'checked-no-match');
+assert.equal(emptySource.qualifyingLeads,0);
+const foundSource=checked.sources.find(x=>x.name.includes('affiliate mentions'));
+assert.equal(foundSource.available,true);
+assert.equal(foundSource.state,'leads-found');
+assert.equal(foundSource.qualifyingLeads,2);
+const blockedSource=checked.sources.find(x=>x.name.includes('central eProcurement'));
+assert.equal(blockedSource.available,false);
+assert.equal(blockedSource.state,'source-unavailable');
+assert.ok(blockedSource.note.includes('no access bypassed'));
+assert.equal(checked.sourceScansCompleted,3);
+assert.ok(base.opportunities.filter(x=>x.channel.startsWith('Government contracts')).every(x=>x.priorityScore<43),
+ 'Generic official portal is a place to search, not a high-priority verified client lead');
 assert.equal(base.constraints.advertisingScope,'Free Tools only');
 assert.ok(base.constraints.adFreeAreas.includes('HQventures'));
 assert.ok(base.constraints.adFreeAreas.includes('YorpHivesHQ'));
@@ -80,6 +100,9 @@ const gov=buildRevenueIntelligence({now,researchRows:[tender]});
 const tenderCard=gov.opportunities.find(x=>x.channel==='Government project · verify eligibility');
 assert.ok(tenderCard,'A first-party still-open tender with reference and closing date is prioritized');
 assert.equal(tenderCard.bidDeadline,'2026-11-29 15:30 IST');
+assert.ok(tenderCard.priorityScore<=77,'Unqualified tender must not be ranked as a proven deal');
+assert.ok(tenderCard.priorityScore>gov.opportunities.find(x=>x.channel==='Government contracts · India').priorityScore,
+ 'A specific time-bound official tender should outrank a generic portal link');
 assert.equal(tenderCard.sourceUrl,'https://eprocure.gov.in/eprocure/app');
 assert.ok(tenderCard.whoMightPay&&tenderCard.whyPay&&tenderCard.nextAction);
 assert.equal(tenderCard.revenueVerified,false);

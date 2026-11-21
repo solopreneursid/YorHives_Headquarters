@@ -147,3 +147,9 @@ This applies across **Ads, affiliates, partners, potential client services, gove
 The three-question display is an eligible routine static UI change in isolation. However, the official tender collector and protected D1 Revenue SQL query change the backend, so this work is **not auto-release eligible**. It is included in the same pending multi-channel candidate following PR #49 and requires **one** manual founder-approved protected HQ workflow run after CI. This is a narrow exception, not permission for HQ agents to change production autonomously; future model-only ranking and UI work remains automatic.
 
 No tender, contract, client budget or government payment is claimed as verified in this initial version. Actual collector reachability and bid completeness must be confirmed from first unattended scans; portal homepages are published first-party links, never fabricated invitations.
+
+## Revenue source-quality refinement (21 November 2026)
+
+The live research database recorded `hn-mrr:empty-public-evidence:0` and `hn-clients:empty-public-evidence:0`. A successful HTTP source check with zero qualifying matches is **not** a source outage. The model now differentiates `leads-found`, `checked-no-match`, `source-unavailable`, and `not-yet-checked`, with source-specific explanations and accurate availability semantics.
+
+Ranked opportunity scores reflect evidence: **generic procurement portal links are places to search, not actual buyer leads** and receive lower investigation priority. Specific official notices with a future deadline remain more actionable than generic portals, but are capped as **unqualified** until bidder experience, eligibility and contract terms are independently reviewed. No claimed earnings or project awards, no bid submissions, no new scrapers or external permissions. Model-only change qualifies for the existing routine reviewed auto-release path after successful tests.

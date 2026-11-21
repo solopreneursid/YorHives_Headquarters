@@ -96,3 +96,11 @@ certified by these source comparisons.
 The old account-wide Cloudflare integration credential remains a separate
 governance concern. The published repository remains public by founder choice,
 while the HQ dashboard remains gated by Cloudflare Access.
+
+## Credential audit update (21 November 2026)
+
+Live Cloudflare **account API token metadata** was inspected read-only. It confirmed two active account tokens: `YorpHives Account Integration` with **132 permission groups** including Workers Scripts Write, D1 Write, Pages Write and DNS Write; and `YorpHives HQ - Founder Approved Deployment` with just **Individual Workers Editor**. No secret values or token IDs were retrieved or stored in the public repository. The broad integration token can bypass the narrow GitHub deployment controls.
+
+The account integration is connected to active Cloudflare-management workflows; narrowing/revoking it before dependent workflows are migrated risks disruption. **No token revoked, rolled, reissued or modified.** Founder action required: inventory every consumer of `YorpHives Account Integration`, migrate each to individually scoped read/write tokens, verify functionality, then revoke the broad original and recheck permissions. This credential remains an **OPEN security risk** until the follow-up read confirms the broad token is inactive. GitHub workflow success does not resolve this.
+
+Current release model supersedes this document's earlier assertion that automatic deployments never occur: scope-limited model/UI ranking changes publish automatically after merge with CI; collector/auth/backend changes still require founder-controlled workflow_dispatch. See `docs/HQ_AUTOMATIC_RELEASES.md` for the live policy.
