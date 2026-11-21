@@ -69,3 +69,40 @@ The initial model displayed the same unverified **Glowy** outside revenue claim 
 The corrected logic leaves unverified third-party revenue figures in **Market Revenue Intelligence** only, until meaningful independent customer and operating-cost evidence justifies founder investigation. Research discussion leads may be promoted into Top Opportunities as speculative validation experiments but, once promoted, are excluded from the redundant Market list. An AI photo generation/paid credits product is evaluated as a possible HQventures product with *high, unverified inference costs*; ordinary private PDF/image editing may still be appropriate for Free Tools.
 
 No change to collectors, scheduling, source restrictions, website monetization, cash accounting, founder permissions or existing production configuration. This correction requires the same manual founder-approved HQ release; current live eight-module version is `efdb1d2a-2d56-4a4f-89c2-8505fa4dfa1c`.
+
+## V3 — multiple direct revenue pathways (2026-11-21)
+
+The founder explicitly required **opportunity discovery** rather than merely observing outside startup revenues. The Revenue tab must identify workable, evidence-backed ways for YorpHives to earn via advertising, affiliate referrals, partnerships, sponsorships, directly acquired clients, and sales of founder-approved HQventures offerings. Any such recommendation remains advisory and cannot alter the public website, trigger payment setup, or initiate outreach.
+
+### Concrete lanes, evidence and example original sources
+
+- **Ads:** Keep Free Tools free; consider publisher approval and eligible page traffic before testing ads on Free Tools alone. Read the official Google AdSense eligibility/publisher restrictions: https://support.google.com/adsense/answer/9724?hl=en-IN. HQventures, HQ, Home and HQconnect remain ad-free.
+- **Affiliate:** Official program pages, e.g. Namecheap https://www.namecheap.com/affiliates/ and DigitalOcean https://www.digitalocean.com/affiliates, are independently sourced **program candidates**, not partner approvals or promised commissions. These providers are *optional external referral destinations* and introduce **no runtime/build/hosting dependency** for YorpHives. Validate visitor intent, availability by country, advertising rules, disclosures, enrollment and current payout terms before applying.
+- **Partnerships:** Example official Cloudflare PowerUP partner page https://www.cloudflare.com/partners/power-up-program/. Whether services, leads or commercial referral compensation are available to YorpHives must be checked individually; no assumed referral fee.
+- **Sponsorship:** HQ researches public commercial sponsorship discussions and genuine traffic fit; does not add sponsor placements or contact brands on its own.
+- **Client acquisition:** HQ reads public Hacker News requests describing a possible software/document/automation project, linking directly to the original item. It requires request-intent keywords, relevant technical work, recent timestamps and multiple corroborating terms. These are **unqualified potential client requests**, *not paying clients or verified active project contracts*. Source comments containing email addresses/phone-like contact details are masked before storage. No unsolicited outreach or automatic lead contact.
+- **Paid HQventures products:** Continue customer validation and staged founder approvals. Do not paywall existing Free Tools.
+
+### Scheduled discovery and source health
+
+The existing 5-minute HQ cron drives seven sparse independent read-only public GET windows (UTC):
+
+| UTC | Source | Purpose |
+|---|---|---|
+| 03:25 | HN public story search | Affiliate program mentions |
+| 06:25 | HN public story search | Sponsorship mentions |
+| 09:25 | HN public story search | Maker MRR/revenue discussions |
+| 12:25 | HN public comment search | Potential client work requests |
+| 15:25 | IndieMakerList public XML feed | Outside maker revenue discussions |
+| 18:25 | HN public story search | Partner/collaboration discussions |
+| 21:25 | HN public story search | Pricing/paid-customer discussions |
+
+Each window remains **at most one public GET**, timeouts, size cap, existing quota, no redirects or forced access, and at most five stored requests for the new monetization lanes (six for existing HN). No new host, secret, cron, cloud resource or external automation service. Results may legitimately be empty. Each source has a visible success/empty/unavailable status. Existing SQLite/D1 opportunities receive only anonymized research evidence with `kind='revenue-client'`, `revenue-affiliate`, `revenue-partnership`, `revenue-sponsorship` (or existing revenue research kinds); no account/lead scraping or emailing.
+
+### Ranking and financial truth
+
+The private Revenue API and simple four-button UI show up to ten ranked channels or specific research leads. Concrete first-party program pages are distinguished from public community chatter, and a client request is not presented as a contract or a qualified prospect. Verified YorpHives income remains `null` without authenticated payment evidence. Outside self-reported earnings never count as company income. All opportunities have original link, risk and the specific manual validation step, with auto-execution disabled.
+
+### Deployment boundary
+
+The latest live HQ baseline was Worker version `6057bd41-ca23-46ae-bc7a-472fa7832a2a`, verified at 100% traffic. The multi-lane upgrade changes bounded public-source collection and the backend query; therefore it is **not eligible for routine auto-deployment** under the installed fail-closed release scope. It needs one additional explicitly founder-approved release. **Subsequent model-only ranking and embedded HQ UI updates auto-deploy after CI**. Do not widen the privilege of the deployed HQ agents merely to avoid this sensitive change gate.
