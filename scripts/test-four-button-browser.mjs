@@ -43,7 +43,16 @@ const mock={
    {id:'hqventures-product-sales',rank:1,channel:'HQventures',title:'Validate a paid HQventures product',stage:'Research first',evidenceStatus:'No customers verified',evidence:'No verified orders.',nextAction:'Review one approved product.',risk:'Payment handling.',sourceUrl:'https://yorphives.com/hqventures/'},
    {id:'free-tools-advertising',rank:2,channel:'Free Tools only',title:'Evaluate advertising on Free Tools',stage:'Research first',evidenceStatus:'AdSense not verified',evidence:'Ads not enabled.',nextAction:'Review page evidence.',risk:'Publisher compliance.',sourceUrl:'https://yorphives.com/free-tools/'},
    {id:'free-tools-sponsorship',rank:3,channel:'Free Tools only',title:'Research relevant tool sponsorship',stage:'Research first',evidenceStatus:'No sponsor',evidence:'Hypothesis.',nextAction:'Test sponsor interest.',risk:'Disclosure.',sourceUrl:'https://yorphives.com/free-tools/'}
-  ],marketSignals:[{title:'External reported startup earnings',classification:'Third-party reported claim · not independently verified',summary:'Reported third-party earnings.',nextAction:'Investigate only',sourceUrl:'https://trustmrr.com/newsletter',yorphivesRevenue:false}]
+   ,{id:'maker-research',rank:4,channel:'HQventures · research',title:'Investigate: Maker reported paid SaaS',stage:'Founder research',
+     evidenceStatus:'Public maker statement · earnings unverified',evidence:'Public statement is not audited.',nextAction:'Interview buyer.',risk:'Pricing unverified.',
+     sourceUrl:'https://news.ycombinator.com/item?id=991',buildEffortHypothesis:'high'},
+    {id:'free-tools-research',rank:5,channel:'Free Tools · research',title:'Investigate: Paid PDF workflow',
+     stage:'Founder research',evidenceStatus:'Discussion only',evidence:'A related market signal.',nextAction:'Review tool usage.',risk:'No paywall.',
+     sourceUrl:'https://indiemakerlist.com/makers/pdf-sample',buildEffortHypothesis:'low-to-medium'}
+  ],sources:[{name:'Hacker News · maker revenue',status:'ok:2',checkedAt:now},
+     {name:'IndieMakerList · maker feed',status:'ok:1',checkedAt:now},
+     {name:'Hacker News · pricing',status:'not-yet-checked',checkedAt:null}],
+   sourceScansCompleted:2,marketSignals:[{title:'External reported startup earnings',classification:'Third-party reported claim · not independently verified',summary:'Reported third-party earnings.',nextAction:'Investigate only',sourceUrl:'https://trustmrr.com/newsletter',yorphivesRevenue:false}]
  },
  '/api/tool-coverage':{available:true,declaredCanonicalPages:143,checkedCanonicalPages:143,
    pageResponding:143,brokenLegacyUrls:0}
@@ -97,11 +106,14 @@ try{
   await page.getByText('Validate a paid HQventures product').waitFor({timeout:10000});
   await page.getByText('Evaluate advertising on Free Tools').waitFor({timeout:10000});
   await page.getByText('Research relevant tool sponsorship').waitFor({timeout:10000});
+  await page.getByText('Investigate: Maker reported paid SaaS').waitFor({timeout:10000});
+  await page.getByText('Investigate: Paid PDF workflow').waitFor({timeout:10000});
+  await page.getByText('Recorded public checks: 2 of 3.',{exact:false}).waitFor({timeout:10000});
   await page.getByText('External reported startup earnings').waitFor({timeout:10000});
   const external=page.getByRole('link',{name:'Original report'});
   assert.equal(await external.getAttribute('href'),'https://trustmrr.com/newsletter');
   assert.equal(await external.getAttribute('rel'),'noopener noreferrer');
-  assert.equal(await page.locator('main .revenue-row').count(),4,'Three opportunities plus one external source');
+  assert.equal(await page.locator('main .revenue-row').count(),6,'Five opportunities plus one external source');
   await page.goBack({waitUntil:'networkidle'});
   assert.equal(await page.locator('main h1').textContent(),'Products','Browser Back must restore Products');
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
