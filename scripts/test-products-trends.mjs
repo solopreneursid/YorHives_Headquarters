@@ -17,7 +17,7 @@ const gh=f.trendGithub({items:[{full_name:'example/good',stargazers_count:810,cr
  {full_name:'example/bad',stargazers_count:900,html_url:'https://github.com.evil.test/example/bad'}]});
 assert.equal(gh.length,1);
 assert.equal(gh[0].score,85);
-assert.equal(gh[0].kind,'trend-measured');
+assert.equal(gh[0].kind,'trend-signal'); // Live raw GitHub stars are not measured daily growth.
 assert.match(gh[0].description,/not daily growth/i);
 assert.match(gh[0].recommendation,/Monetization:/);
 const hn=f.trendHackerNews({hits:[{title:'Show HN: PDF tool',points:130,num_comments:31,objectID:'123456'},
