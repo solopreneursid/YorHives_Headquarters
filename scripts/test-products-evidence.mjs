@@ -41,6 +41,8 @@ const src=readFileSync(new URL('../src/hq-worker.mjs',import.meta.url),'utf8');
 assert.match(src,/rankProducts\(products\.results/);
 assert.match(src,/product_intel_leads/);
 assert.match(src,/link-only-unverified/);
+assert.match(src,/More research candidates/);
+assert.match(src,/recent\.slice\(0,30\)/);
 assert.match(src,/verifyAccess\(request,env,ctx\)/);
 assert.match(src,/if\(!decisionWrite/);
 const ranker=readFileSync(new URL('../src/products-ranker.mjs',import.meta.url),'utf8');
