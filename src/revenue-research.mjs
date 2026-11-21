@@ -5,13 +5,15 @@
  */
 const minuteMs=60000;
 const specs=Object.freeze([
+ {id:'gov-cppp',hour:1,minute:25,kind:'government',site:'https://eprocure.gov.in/eprocure/app',name:'India · official Central eProcurement tender notices'},
  {id:'hn-affiliates',hour:3,minute:25,kind:'affiliate',term:'affiliate',site:'https://hn.algolia.com/api',name:'Hacker News · publicly discussed affiliate programs'},
  {id:'hn-sponsors',hour:6,minute:25,kind:'sponsorship',term:'sponsor',site:'https://hn.algolia.com/api',name:'Hacker News · public sponsorship interest'},
  {id:'hn-mrr',hour:9,minute:25,kind:'hn',term:'mrr',site:'https://hn.algolia.com/api',name:'Hacker News · maker revenue conversations'},
  {id:'hn-clients',hour:12,minute:25,kind:'client',term:'looking for',site:'https://hn.algolia.com/api',name:'Hacker News · potential public client requests'},
  {id:'makers',hour:15,minute:25,kind:'feed',site:'https://indiemakerlist.com/feed.xml',name:'IndieMakerList · public maker feed'},
  {id:'hn-partners',hour:18,minute:25,kind:'partnership',term:'partner',site:'https://hn.algolia.com/api',name:'Hacker News · publicly discussed partnerships'},
- {id:'hn-pricing',hour:21,minute:25,kind:'hn',term:'pricing',site:'https://hn.algolia.com/api',name:'Hacker News · pricing discussions'}
+ {id:'hn-pricing',hour:21,minute:25,kind:'hn',term:'pricing',site:'https://hn.algolia.com/api',name:'Hacker News · pricing discussions'},
+ {id:'gov-jharkhand',hour:23,minute:25,kind:'government',site:'https://jharkhandtenders.gov.in/nicgep/app',name:'Jharkhand · official state eProcurement tender notices'}
 ]);
 const clean=(x,n=200)=>String(x??'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,n);
 const safeLink=x=>{try{const v=new URL(String(x));return v.protocol==='https:'&&!v.username&&!v.password&&!v.port&&v.href.length<500?v.href:null}catch{return null}};
@@ -133,13 +135,112 @@ export function normalizeMakerFeed(xml,at){
  }
  return out;
 }
+
+const procurementScope=/\b(?:software|web\s?site|web\s?application|portal development|mobile\s?app|document management|data entry|digitization|digitalisation|digitalization|e[- ]?governance|information technology|IT services|IT enabled services|IT consultancy|MIS software|database management|automation|cyber security|cybersecurity|artificial intelligence|machine learning|web application|software maintenance|online dashboard|ERP software|digital records|data processing|website maintenance|computer programming|system integration)\b/i;
+const nonSoftware=/\b(?:road widening|construction of|civil works|plumbing|building repair|bridge construction|fencing|garden works|road resurfacing|earthwork|cement|pipeline laying)\b/i;
+const months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+const dateRe=/([0-3]?\d)-([A-Za-z]{3})-(20\d\d)\s+([01]?\d):([0-5]\d)\s*(AM|PM)/i;
+const decodeTender=t=>String(t||'').replace(/&nbsp;|&#160;/gi,' ').replace(/&amp;/gi,'&')
+ .replace(/&lt;/gi,'<').replace(/&gt;/gi,'>').replace(/&quot;/gi,'"').replace(/&#39;/gi,"'")
+ .replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+function dateIst(m){
+ if(!m)return null;const month=months[m[2].toLowerCase()],day=Number(m[1]),year=Number(m[3]);
+ let hour=Number(m[4])%12;if(m[6].toUpperCase()==='PM')hour+=12;
+ if(month===undefined||day<1||day>31)return null;
+ const utc=Date.UTC(year,month,day,hour,Number(m[5]))-(330*minuteMs);
+ const local=new Date(utc+330*minuteMs);
+ if(local.getUTCFullYear()!==year||local.getUTCMonth()!==month||local.getUTCDate()!==day)return null;
+ return {iso:new Date(utc).toISOString(),local:year+'-'+String(month+1).padStart(2,'0')+'-'+String(day).padStart(2,'0')+' '+String(hour).padStart(2,'0')+':'+m[5]+' IST'};
+}
+function portalConfig(portal){
+ try{const u=new URL(portal);if(u.protocol!=='https:'||u.search||u.hash)return null;
+  if(u.hostname==='eprocure.gov.in'&&u.pathname==='/eprocure/app')
+   return {id:'central',site:u.href,label:'Central government procurement'};
+  if(u.hostname==='jharkhandtenders.gov.in'&&u.pathname==='/nicgep/app')
+   return {id:'jharkhand',site:u.href,label:'Jharkhand government procurement'};
+  return null;}catch{return null}
+}
+// Parse ONLY a verifiable, still-open, public first-party notice row:
+// title + reference + closing date in IST. This does not verify supplier eligibility.
+export function normalizeGovernmentTenders(html,observedAt,portal){
+ const config=portalConfig(portal),time=validDate(observedAt),out=[],seen=new Set();
+ if(!config||!time||typeof html!=='string'||html.length>200000||!/<tr\b/i.test(html))return [];
+ for(const [,raw] of [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].slice(0,70)){
+  const cells=[...raw.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(x=>({raw:x[1],title:clean(decodeTender(x[1]),170)}));
+  if(cells.length<4)continue;
+  for(let i=0;i<cells.length-2;i++){
+   const title=cells[i].title;
+   if(!procurementScope.test(title)||nonSoftware.test(title)||title.length<17||title.length>170||
+      !/<a\b/i.test(cells[i].raw))continue;
+   const ref=cells[i+1].title.replace(/\s+/g,' ').slice(0,105);
+   if(!/^[\p{L}\d][\p{L}\d\s./()_-]{5,105}$/u.test(ref)||dateRe.test(ref))continue;
+   const deadline=dateIst(cells[i+2].title.match(dateRe));
+   if(!deadline)continue;
+   const until=Date.parse(deadline.iso)-time;
+   if(until<=0||until>90*86400000)continue;
+   const key=config.id+'|'+ref.toLowerCase();if(seen.has(key))continue;seen.add(key);
+   out.push({id:'gov-'+shortId(key),
+    title:clean('Government tender · '+title,115),
+    description:'Official '+config.label+' public listing. Tender reference: '+ref+'. Bid closing: '+deadline.local+'. Scope: '+title+'. Issuing body and exact eligibility must be checked in tender documents.',
+    recommendation:'VERIFY BEFORE BID: Open the official tender portal, search the exact reference, confirm issuing body, deliverables, bidder registration and DSC, past-experience criteria, EMD/fees, deadlines, and corrigenda. Founder decides whether to bid; no automatic submission.',
+    source_url:config.site,observed_at:new Date(time).toISOString(),score:71,kind:'revenue-government'});
+   if(out.length>=6)return out;
+   break;
+  }
+ }
+ return out;
+}
+function robotsMatch(path,pattern){
+ if(pattern.includes('*'))return path.startsWith(pattern.split('*')[0]); // conservative disallow
+ return path.startsWith(pattern.replace(/\$/,''));
+}
+export function robotsPermit(text,agent,path){
+ if(typeof text!=='string'||text.length>32000)return false;
+ if(text.length===0)return true; // robots.txt returned HTTP 404
+ let agents=[],rules=[],groups=[],active=false;
+ const finish=()=>{if(agents.length)groups.push({agents,rules});agents=[];rules=[];active=false};
+ for(const raw of text.split(/\r?\n/).slice(0,1200)){
+  const line=raw.replace(/#.*$/,'').trim();
+  if(!line){if(active)finish();continue;}
+  const m=line.match(/^([\w-]+)\s*:\s*(.*)$/);if(!m)continue;
+  const name=m[1].toLowerCase(),value=m[2].trim();
+  if(name==='user-agent'){if(active)finish();agents.push(value.toLowerCase());continue;}
+  if(name==='allow'||name==='disallow'){active=true;if(value)rules.push({name,value});continue;}
+ }
+ finish();
+ const specific=groups.filter(g=>g.agents.includes(agent.toLowerCase()));
+ const applicable=specific.length?specific:groups.filter(g=>g.agents.includes('*'));
+ let winner=null;
+ for(const group of applicable)for(const rule of group.rules){
+  if(!robotsMatch(path,rule.value))continue;
+  if(rule.name==='allow'&&rule.value.includes('*'))continue;
+  const weight=rule.value.replace(/\*/g,'').length;
+  if(!winner||weight>winner.weight||(weight===winner.weight&&rule.name==='disallow'))
+   winner={weight,disallow:rule.name==='disallow'};
+ }
+ return !winner?.disallow;
+}
+async function governmentRobotsAllowed(source,{reserveFetch,env,fetchFn}){
+ const u=new URL(source.site);
+ if(!await reserveFetch(env))throw Error('public-fetch-budget-exhausted');
+ const robot=await boundedGet(u.origin+'/robots.txt',{fetchFn,limit:32000});
+ if(!robotsPermit(robot,'YorpHivesHQ-RevenueResearch',u.pathname))throw Error('robots-disallows-source');
+ return true;
+}
+
 async function boundedGet(url,{fetchFn=fetch,limit=96000}={}){
  const target=new URL(url);
  if(target.protocol!=='https:'||target.username||target.password||target.port)throw Error('unapproved-url');
- if(!((target.hostname==='hn.algolia.com'&&target.pathname==='/api/v1/search_by_date')||
-   (target.hostname==='indiemakerlist.com'&&target.pathname==='/feed.xml')))throw Error('source-not-allowlisted');
+ const standard=(target.hostname==='hn.algolia.com'&&target.pathname==='/api/v1/search_by_date')||
+   (target.hostname==='indiemakerlist.com'&&target.pathname==='/feed.xml');
+ const government=(target.hostname==='eprocure.gov.in'&&['/eprocure/app','/robots.txt'].includes(target.pathname))||
+   (target.hostname==='jharkhandtenders.gov.in'&&['/nicgep/app','/robots.txt'].includes(target.pathname));
+ if(!standard&&!government||target.search&&government)throw Error('source-not-allowlisted');
  const resp=await fetchFn(url,{method:'GET',redirect:'manual',signal:AbortSignal.timeout(8000),
-  headers:{accept:target.hostname==='hn.algolia.com'?'application/json':'application/atom+xml, application/rss+xml, application/xml','user-agent':'YorpHivesHQ-RevenueResearch/1.0'}});
+  headers:{accept:target.hostname==='hn.algolia.com'?'application/json':government?
+   (target.pathname==='/robots.txt'?'text/plain':'text/html'):'application/atom+xml, application/rss+xml, application/xml',
+   'user-agent':'YorpHivesHQ-RevenueResearch/1.0'}});
+ if(target.pathname==='/robots.txt'&&resp?.status===404)return '';
  if(!resp||resp.status!==200)throw Error('source-http-'+String(resp?.status||'unknown'));
  const length=Number(resp.headers?.get?.('content-length')||0);
  if(Number.isFinite(length)&&length>limit){try{await resp.body?.cancel()}catch{}throw Error('public-source-too-large')}
@@ -163,7 +264,11 @@ export async function runRevenueResearch(env,scheduledTime,{reserveFetch,fetchFn
  try{
   if(!await reserveFetch(env))throw Error('public-fetch-budget-exhausted');
   let entries=[];
-  if(source.kind!=='feed'){
+  if(source.kind==='government'){
+   await governmentRobotsAllowed(source,{reserveFetch,env,fetchFn});
+   const html=await boundedGet(source.site,{fetchFn,limit:180000});
+   entries=normalizeGovernmentTenders(html,at,source.site);
+  }else if(source.kind!=='feed'){
    const tags=source.kind==='client'?'comment':'story';
    const url='https://hn.algolia.com/api/v1/search_by_date?tags='+tags+'&query='+encodeURIComponent(source.term)+
     '&numericFilters='+encodeURIComponent('created_at_i>'+(Math.floor(Date.parse(since)/1000)))+'&hitsPerPage=35';
@@ -183,7 +288,7 @@ export async function runRevenueResearch(env,scheduledTime,{reserveFetch,fetchFn
   .bind(statusKey,result,at).run();
  // Own evidence only, bounded retention, no changes to unrelated source data.
  if(source.id==='hn-pricing')
-  await env.DB.prepare("DELETE FROM opportunities WHERE kind IN ('revenue-research','revenue-client','revenue-affiliate','revenue-partnership','revenue-sponsorship') AND observed_at<?")
+  await env.DB.prepare("DELETE FROM opportunities WHERE kind IN ('revenue-research','revenue-client','revenue-affiliate','revenue-partnership','revenue-sponsorship','revenue-government') AND observed_at<?")
    .bind(new Date(Date.parse(at)-120*86400000).toISOString()).run();
  return source.id+':'+result;
 }
