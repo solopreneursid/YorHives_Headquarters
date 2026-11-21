@@ -35,10 +35,14 @@ export function rankProducts(rows,signals,now=Date.now()){
   }
   const n=best.length,days=n>=2?(stamp(best[n-1][0])-stamp(best[0][0]))/dayMs:0;
   const delta=days>0?best[n-1][1]-best[0][1]:null;
+  const upSteps=best.reduce((sum,entry,i)=>sum+(i>0&&entry[1]>best[i-1][1]?1:0),0);
+  const rate=days>0?delta/days:0,pctPerDay=days>0?100*delta/Math.max(1,best[0][1])/days:0;
+  const cutoff={github_stars:[10,3],hn_points:[12,20],firefox_daily_users:[25,5],npm_downloads_7d:[200,20]};
+  const min=cutoff[metric]||[Infinity,Infinity];
   let grade='listing-only',score=20,action='Listing · growth unverified';
   if(n){grade='one-snapshot';score=32;action='Popular · growth unverified'}
   if(delta!==null){grade=delta>0?'early-growth':'flat-or-down';score=delta>0?49:24;action=delta>0?'Early growth · needs confirmation':'Flat or declining · monitor'}
-  if(n>=3&&days>=2&&delta>0){grade='multi-day-growth';score=68;action='Repeated multi-day growth · investigate'}
+  if(n>=3&&days>=2&&delta>0&&upSteps>=2&&rate>=min[0]&&pctPerDay>=min[1]){grade='multi-day-growth';score=68;action='Repeated multi-day growth · investigate'}
   if(/agent|workflow|automation|pdf|document|monitor|privacy|self.?host|browser|converter|tool/i.test(x.title||''))score+=7;
   if(now-stamp(x.observed_at)>7*dayMs)score-=7;
   const evidence=n?(n+' dated '+metric+' sample(s); '+(delta===null?'growth not yet measurable.':('change '+(delta>=0?'+':'')+delta+' in '+days.toFixed(1)+' days.'))):'No repeated popularity measurements.';
