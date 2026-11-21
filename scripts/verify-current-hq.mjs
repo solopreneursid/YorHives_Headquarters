@@ -26,7 +26,7 @@ export function verify(){
  assert.equal(info.productionWorker,'yorphives-hq-free-pilot');
  assert.equal(info.releaseMethod.includes('workflow_dispatch'),true);
  const expected=Object.entries(info.moduleGitBlobs);
- assert.equal(expected.length,6,'Six reviewed Worker modules required, including evidence ranker and scanner');
+ assert.equal(expected.length,7,'Seven reviewed Worker modules required, including Products and Revenue intelligence');
  const imported=[];
  for(const [name,sha] of expected){
   const src=load('src/'+name);
@@ -37,6 +37,7 @@ export function verify(){
  }
  const hq=load('src/hq-worker.mjs');
  assert.match(hq,/from '\.\/products-ranker\.mjs'/,'Ranker must be imported');
+ assert.match(hq,/from '\.\/revenue-intelligence\.mjs'/,'Revenue intelligence must be imported');
  assert.match(hq,/rankProducts\(products\.results/,'Evidence-ranked Products route missing');
  assert.match(hq,/product_intel_leads/,'Safe public source fallback links missing');
  const html=asset(hq,'/index.html');
@@ -52,7 +53,7 @@ export function verify(){
  assert.match(js,/credentials:'same-origin'/);
  assert.match(css,/max-width:600px|@media/,'Mobile CSS breakpoint must exist');
  for(const endpoint of ['/api/report','/api/health-self-check','/api/dependency-audit',
-  '/api/tool-coverage','/api/hq-perimeter','/api/agent-demand']){
+  '/api/tool-coverage','/api/hq-perimeter','/api/agent-demand','/api/revenue-intelligence']){
    assert.ok(hq.includes(endpoint),'Missing currently deployed endpoint '+endpoint);
  }
  assert.match(hq,/verifyAccess\(request,env,ctx\)/,'Auth guard must be enforced in the live source');
