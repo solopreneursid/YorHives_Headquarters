@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// Manual-only, fail-closed HQ Worker publisher. Not callable by deployed HQ agents.
-// No deploy on push/PR. Require founder-approved GitHub environment and narrow token.
+// Fail-closed HQ publisher: normal automatic GitHub CI or sensitive manual founder dispatch.
+// Deployed HQ agents cannot call this, access GH deployment secrets, or change infrastructure.
 import {readFileSync} from 'node:fs';
 import {dirname,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
 import {verify,gitBlob} from './verify-current-hq.mjs';
 
 const root=dirname(dirname(fileURLToPath(import.meta.url)));
@@ -12,12 +13,20 @@ const info=JSON.parse(readFileSync(join(root,'hq-release.json'),'utf8'));
 verify(); // Fail before network access if the reviewed source changed.
 const env=process.env;
 function fail(condition,message){if(!condition)throw Error(message)}
-fail(env.GITHUB_EVENT_NAME==='workflow_dispatch','Only a manual GitHub Actions release is allowed');
+const manual=env.GITHUB_EVENT_NAME==='workflow_dispatch';
+const auto=env.GITHUB_EVENT_NAME==='push'&&env.HQ_AUTO_RELEASE==='true';
+fail(manual||auto,'Only founder-manual or scoped GitHub main-branch auto-release is allowed');
 fail(env.GITHUB_REF==='refs/heads/main','Only the approved main branch may release');
-fail(env.HQ_FOUNDER_CONFIRMATION==='RELEASE_FOUR_BUTTON_HQ','Founder confirmation text required');
+if(manual)fail(env.HQ_FOUNDER_CONFIRMATION==='RELEASE_FOUR_BUTTON_HQ','Founder confirmation text required');
+if(auto){
+ fail(env.HQ_AUTO_SCOPE_OK==='true','Safe automatic release scope check is mandatory');
+ // This script must NEVER be invoked directly in production without the upstream path gate.
+ fail(Boolean(env.GITHUB_WORKFLOW_REF?.includes('/.github/workflows/hq-production-release.yml@refs/heads/main')),
+  'Automated release must originate from the reviewed main-branch workflow');
+}
 fail(/^[0-9a-f]{40}$/.test(env.HQ_APPROVED_SOURCE_SHA||''),'Source commit SHA input invalid');
 fail(env.HQ_APPROVED_SOURCE_SHA===env.GITHUB_SHA,'Approved SHA must match workflow checked-out commit');
-fail(env.EXPECTED_CURRENT_VERSION===info.sourceWorkerVersion,
+if(manual)fail(env.EXPECTED_CURRENT_VERSION===info.sourceWorkerVersion,
   'Current Worker version must match the review manifest (prevents stale releases)');
 fail(Boolean(env.HQ_RELEASE_TOKEN)&&Boolean(env.HQ_CLOUDFLARE_ACCOUNT_ID),
   'Missing founder-configured, scoped release token or Cloudflare account ID');
@@ -60,7 +69,10 @@ function sameSource(remote){
 }
 const deployments=await data(prefix+'/deployments');
 const version=deployments?.deployments?.[0]?.versions?.[0]?.version_id;
-fail(version===env.EXPECTED_CURRENT_VERSION,'Live HQ version changed. Release denied.');
+if(manual)fail(version===env.EXPECTED_CURRENT_VERSION,'Live HQ version changed. Release denied.');
+const parent=auto?execFileSync('git',['rev-parse','HEAD^'],{encoding:'utf8'}).trim():null;
+const bootstrap=auto&&parent==='fcad1341f06100d23f7ff6e50db0ff505de859e6';
+if(bootstrap)fail(version===info.sourceWorkerVersion,'Bootstrap Worker version changed; release denied.');
 const [settings,schedules]=await Promise.all([data(prefix+'/settings'),data(prefix+'/schedules')]);
 fail(equalJson(sortedBindings(settings.bindings),sortedBindings(info.expectedBindings)),
  'Live bindings differ from reviewed inventory. Release denied.');
@@ -69,7 +81,12 @@ const currentSchedule=(schedules?.schedules||[]).map(x=>x.cron);
 fail(equalJson(currentSchedule,info.expectedSchedules),'Live scheduler differs; release denied');
 const sourceResponse=await request(prefix+'/content/v2');
 const current=parseModules(await sourceResponse.text());
-const pinnedLive=new Map(Object.entries(info.liveModuleGitBlobs||{}));
+// For routine updates the previously merged main commit is the expected deployed
+// source, so auto-release does not require hand-updating a Worker version after every deploy.
+const priorManifest=auto&&!bootstrap?JSON.parse(execFileSync('git',['show','HEAD^:hq-release.json'],
+ {encoding:'utf8',maxBuffer:300000})):null;
+const pinnedLive=new Map(Object.entries(auto&&!bootstrap?
+ (priorManifest?.moduleGitBlobs||{}):(info.liveModuleGitBlobs||{})));
 fail(current.size===pinnedLive.size&&[...pinnedLive].every(([name,sha])=>current.has(name)&&gitBlob(current.get(name))===sha),
  'Currently deployed Worker module source drifted from founder-reviewed live baseline. Release denied.');
 
@@ -115,6 +132,6 @@ fail(equalJson(sortedBindings(newSettings.bindings),sortedBindings(info.expected
 fail(equalJson((newSchedules?.schedules||[]).map(x=>x.cron),info.expectedSchedules),
  'Post-upload scheduler mismatch');
 const finalDeployment=await data(prefix+'/deployments');
-console.log('PASS: manually approved HQ source deployed and verified. Version: '+
+console.log('PASS: '+(auto?'scoped automatic':'founder manual')+' HQ source deployed and verified. Version: '+
  (finalDeployment?.deployments?.[0]?.versions?.[0]?.version_id||'check Cloudflare dashboard'));
 console.log('Limitations: authenticated founder browser and Cloudflare Access policies require separate checks.');
