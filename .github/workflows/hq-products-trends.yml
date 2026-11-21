@@ -4,14 +4,20 @@ on:
     branches: [main]
     paths:
       - 'src/hq-worker.mjs'
+      - 'src/product-intelligence.mjs'
+      - 'src/products-ranker.mjs'
       - 'hq-release.json'
       - 'scripts/test-products-trends.mjs'
+      - 'scripts/test-products-evidence.mjs'
       - '.github/workflows/hq-products-trends.yml'
   pull_request:
     paths:
       - 'src/hq-worker.mjs'
+      - 'src/product-intelligence.mjs'
+      - 'src/products-ranker.mjs'
       - 'hq-release.json'
       - 'scripts/test-products-trends.mjs'
+      - 'scripts/test-products-evidence.mjs'
       - '.github/workflows/hq-products-trends.yml'
   workflow_dispatch:
 permissions:
@@ -30,6 +36,10 @@ jobs:
       - name: Verify authorized HQ modules and complete Worker syntax
         run: |
           node --check src/hq-worker.mjs
+          node --check src/product-intelligence.mjs
+          node --check src/products-ranker.mjs
           node scripts/verify-current-hq.mjs
       - name: Validate trend signals, sources and private Products UI offline
-        run: node scripts/test-products-trends.mjs
+        run: |
+          node scripts/test-products-trends.mjs
+          node scripts/test-products-evidence.mjs
