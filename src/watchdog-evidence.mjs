@@ -137,7 +137,7 @@ export const WATCHDOG_CHECK_IDS=Object.freeze([...CHECK_IDS]);
 const REPO='solopreneursid/YorpHives_Website';
 const API='https://api.github.com/repos/'+REPO;
 const WORKFLOW='free-tools-long-run-watchdog.yml';
-const MAX_BYTES=65000;
+const MAX_BYTES=350000;
 const TIMEOUT_MS=4300;
 const FRESH_MS=36*60*60*1000;
 const safeText=(value,n=200)=>typeof value==='string'?value.replace(/[\x00-\x1f\x7f]/g,' ').slice(0,n):'';
@@ -209,7 +209,7 @@ export function assessFreeToolsEvidence({runs,issues,now=Date.now()}={}){
   incidents,improvements,nextAction,digest};
 }
 export async function loadFreeToolsOperations({fetcher=fetch,now=()=>Date.now()}={}){
- const urls=[API+'/actions/workflows/'+WORKFLOW+'/runs?per_page=8',API+'/issues?state=open&per_page=50'];
+ const urls=[API+'/actions/workflows/'+WORKFLOW+'/runs?per_page=8',API+'/issues?state=open&per_page=30'];
  const [runs,issues]=await Promise.allSettled(urls.map(url=>readPublicEvidence(url,{fetcher})));
  const value=x=>x.status==='fulfilled'?x.value:null;
  const result=assessFreeToolsEvidence({runs:value(runs),issues:value(issues),now:now()});
