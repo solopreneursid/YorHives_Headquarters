@@ -37,3 +37,7 @@ The scope checker and tests use only Git history locally; they cannot access a b
 ## Acceptance
 
 Inspect GitHub Actions `HQ production release (safe auto / sensitive founder manual)` after the first merge. A routine change should automatically finish `auto-scope`, `safe-auto-release`, the source test suite and post-upload code verification. An unrelated/sensitive code change should finish `auto-scope` with `eligible=false`, skipping deployment and never requesting environment approval. If an environment approval remains required, complete the one-time setting above; no need to approve every subsequent safe update.
+
+## Bootstrap workflow syntax repair
+
+The first automatic-run workflow failed YAML parsing on a `run: echo` line that contained an unescaped `:`. The repair uses a multiline YAML block and intentionally rebases the **one-time-only** trusted bootstrap parent from `fcad1341f06100d23f7ff6e50db0ff505de859e6` to `bc0601193e5e2902545bec95a7567bab5c8dbc12`. No Cloudflare deployment occurred on the invalid workflow run. All regular automatic releases still reject workflow/deployer changes.

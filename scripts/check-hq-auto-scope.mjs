@@ -6,7 +6,7 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 
-const BOOTSTRAP_PARENT='fcad1341f06100d23f7ff6e50db0ff505de859e6';
+const BOOTSTRAP_PARENT='bc0601193e5e2902545bec95a7567bab5c8dbc12';
 const BOOTSTRAP_FILES=new Set([
  '.github/workflows/hq-production-release.yml',
  'scripts/release-hq-manual.mjs',

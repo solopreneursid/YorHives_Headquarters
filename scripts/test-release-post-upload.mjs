@@ -45,6 +45,6 @@ assert.match(src,/const auto=env\.GITHUB_EVENT_NAME==='push'&&env\.HQ_AUTO_RELEA
 assert.match(src,/HQ_AUTO_SCOPE_OK==='true'/);
 assert.match(src,/GITHUB_WORKFLOW_REF\?\.includes/);
 assert.match(src,/const priorManifest=auto&&!bootstrap/);
-assert.match(src,/parent==='fcad1341f06100d23f7ff6e50db0ff505de859e6'/);
+assert.match(src,/parent==='bc0601193e5e2902545bec95a7567bab5c8dbc12'/);
 assert.match(src,/manual\)fail\(version===env\.EXPECTED_CURRENT_VERSION/);
 console.log('PASS HQ founder manual and safe automatic release: retries read-only GET after temporary 404; never retries PUT or 403');

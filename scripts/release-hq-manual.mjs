@@ -71,7 +71,7 @@ const deployments=await data(prefix+'/deployments');
 const version=deployments?.deployments?.[0]?.versions?.[0]?.version_id;
 if(manual)fail(version===env.EXPECTED_CURRENT_VERSION,'Live HQ version changed. Release denied.');
 const parent=auto?execFileSync('git',['rev-parse','HEAD^'],{encoding:'utf8'}).trim():null;
-const bootstrap=auto&&parent==='fcad1341f06100d23f7ff6e50db0ff505de859e6';
+const bootstrap=auto&&parent==='bc0601193e5e2902545bec95a7567bab5c8dbc12';
 if(bootstrap)fail(version===info.sourceWorkerVersion,'Bootstrap Worker version changed; release denied.');
 const [settings,schedules]=await Promise.all([data(prefix+'/settings'),data(prefix+'/schedules')]);
 fail(equalJson(sortedBindings(settings.bindings),sortedBindings(info.expectedBindings)),

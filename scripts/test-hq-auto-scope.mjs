@@ -15,7 +15,7 @@ for(const file of ['src/revenue-research.mjs','src/product-intelligence.mjs','sc
 }
 assert.equal(eligibleFiles({...base,changed:['docs/safe.md']}).eligible,false,'Docs alone do not redeploy');
 assert.equal(eligibleFiles({...base,changed:['hq-release.json']}).eligible,false,'Manifest alone does not redeploy');
-const bootstrap=eligibleFiles({parent:'fcad1341f06100d23f7ff6e50db0ff505de859e6',changed:[
+const bootstrap=eligibleFiles({parent:'bc0601193e5e2902545bec95a7567bab5c8dbc12',changed:[
  '.github/workflows/hq-production-release.yml','scripts/release-hq-manual.mjs',
  'scripts/check-hq-auto-scope.mjs','scripts/test-hq-auto-scope.mjs','docs/HQ_AUTOMATIC_RELEASES.md']});
 assert.equal(bootstrap.eligible,true,'Explicitly pinned one-time pipeline bootstrap permitted');
