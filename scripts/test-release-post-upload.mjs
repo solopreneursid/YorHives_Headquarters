@@ -40,4 +40,11 @@ assert.equal(forbidden.requests.length,1);
 const permanent=runner(async ()=>{throw new Error('Cloudflare GET request failed HTTP 404')});
 await assert.rejects(permanent.verify(),/Do NOT rerun publication/);
 assert.equal(permanent.requests.length,7,'Post-upload verification attempts must be bounded');
-console.log('PASS HQ manual release: retries read-only GET after temporary 404; never retries PUT or 403');
+// Auto mode is approved only for the exact main-branch workflow and reviewed changed scope.
+assert.match(src,/const auto=env\.GITHUB_EVENT_NAME==='push'&&env\.HQ_AUTO_RELEASE==='true'/);
+assert.match(src,/HQ_AUTO_SCOPE_OK==='true'/);
+assert.match(src,/GITHUB_WORKFLOW_REF\?\.includes/);
+assert.match(src,/const priorManifest=auto&&!bootstrap/);
+assert.match(src,/parent==='fcad1341f06100d23f7ff6e50db0ff505de859e6'/);
+assert.match(src,/manual\)fail\(version===env\.EXPECTED_CURRENT_VERSION/);
+console.log('PASS HQ founder manual and safe automatic release: retries read-only GET after temporary 404; never retries PUT or 403');
