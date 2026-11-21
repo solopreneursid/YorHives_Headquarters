@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "application": "YorpHives HQ",
   "productionWorker": "yorphives-hq-free-pilot",
-  "sourceWorkerVersion": "9396a967-e8a7-4814-9232-d3eabda774d3",
+  "sourceWorkerVersion": "3a706c0e-814e-4991-b36f-7ab661144b96",
   "workerContentSha256": null,
   "moduleGitBlobs": {
     "hq-worker.mjs": "a6ab75b18cab251408423b6461833569216024b0",
@@ -91,33 +91,33 @@
     "All ranked Revenue opportunities expose whoMightPay, whyPay, nextAction, verified earnings null and founder approval required; HQ cannot register/bid/contact/pay.",
     "Monetization follow-up: never claim a government award or supplier eligibility from a tender portal homepage; all proposals/tenders require founder review."
   ],
-  "previousWorkerVersion": "c94c89a0-e314-4a43-bd8b-da879e3bab1d",
+  "previousWorkerVersion": "9396a967-e8a7-4814-9232-d3eabda774d3",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
   "releaseVerification": {
     "githubWorkflowRun": 44868381659,
-    "acceptedAt": "2026-11-21T07:40:27.203877Z",
+    "acceptedAt": "2026-11-21T12:18:52.45854Z",
     "outcome": "Successful safe automatic rollout; all eight current Cloudflare modules checked against approved source, HQ Access founder-only and bound settings preserved.",
-    "verifiedBy": "GitHub completed successful run and independently checked Cloudflare deployed source checksum",
+    "verifiedBy": "Independent Cloudflare deployment version and exact eight Worker module Git blob comparison",
     "modulesMatched": 8,
     "bindingsMatched": 9,
     "cron": "*/5 * * * *",
     "manualFounderApproved": false,
     "productionBrowserSessionVerified": false,
     "sourceCollectorsVerified": false,
-    "recordType": "verified eight-module live baseline for distinct multi-channel candidate",
-    "candidateVerifiedInProduction": false
+    "recordType": "verified deployed Free Tools analytics HQ source",
+    "candidateVerifiedInProduction": true
   },
   "privateSnapshotKey": "hq-authoritative-snapshot__2026-11-19__b2fa6a0a-b872-48f4-888f-e675e84fa0a5",
   "moduleTreeSha256": null,
   "liveModuleGitBlobs": {
-    "hq-worker.mjs": "8d4279db4e234f14439ddebd4e3b2b2a5e6b99c9",
+    "hq-worker.mjs": "a6ab75b18cab251408423b6461833569216024b0",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
-    "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
+    "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
     "product-intelligence.mjs": "1afd4abb92978bda8abc97287bbbf760534e9e72",
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
-    "revenue-intelligence.mjs": "990c94539ee4672c31854cfbf0e38933428ba4bd",
+    "revenue-intelligence.mjs": "18fda8b95f716a15a43364cca09d407104a89bdf",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "Founder-review-gated Free Tools Revenue Intelligence candidate: catalog-validated individual pageviews and first-party tool actions, never unique people, ad impressions or earnings. Existing private HQ Access, eight modules, schedules and bindings preserved."
+  "candidateStatus": "Verified in deployed HQ Worker: Free Tools Revenue baseline, private read-only tool pageview monitoring and no fabricated earnings. Browser session verification separate."
 }
