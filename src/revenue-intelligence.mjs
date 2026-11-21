@@ -31,7 +31,7 @@ export function freeToolsRevenueReadiness(growth,{now=new Date().toISOString()}=
   available:false,status:'not-connected',observedAt:null,
   pageViews7d:null,previousPageViews7d:null,sitewidePageViews:true,
   completedActions7d:null,previousCompletedActions7d:null,
-  topToolActions:[],uniqueVisitors:null,adImpressions:null,adSenseEarnings:null,
+  topToolActions:[],topToolPageViews:[],uniqueVisitors:null,adImpressions:null,adSenseEarnings:null,
   currency:null,adsApproved:null,recommendations:[],
   disclaimer:'Pageviews are sitewide browser-reported events, not unique visitors, free-tool-only traffic, ad impressions or income.'};
  if(growth?.available!==true||growth.source!==base.source||!Array.isArray(growth.ranked)||
@@ -50,7 +50,17 @@ export function freeToolsRevenueReadiness(growth,{now=new Date().toISOString()}=
   .sort((a,b)=>b.completedActions7d-a.completedActions7d).slice(0,5)
   .map(x=>({name:text(x.name,90),path:x.url,
    completedActions7d:x.completedActions7d,previousCompletedActions7d:x.previous7d}));
+ const topToolPageViews=(Array.isArray(growth.toolPageViews)?growth.toolPageViews:[])
+  .filter(x=>/^tools\/[a-z0-9-]+\/$/.test(String(x.url||''))&&validCount(x.pageViews7d)&&
+    validCount(x.pageViews30d)&&validCount(x.previous7d))
+  .sort((a,b)=>b.pageViews7d-a.pageViews7d).slice(0,5)
+  .map(x=>({name:text(x.name,90),path:x.url,pageViews7d:x.pageViews7d,
+    previousPageViews7d:x.previous7d}));
  const recommendations=[];
+ if(topToolPageViews.length)recommendations.push({priority:'improvement',
+   title:'Review Free Tools with observed page demand',
+   evidence:'Per-tool browser pageview events show some activity; these are not verified visitors, ad impressions, or conversions.',
+   nextAction:'Prioritize usability, search metadata, and tool success checks on these pages using verified engagement evidence.'});
  if(c.recent7dCompletedActions===0)recommendations.push({
   priority:'important',title:'Verify Free Tools usage instrumentation',
   evidence:c.recent7dPageViews+' reported sitewide pageviews and no recorded tool completions in the recent seven-day window.',
@@ -71,7 +81,7 @@ export function freeToolsRevenueReadiness(growth,{now=new Date().toISOString()}=
   pageViews7d:c.recent7dPageViews,previousPageViews7d:c.previous7dPageViews,
   completedActions7d:c.recent7dCompletedActions,
   previousCompletedActions7d:c.previous7dCompletedActions,
-  topToolActions:tools,recommendations};
+  topToolActions:tools,topToolPageViews,recommendations};
 }
 
 function revenueFit(title){
