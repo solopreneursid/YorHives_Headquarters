@@ -2,13 +2,15 @@
   "schemaVersion": 1,
   "application": "YorpHives HQ",
   "productionWorker": "yorphives-hq-free-pilot",
-  "sourceWorkerVersion": "b2fa6a0a-b872-48f4-888f-e675e84fa0a5",
-  "workerContentSha256": "094e1bd8b5e9c59ecd01072c4087fdc8ff60398c303c706ab3457c44b8812ebd",
+  "sourceWorkerVersion": "8ef0a04b-645a-4a9e-aa39-a95b0b1700d2",
+  "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "2085f8541bd342754a007f568ce747b8a6b94102",
+    "hq-worker.mjs": "0f247c048c0c5d203dce23f1d7cdb6d7a0abd733",
     "watchdog-evidence.mjs": "f3c47a3fad7589f0c9b6aadd5ff613e528ef40e7",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
-    "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867"
+    "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
+    "product-intelligence.mjs": "b0f21738244fe1c620303229c5d5b67686dbb5a6",
+    "products-ranker.mjs": "6551386c28cfd2db8ca14e9a2c980f90a7f74def"
   },
   "navigation": [
     "home",
@@ -61,10 +63,10 @@
   "releaseMethod": "founder-reviewed workflow_dispatch only, no automatic deployment",
   "readOnlyRuntime": true,
   "notes": [
-    "Founder-approved Products finder deployed on 2026-11-19; all 4 live modules verified equal to main source, nine bindings and five-minute cron intact.",
-    "GitHub release run 44484972166 uploaded successfully, but the immediate post-upload /content/v2 GET returned HTTP 404; publisher fixed to retry only read-only verification requests.",
-    "Seven public trend scouts are scheduled but source-by-source unattended scans have not been independently confirmed; URLs can fail or be disallowed.",
-    "GitHub source repo remains public by founder choice; live HQ remains behind Cloudflare Access. Do not store credentials in repository."
+    "Products ranking candidate uses repeated UTC-day public signal evidence; does not present stars, upvotes or installs as verified traffic, revenue or profit.",
+    "Source directories that restrict collection remain respected; dashboard shows links from permitted public launch feeds as link-only unverified candidates.",
+    "Current live HQ version and five module hashes are pinned separately from the six-module release candidate.",
+    "No automatic release and no autonomous HQ deploy permissions; founder approval required."
   ],
   "previousWorkerVersion": "0aa5ea9f-9d8d-4e56-966d-8920ffc5fff1",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
@@ -79,8 +81,18 @@
     "manualFounderApproved": true,
     "productionBrowserSessionVerified": false,
     "sourceCollectorsVerified": false,
-    "noImmediateRerunRequired": true
+    "noImmediateRerunRequired": true,
+    "recordType": "historical 2026-11-19 verification, not verification of current candidate",
+    "candidateVerifiedInProduction": false
   },
   "privateSnapshotKey": "hq-authoritative-snapshot__2026-11-19__b2fa6a0a-b872-48f4-888f-e675e84fa0a5",
-  "moduleTreeSha256": "f829b9ea82cd4fca54f40a206ddce19cfb3c03b2b907bf075fa1b81d8f60fa8e"
+  "moduleTreeSha256": null,
+  "liveModuleGitBlobs": {
+    "hq-worker.mjs": "234e8eedc3a99c8b49184b780ca2a1f3aea9f037",
+    "watchdog-evidence.mjs": "f3c47a3fad7589f0c9b6aadd5ff613e528ef40e7",
+    "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
+    "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
+    "product-intelligence.mjs": "b0f21738244fe1c620303229c5d5b67686dbb5a6"
+  },
+  "candidateStatus": "Development PR only; not deployed; requires founder-approved workflow_dispatch on main"
 }

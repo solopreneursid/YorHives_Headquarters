@@ -69,8 +69,12 @@ const currentSchedule=(schedules?.schedules||[]).map(x=>x.cron);
 fail(equalJson(currentSchedule,info.expectedSchedules),'Live scheduler differs; release denied');
 const sourceResponse=await request(prefix+'/content/v2');
 const current=parseModules(await sourceResponse.text());
+const pinnedLive=new Map(Object.entries(info.liveModuleGitBlobs||{}));
+fail(current.size===pinnedLive.size&&[...pinnedLive].every(([name,sha])=>current.has(name)&&gitBlob(current.get(name))===sha),
+ 'Currently deployed Worker module source drifted from founder-reviewed live baseline. Release denied.');
+
 const local=new Map(Object.keys(info.moduleGitBlobs).map(name=>[name,readFileSync(join(root,'src',name),'utf8')]));
-fail(local.size===4&&[...local].every(([name,src])=>gitBlob(src)===info.moduleGitBlobs[name]),
+fail(local.size===6&&[...local].every(([name,src])=>gitBlob(src)===info.moduleGitBlobs[name]),
  'Local Worker module checksum changed. Release denied.');
 if(sameSource(current)){
  console.log('PASS: live HQ modules already match approved private repo source; no deployment necessary.');
