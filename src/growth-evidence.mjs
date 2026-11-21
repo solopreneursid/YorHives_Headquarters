@@ -30,6 +30,22 @@ export function validateGrowth(x){
     completedActions7d:r.completedActions7d,previous7d:r.previous7d};
  });
  if(new Set(ranked.map(x=>x.url)).size!==ranked.length)throw Error('Duplicate ranking');
+ // Separately validate anonymous Free Tools pageviews. These are not sessions,
+ // conversions, ad impressions or verified human visitors.
+ const rawToolViews=x.toolPageViews===undefined?[]:x.toolPageViews;
+ if(!Array.isArray(rawToolViews)||rawToolViews.length>10)throw Error('Invalid tool pageview rankings');
+ const toolPageViews=rawToolViews.map(r=>{
+  if(!/^tools\/[a-z0-9][a-z0-9-]*\/$/.test(String(r.url||''))||
+    typeof r.name!=='string'||r.name.length<1||r.name.length>100||
+    !validCount(r.pageViews30d)||!validCount(r.pageViews7d)||!validCount(r.previous7d)||
+    r.pageViews7d>r.pageViews30d||r.previous7d>r.pageViews30d)
+   throw Error('Invalid Free Tool pageview aggregate');
+  return {url:r.url,name:r.name,pageViews30d:r.pageViews30d,
+   pageViews7d:r.pageViews7d,previous7d:r.previous7d};
+ });
+ if(new Set(toolPageViews.map(r=>r.url)).size!==toolPageViews.length)
+  throw Error('Duplicate tool pageview ranking');
+
  const opportunities=x.opportunities.map(r=>{
   if(!safeUrl(r.url)||!ranked.some(v=>v.url===r.url)||r.requiresFounderReview!==true||
     r.signal!=='increasing-completions'||!validCount(r.recent7d)||!validCount(r.previous7d))
@@ -41,7 +57,7 @@ export function validateGrowth(x){
  return {source:GROWTH_SOURCE,sourceType:'public-aggregate',available:true,
    fetchedAt:new Date().toISOString(),generatedAt:x.generatedAt,periodDays:30,
    daily,comparison:{...Object.fromEntries(Object.keys(cmp).filter(k=>['recent7dCompletedActions','previous7dCompletedActions','recent7dPageViews','previous7dPageViews'].includes(k)).map(k=>[k,cmp[k]]))},
-   ranked,opportunities,revenue:{available:false,amount:null},
+   ranked,toolPageViews,opportunities,revenue:{available:false,amount:null},
    caution:'Browser-reported actions are indicative; sessions are not unique humans. Review every opportunity before action.',
    readOnly:true};
 }
