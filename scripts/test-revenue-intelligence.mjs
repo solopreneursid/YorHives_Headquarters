@@ -79,6 +79,18 @@ assert.ok(client.marketSignals.some(x=>x.category==='affiliate'),'Community prog
 assert.equal(client.verifiedEarnings.amount,null);
 assert.equal(client.sourceScansCompleted,1);
 assert.equal(client.sources.length,7);
+const partnerAndSponsor=buildRevenueIntelligence({now,researchRows:[
+ {kind:'revenue-partnership',title:'Potential partner collaboration for a software tool',
+  source_url:'https://news.ycombinator.com/item?id=500113',observed_at:now,
+  description:'Public collaboration request; active agreement not verified.',recommendation:'Check original and validate scope.',score:45},
+ {kind:'revenue-sponsorship',title:'Sponsoring developer newsletters and tools',
+  source_url:'https://news.ycombinator.com/item?id=500114',observed_at:now,
+  description:'Potential sponsor public discussion, not a contract.',recommendation:'Check audience and sponsor fit.',score:44}
+]});
+assert.ok(partnerAndSponsor.opportunities.some(x=>x.channel==='Partnership · investigation'));
+assert.ok(partnerAndSponsor.opportunities.some(x=>x.channel==='Sponsorship · investigation'));
+assert.ok(partnerAndSponsor.opportunities.every(x=>x.approvalRequired&&x.autoExecute===false));
+assert.equal(partnerAndSponsor.verifiedEarnings.amount,null);
 
 const growth={available:true,source:'https://yorphives.com/api/insights/growth',
  generatedAt:now,ranked:[{url:'tools/image-resize/',name:'Image Resize',completedActions7d:40},
