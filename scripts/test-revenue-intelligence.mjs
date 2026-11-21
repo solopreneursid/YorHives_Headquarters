@@ -25,6 +25,14 @@ assert.ok(baseline.recommendations.some(x=>x.title.includes('instrumentation')))
 const sample={...growthFixture,comparison:{...growthFixture.comparison,recent7dCompletedActions:4},
  ranked:[{url:'tools/word-counter/',name:'Word Counter',completedActions7d:4,previous7d:1},
  {url:'hqventures/something/',name:'Not a tool',completedActions7d:100,previous7d:50}]};
+const withViews=freeToolsRevenueReadiness({...growthFixture,toolPageViews:[
+ {url:'tools/word-counter/',name:'Word Counter',pageViews30d:19,pageViews7d:11,previous7d:8},
+ {url:'hqventures/demo/',name:'HQ Ventures',pageViews30d:100,pageViews7d:99,previous7d:1}
+]},{now});
+assert.equal(withViews.topToolPageViews.length,1);
+assert.equal(withViews.topToolPageViews[0].pageViews7d,11);
+assert.equal(withViews.adSenseEarnings,null);
+assert.ok(withViews.recommendations.some(x=>x.title.includes('observed page demand')));
 const observed=freeToolsRevenueReadiness(sample,{now});
 assert.equal(observed.topToolActions.length,1);
 assert.equal(observed.topToolActions[0].completedActions7d,4);
