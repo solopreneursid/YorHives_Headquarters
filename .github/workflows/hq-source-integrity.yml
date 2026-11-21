@@ -11,6 +11,7 @@ on:
       - 'scripts/test-release-post-upload.mjs'
       - 'scripts/test-free-tools-operations.mjs'
       - 'scripts/test-revenue-intelligence.mjs'
+      - 'scripts/test-growth-evidence.mjs'
       - '.github/workflows/hq-source-integrity.yml'
   workflow_dispatch:
 permissions:
@@ -40,6 +41,7 @@ jobs:
           node scripts/test-release-post-upload.mjs
           node --check scripts/check-hq-auto-scope.mjs
           node scripts/test-hq-auto-scope.mjs
+          node scripts/test-growth-evidence.mjs
           node scripts/test-revenue-intelligence.mjs
           node scripts/test-revenue-research.mjs
       - name: Confirm CI itself has no production release secrets or deployment permission
