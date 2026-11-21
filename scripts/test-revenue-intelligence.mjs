@@ -11,10 +11,10 @@ assert.equal(noGrowth.available,false);
 assert.equal(noGrowth.pageViews7d,null);
 assert.equal(noGrowth.adSenseEarnings,null);
 assert.equal(noGrowth.adsApproved,null);
-const growth={available:true,source:'https://yorphives.com/api/insights/growth',generatedAt:now,
+const growthFixture={available:true,source:'https://yorphives.com/api/insights/growth',generatedAt:now,
  comparison:{recent7dPageViews:287,previous7dPageViews:0,recent7dCompletedActions:0,previous7dCompletedActions:0},
  ranked:[]};
-const baseline=freeToolsRevenueReadiness(growth,{now});
+const baseline=freeToolsRevenueReadiness(growthFixture,{now});
 assert.equal(baseline.available,true);
 assert.equal(baseline.pageViews7d,287);
 assert.equal(baseline.sitewidePageViews,true);
@@ -22,15 +22,15 @@ assert.equal(baseline.topToolActions.length,0);
 assert.equal(baseline.adSenseEarnings,null);
 assert.equal(baseline.uniqueVisitors,null);
 assert.ok(baseline.recommendations.some(x=>x.title.includes('instrumentation')));
-const sample={...growth,comparison:{...growth.comparison,recent7dCompletedActions:4},
+const sample={...growthFixture,comparison:{...growthFixture.comparison,recent7dCompletedActions:4},
  ranked:[{url:'tools/word-counter/',name:'Word Counter',completedActions7d:4,previous7d:1},
  {url:'hqventures/something/',name:'Not a tool',completedActions7d:100,previous7d:50}]};
 const observed=freeToolsRevenueReadiness(sample,{now});
 assert.equal(observed.topToolActions.length,1);
 assert.equal(observed.topToolActions[0].completedActions7d,4);
 assert.equal(observed.adImpressions,null);
-assert.equal(freeToolsRevenueReadiness({...growth,generatedAt:'2026-11-17T00:00:00Z'},{now}).status,'stale');
-assert.equal(buildRevenueIntelligence({growth,now}).freeToolsReadiness.pageViews7d,287);
+assert.equal(freeToolsRevenueReadiness({...growthFixture,generatedAt:'2026-11-17T00:00:00Z'},{now}).status,'stale');
+assert.equal(buildRevenueIntelligence({growth:growthFixture,now}).freeToolsReadiness.pageViews7d,287);
 
 const base=buildRevenueIntelligence({now});
 assert.equal(base.schemaVersion,1);
