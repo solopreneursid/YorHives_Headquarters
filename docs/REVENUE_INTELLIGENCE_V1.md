@@ -106,3 +106,44 @@ The private Revenue API and simple four-button UI show up to ten ranked channels
 ### Deployment boundary
 
 The latest live HQ baseline was Worker version `6057bd41-ca23-46ae-bc7a-472fa7832a2a`, verified at 100% traffic. The multi-lane upgrade changes bounded public-source collection and the backend query; therefore it is **not eligible for routine auto-deployment** under the installed fail-closed release scope. It needs one additional explicitly founder-approved release. **Subsequent model-only ranking and embedded HQ UI updates auto-deploy after CI**. Do not widen the privilege of the deployed HQ agents merely to avoid this sensitive change gate.
+
+## V4 — Government projects and mandatory 3-question recommendations
+
+Revenue should also look for **government work YorpHives could realistically deliver**: public website projects, digital record management, software, small web applications, automation, dashboards, document workflows, and eligible IT services. This adds a sales opportunity channel, not a separate navigation tab or an autonomous bidding agent.
+
+### First-party procurement sources
+
+- Central Government eProcurement / CPPP: https://eprocure.gov.in/eprocure/app
+- Government of Jharkhand eProcurement: https://jharkhandtenders.gov.in/nicgep/app
+- Government e-Marketplace (GeM), interactive official bid listings: https://bidplus.gem.gov.in/all-bids
+
+The first two official portals are checked at one **bounded public page check per day**, and only after a respectful robots.txt preflight. Robots disallow, inaccessible robots, 403, redirect, CAPTCHA, unexpected data shape, HTTP errors, or oversized responses produce an unavailable source status and **zero invented tenders**. GeM is link-only/manual: HQ does not use browser tricks or CAPTCHA/proxy bypass to extract bids.
+
+The new windows are 01:25 UTC for CPPP and 23:25 UTC for Jharkhand. The existing seven Revenue research windows are unchanged. Each approved government scan consumes at most two requests (one robots.txt and one public landing page), with 8-second timeouts, manual redirects, bounded response data, the same existing public-fetch budget, and no new binding, service, or site dependency.
+
+### Individual tender verification
+
+A row is accepted only if the official public tender listing contains:
+1. A software/website/digital/IT-services scope, not a civil-construction or unrelated goods category.
+2. A visible tender reference / procurement identifier.
+3. A **future bid-closing date and time**, parsed with explicit Asia/Kolkata (+05:30) timezone and checked against current time.
+4. A first-party original portal URL matching the approved official host.
+
+Missing, expired or ambiguous data is excluded. Source-specific rows are deduplicated by tender reference and the information is persisted as **read-only intelligence records** in existing D1 `opportunities.kind='revenue-government'`. No browser/scraper extension, contact harvesting, new HTTP destination, bid registration, or private tender document submission is allowed.
+
+**Important:** An official public tender listing is not proof that YorpHives is eligible or could win, that the tender's scope is feasible, or that a value/EMD/refund/award is known. Tender reference and closing time are shown so the founder can find the original notice and verify all conditions and corrigenda. No bid is recommended for execution until founder review.
+
+### Payer → Why → Next action
+
+Every recommended channel or specific market lead is annotated with:
+- **Who might pay?** Potential advertiser, partner, customer, affiliate program, specific tender buyer when present, or *unconfirmed issuing public authority* if not named in the source.
+- **Why would they pay?** The actual contract/revenue mechanism being investigated, with unverified buyer need explicitly labeled.
+- **What next?** A concrete original-source validation step, not generic encouragement. For tenders, verify reference, issuer, SOW/deliverables, eligibility/experience, digital signature and registrations, closing/corrigenda, EMD/fees/tax, cost and delivery risk before the founder decides whether to bid.
+
+This applies across **Ads, affiliates, partners, potential client services, government procurement, Free Tools sponsorships, and founder-approved HQventures**. All opportunities are still research-only with `revenueVerified:false`, `approvalRequired:true` and `autoExecute:false`. The Revenue page remains inside Home / Health / Products / Revenue, with up to 10 prioritized cards and source/freshness status.
+
+### Governance and release
+
+The three-question display is an eligible routine static UI change in isolation. However, the official tender collector and protected D1 Revenue SQL query change the backend, so this work is **not auto-release eligible**. It is included in the same pending multi-channel candidate following PR #49 and requires **one** manual founder-approved protected HQ workflow run after CI. This is a narrow exception, not permission for HQ agents to change production autonomously; future model-only ranking and UI work remains automatic.
+
+No tender, contract, client budget or government payment is claimed as verified in this initial version. Actual collector reachability and bid completeness must be confirmed from first unattended scans; portal homepages are published first-party links, never fabricated invitations.

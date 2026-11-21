@@ -55,16 +55,82 @@ function rankedPrograms(){
   approvalRequired:true,autoExecute:false}));
 }
 
+
+// Verified FIRST-PARTY procurement portals: these are search channels, NOT confirmed open bids.
+const officialGovernmentPortals=Object.freeze([
+ {id:'central-procurement-india',title:'Find central-government software and digital-service tenders',
+  channel:'Government contracts · India',priorityScore:76,sourceUrl:'https://eprocure.gov.in/eprocure/app',
+  whoMightPay:'Indian ministries, central public institutions and other eligible government buyers — specific buyer not yet identified.',
+  whyPay:'Government entities publish competitive procurements for software, systems and services; the presence of a portal does not mean YorpHives is eligible.',
+  nextAction:'Search the official portal for software, web application, digital documents or automation tenders; record bid reference, buyer, scope, deadline, bidder qualifications, EMD/fees and corrigenda before considering a bid.',
+  evidence:'Official Indian government eProcurement search portal. This is a discovery channel, not an individually verified tender or award.',
+  risk:'Experience, turnover, certificates, eligibility, bidder registration, digital signature, tax obligations, project delivery and contract conditions may disqualify a sole founder.'},
+ {id:'jharkhand-procurement',title:'Explore Jharkhand government IT and automation projects',
+  channel:'Government contracts · Jharkhand',priorityScore:72,sourceUrl:'https://jharkhandtenders.gov.in/nicgep/app',
+  whoMightPay:'Jharkhand departments, boards and state institutions with issued tenders — issuing body to be verified.',
+  whyPay:'State procurement can commission websites, records digitization, software operations and similar services, but individual notices must be checked.',
+  nextAction:'Search the official Jharkhand portal for relevant current IT tenders; check the exact tender ID, closing date, specifications, local eligibility, DSC, fees, and past-experience conditions.',
+  evidence:'Official Government of Jharkhand eProcurement portal. No particular award, contract value or active tender is asserted.',
+  risk:'State-specific conditions, qualifications, guarantee/EMD and execution scope are unknown until the tender documents are read.'},
+ {id:'gem-government-marketplace',title:'Investigate GeM software and IT service bids',
+  channel:'Government contracts · GeM',priorityScore:64,sourceUrl:'https://bidplus.gem.gov.in/all-bids',
+  whoMightPay:'Public-sector GeM buyers seeking eligible goods or services — individual buyer not yet selected.',
+  whyPay:'The government marketplace publishes bids for services and products; the existence of listings is not evidence of a suitable active opportunity.',
+  nextAction:'Search GeM for software development, websites, cloud-adjacent services and digitization; independently verify bid ID, deadline, GeM seller eligibility, categories, taxes and contract terms.',
+  evidence:'Official GeM bid listing. Access may require an interactive browser; HQ does not bypass restricted collection.',
+  risk:'Seller onboarding, category restrictions, bid eligibility, service delivery and financial guarantees may apply.'}
+]);
+function governmentPortalCards(){
+ return officialGovernmentPortals.map(x=>({...x,method:'Review official public procurement and assess bid feasibility',
+  stage:'Official portal · specific tender not yet verified',evidenceStatus:'First-party portal, no verified live project',
+  buildEffortHypothesis:'TBD after tender document',buyerDemandVerified:false,trafficVerified:false,revenueVerified:false,
+  approvalRequired:true,autoExecute:false}));
+}
+function closingTime(description){
+ const m=String(description||'').match(/Bid closing:\s*(20\d\d-\d\d-\d\d)\s+([0-2]\d:[0-5]\d)\s+IST/i);
+ if(!m)return null;const n=Date.parse(m[1]+'T'+m[2]+':00+05:30');return Number.isFinite(n)?{ms:n,local:m[1]+' '+m[2]+' IST'}:null;
+}
+function explainOpportunity(o){
+ let who=o.whoMightPay,why=o.whyPay;
+ const kind=String(o.id||'')+' '+String(o.channel||'');
+ if(!who){
+  if(/government|tender/i.test(kind)){who='Issuing public buyer in the official notice — exact buyer unverified.';
+   why='Government service procurement may pay for the work specified in the tender, only through an eligible competitive award.';}
+  else if(/affiliate/i.test(kind)){who='Affiliate program operator, only after approval and attributable qualifying referrals.';
+   why='An approved affiliate program may pay a commission for eligible conversions; no conversion or payout has occurred.';}
+  else if(/partner/i.test(kind)){who='A potential commercial partner, once mutual deliverables and payment terms are agreed.';
+   why='Distribution, referrals or software services may have commercial value, but no agreement or fees are verified.';}
+  else if(/sponsor|advertis|adsense/i.test(kind)){who='Qualified advertisers or sponsor brands reaching the relevant Free Tools audience.';
+   why='Advertising placement may be valuable if verified eligible visits and publisher rules support it.';}
+  else if(/client/i.test(kind)){who='Potential client described in the original public request — budget and intent unverified.';
+   why='The requester may need a paid software, document or automation service, if the work and terms can be confirmed.';}
+  else if(/free tools/i.test(kind)){who='Relevant advertisers, not existing Free Tools users.';
+   why='Advertising may support free access only with verified audience and publisher permission.';}
+  else{who='Potential paying users of the founder-approved product — demand unverified.';
+   why='Solving a specific repeat problem may justify a paid product if independent buyer validation succeeds.';}
+ }
+ return {...o,whoMightPay:who,whyPay:why,
+  nextAction:o.nextAction||o.nextValidation||'Review the original source and independently validate the opportunity before any founder decision.'};
+}
+
 function normalizeMarket(rows,now){
  const nowMs=Date.parse(now)||Date.now(),out=[],seen=new Set();
  for(const x of (Array.isArray(rows)?rows:[])){
-  if(!x||!['revenue-trend','revenue-research','revenue-client','revenue-affiliate','revenue-partnership','revenue-sponsorship'].includes(x.kind))continue;
+  if(!x||!['revenue-trend','revenue-research','revenue-client','revenue-affiliate','revenue-partnership','revenue-sponsorship','revenue-government'].includes(x.kind))continue;
   const link=safeLink(x.source_url),title=text(x.title,120),at=Date.parse(String(x.observed_at||''));
   if(!link||!title||!Number.isFinite(at)||at>nowMs+300000||(nowMs-at)>120*86400000)continue;
   const key=link+'|'+title.toLowerCase();if(seen.has(key))continue;seen.add(key);
+  const government=x.kind==='revenue-government';
+  const expiry=government?closingTime(x.description):null;
+  if(government&&(!expiry||expiry.ms<=nowMs||expiry.ms>nowMs+90*86400000||
+   !['https://eprocure.gov.in/eprocure/app','https://jharkhandtenders.gov.in/nicgep/app'].includes(link)))continue;
   const fit=revenueFit(title),reported=x.kind==='revenue-trend';
   const channel=x.kind.slice('revenue-'.length);
-  const profile=channel==='client'?{sourceType:'public-client-intent',channel:'Potential client · unqualified',
+  const profile=channel==='government'?{sourceType:'official-tender-listing',channel:'Government project · verify eligibility',
+    next:'Search the exact tender reference on the original official portal. Check buyer, scope, closing time '+(expiry?.local||'')+', bidder enrollment/DSC, financial/experience criteria, EMD, taxes and corrigenda before proposing a bid.',
+    risk:'A tender listing does NOT establish qualification, contract value, win probability, ability to deliver or awarded revenue.',
+    category:'government',effort:'scope and eligibility unknown'}:
+   channel==='client'?{sourceType:'public-client-intent',channel:'Potential client · unqualified',
     next:'Open the original request and verify paid project intent, scope, budget, freshness and fit before any founder-approved response.',
     risk:'No signed client, payment, active request or permission to solicit is verified.',category:'client',effort:'unassessed'}:
    channel==='partnership'?{sourceType:'community-partner-mention',channel:'Partnership · investigation',
@@ -83,6 +149,7 @@ function normalizeMarket(rows,now){
     profile?profile.sourceType==='public-client-intent'?'Public client request signal · NOT a qualified lead':
     'Public commercial mention · offer/terms unverified':'Public discussion or maker statement · earnings unverified',
    sourceType:reported?'reported-claim':profile?profile.sourceType:'public-discussion',
+   bidDeadline:government?expiry.local:null,
    audienceHypothesis:profile?.sourceType==='public-client-intent'?'Possible buyer requesting a service, unverified':fit.audience,
    category:profile?.category||fit.category,relevanceScore:priority,effortHypothesis:profile?.effort||fit.effort,
    nextValidation:profile?.next||fit.next,risk:profile?.risk||fit.risk,channel:profile?.channel||fit.lane,
@@ -92,13 +159,15 @@ function normalizeMarket(rows,now){
 }
 function revenueSourceHealth(rows){
  const specs=[
+  ['revenue_research_gov_cppp','India · official central eProcurement'],
   ['revenue_research_hn_affiliates','Hacker News · affiliate mentions'],
   ['revenue_research_hn_sponsors','Hacker News · sponsorship mentions'],
   ['revenue_research_hn_mrr','Hacker News · maker revenue'],
   ['revenue_research_hn_clients','Hacker News · potential public client requests'],
   ['revenue_research_makers','IndieMakerList · maker feed'],
   ['revenue_research_hn_partners','Hacker News · partnership mentions'],
-  ['revenue_research_hn_pricing','Hacker News · pricing']];
+  ['revenue_research_hn_pricing','Hacker News · pricing'],
+  ['revenue_research_gov_jharkhand','Jharkhand · official state eProcurement']];
  const byKey=new Map((Array.isArray(rows)?rows:[]).map(x=>[x.key,x]));
  return specs.map(([id,name])=>{const r=byKey.get(id),status=String(r?.value||'not-yet-checked');
   return {name,status,checkedAt:r?.checked_at||null,available:status.startsWith('ok:'),
@@ -141,14 +210,16 @@ export function buildRevenueIntelligence({growth=null,externalRows=[],researchRo
  const filtered=[],byCategory=new Map(),byType=new Map();
  for(const lead of marketSignals){
   // Source-reported revenue stays in Market Intelligence; never auto-promote a claim to an investment priority.
-  if(!['public-discussion','public-client-intent','community-partner-mention','community-sponsorship-mention'].includes(lead.sourceType)||lead.category==='unclassified'||(byCategory.get(lead.category)||0)>=3||
+  if(!['official-tender-listing','public-discussion','public-client-intent','community-partner-mention','community-sponsorship-mention'].includes(lead.sourceType)||lead.category==='unclassified'||(byCategory.get(lead.category)||0)>=3||
      (byType.get(lead.sourceType)||0)>=5)continue;
   filtered.push({id:'revenue-lead-'+filtered.length+'-'+lead.sourceUrl.slice(-18),
    channel:lead.channel,title:'Investigate: '+lead.title,stage:'Founder research',
    method:'Research one narrow buyer problem before deciding on monetization',
    evidenceStatus:lead.classification,evidence:lead.summary,nextAction:lead.nextValidation,
    risk:lead.risk,sourceUrl:lead.sourceUrl,observedAt:lead.observedAt,
-   priorityScore:lead.sourceType==='public-client-intent'?Math.min(86,lead.relevanceScore+20):
+   bidDeadline:lead.bidDeadline||null,
+   priorityScore:lead.sourceType==='official-tender-listing'?Math.min(91,lead.relevanceScore+24):
+    lead.sourceType==='public-client-intent'?Math.min(86,lead.relevanceScore+20):
     ['community-partner-mention','community-sponsorship-mention'].includes(lead.sourceType)?
       Math.min(69,lead.relevanceScore+12):lead.relevanceScore,
    buildEffortHypothesis:lead.effortHypothesis,buyerDemandVerified:false,trafficVerified:false,
@@ -159,15 +230,15 @@ export function buildRevenueIntelligence({growth=null,externalRows=[],researchRo
  }
  const ranked=[...opportunities.map((o,i)=>({...o,priorityScore:[70,62,46,54][i],
   buyerDemandVerified:false,trafficVerified:false,revenueVerified:false,
-  buildEffortHypothesis:'unassessed'})),...rankedPrograms(),...filtered]
-  .sort((a,b)=>b.priorityScore-a.priorityScore).slice(0,10).map((x,i)=>({...x,rank:i+1}));
+  buildEffortHypothesis:'unassessed'})),...rankedPrograms(),...governmentPortalCards(),...filtered]
+  .sort((a,b)=>b.priorityScore-a.priorityScore).slice(0,10).map((x,i)=>explainOpportunity({...x,rank:i+1}));
  const sources=revenueSourceHealth(sourceStatuses);
  return {schemaVersion:1,readOnly:true,generatedAt:Number.isFinite(Date.parse(now))?new Date(now).toISOString():new Date().toISOString(),
   verifiedEarnings:{available:false,amount:null,currency:null,reason:'No authenticated YorpHives payout, sales or accounting data connected. Unknown is not zero.'},
   constraints:{advertisingScope:'Free Tools only',adFreeAreas:['Home','HQventures','HQconnect','YorpHivesHQ'],
    freeToolsRemainFree:true,hqventuresOnlyFounderApprovedProducts:true,supportButton:'remains disabled',
    noAutomaticPublishing:true,noAutomaticMonetization:true,noPurchases:true},
-  activity,opportunities:ranked,marketSignals:marketSignals.filter(x=>!filtered.some(f=>f.sourceUrl===x.sourceUrl)).slice(0,10),sources,
+  activity,opportunities:ranked,marketSignals:marketSignals.filter(x=>!filtered.some(f=>f.sourceUrl===x.sourceUrl&&f.title==='Investigate: '+x.title)).slice(0,10),sources,
   researchedOpportunities:filtered.length,sourceScansCompleted:sources.filter(x=>x.checkedAt!==null).length,
   disclaimer:'Opportunity cards and third-party claims are research hypotheses, not verified YorpHives earnings, customer demand or projections.'};
 }

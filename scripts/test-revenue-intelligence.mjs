@@ -12,14 +12,15 @@ assert.equal(base.readOnly,true);
 assert.deepEqual(base.verifiedEarnings,{available:false,amount:null,currency:null,
  reason:'No authenticated YorpHives payout, sales or accounting data connected. Unknown is not zero.'});
 assert.equal(base.activity.available,false);
-assert.equal(base.opportunities.length,7,'Live Revenue fallback covers services, affiliate and partner pathways');
+assert.equal(base.opportunities.length,10,'Revenue has up to ten independently sourced programs and official procurement channels');
 assert.deepEqual(new Set(base.opportunities.map(x=>x.channel)),new Set([
- 'HQventures','Free Tools only','Paid services · possible clients','Affiliate · optional editorial','Partnership · research'
+ 'HQventures','Free Tools only','Paid services · possible clients','Affiliate · optional editorial','Partnership · research',
+ 'Government contracts · India','Government contracts · Jharkhand','Government contracts · GeM'
 ]));
 assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://www.namecheap.com/affiliates/'));
 assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://www.digitalocean.com/affiliates'));
 assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://www.cloudflare.com/partners/power-up-program/'));
-assert.equal(base.sources.length,7);
+assert.equal(base.sources.length,9);
 assert.equal(base.constraints.advertisingScope,'Free Tools only');
 assert.ok(base.constraints.adFreeAreas.includes('HQventures'));
 assert.ok(base.constraints.adFreeAreas.includes('YorpHivesHQ'));
@@ -28,6 +29,36 @@ assert.equal(base.constraints.hqventuresOnlyFounderApprovedProducts,true);
 assert.match(base.constraints.supportButton,/disabled/);
 assert.ok(base.opportunities.every(x=>x.approvalRequired===true&&x.autoExecute===false));
 assert.equal(base.marketSignals.length,0);
+
+assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://eprocure.gov.in/eprocure/app'));
+assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://jharkhandtenders.gov.in/nicgep/app'));
+assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://bidplus.gem.gov.in/all-bids'));
+assert.ok(base.opportunities.every(x=>x.whoMightPay&&x.whyPay&&x.nextAction),'Three founder questions mandatory on all Revenue cards');
+assert.ok(base.opportunities.filter(x=>x.channel.startsWith('Government')).every(x=>x.approvalRequired&&
+ !x.revenueVerified&&x.autoExecute===false),'Official portal does not equal awarded government contract');
+const tender={
+ kind:'revenue-government',title:'Government tender · Website and digital records management software',
+ source_url:'https://eprocure.gov.in/eprocure/app',observed_at:now,score:71,
+ description:'Official Central government procurement public listing. Tender reference: IT/GOV/2026/004. Bid closing: 2026-11-29 15:30 IST. Scope: Website and digital records management software. Issuing body and eligibility must be checked.',
+ recommendation:'VERIFY BEFORE BID: Check the official tender before applying.'
+};
+const gov=buildRevenueIntelligence({now,researchRows:[tender]});
+const tenderCard=gov.opportunities.find(x=>x.channel==='Government project · verify eligibility');
+assert.ok(tenderCard,'A first-party still-open tender with reference and closing date is prioritized');
+assert.equal(tenderCard.bidDeadline,'2026-11-29 15:30 IST');
+assert.equal(tenderCard.sourceUrl,'https://eprocure.gov.in/eprocure/app');
+assert.ok(tenderCard.whoMightPay&&tenderCard.whyPay&&tenderCard.nextAction);
+assert.equal(tenderCard.revenueVerified,false);
+assert.equal(tenderCard.buyerDemandVerified,false);
+assert.equal(gov.verifiedEarnings.amount,null);
+assert.ok(!gov.marketSignals.some(x=>x.title===tender.title),'An individual tender is not duplicated in Market Intelligence');
+const expired={...tender,description:tender.description.replace('2026-11-29 15:30','2026-11-20 15:30')};
+const old=buildRevenueIntelligence({now,researchRows:[expired]});
+assert.ok(!old.opportunities.some(x=>x.channel==='Government project · verify eligibility'),'Expired government tenders must not be recommended');
+const unverified={...tender,description:tender.description.replace('Bid closing: 2026-11-29 15:30 IST.','')};
+assert.ok(!buildRevenueIntelligence({now,researchRows:[unverified]}).opportunities.some(x=>x.channel==='Government project · verify eligibility'),
+ 'Missing deadline is not an active contract opportunity');
+
 const ext=[
  {kind:'revenue-trend',title:'Glowy public earnings report',source_url:'https://trustmrr.com/newsletter',
   observed_at:'2026-11-19T06:30:00Z',
@@ -43,7 +74,7 @@ const ext=[
 const withSignals=buildRevenueIntelligence({externalRows:ext,now});
 assert.equal(withSignals.marketSignals.length,1);
 assert.equal(withSignals.marketSignals[0].sourceUrl,'https://trustmrr.com/newsletter');
-assert.equal(withSignals.opportunities.length,7,'Unverified external earnings may not outrank company opportunities');
+assert.equal(withSignals.opportunities.length,10,'External revenue claims may not outrank real channels');
 assert.ok(!withSignals.opportunities.some(x=>x.sourceUrl==='https://trustmrr.com/newsletter'));
 const glowy=buildRevenueIntelligence({externalRows:[{kind:'revenue-trend',title:'AI photo creation — Glowy',
   source_url:'https://trustmrr.com/newsletter',observed_at:now,score:71,description:'Third-party revenue claim',
@@ -51,7 +82,7 @@ const glowy=buildRevenueIntelligence({externalRows:[{kind:'revenue-trend',title:
 assert.equal(glowy.marketSignals.length,1,'Third-party claim remains accessible with original evidence');
 assert.equal(glowy.marketSignals[0].category,'hqventures','AI photo generation is not automatically a Free Tools ad opportunity');
 assert.equal(glowy.marketSignals[0].effortHypothesis,'high');
-assert.equal(glowy.opportunities.length,7,'An unverified reported amount alone is not a Top Revenue Opportunity');
+assert.equal(glowy.opportunities.length,10,'An unverified reported amount alone is not a Top Revenue Opportunity');
 
 assert.equal(withSignals.marketSignals[0].yorphivesRevenue,false);
 assert.equal(withSignals.marketSignals[0].profitVerified,false);
@@ -78,7 +109,7 @@ assert.ok(!client.marketSignals.some(x=>x.sourceUrl===lead.sourceUrl),'No duplic
 assert.ok(client.marketSignals.some(x=>x.category==='affiliate'),'Community program chatter is not proof of a real offer');
 assert.equal(client.verifiedEarnings.amount,null);
 assert.equal(client.sourceScansCompleted,1);
-assert.equal(client.sources.length,7);
+assert.equal(client.sources.length,9);
 const partnerAndSponsor=buildRevenueIntelligence({now,researchRows:[
  {kind:'revenue-partnership',title:'Potential partner collaboration for a software tool',
   source_url:'https://news.ycombinator.com/item?id=500113',observed_at:now,
