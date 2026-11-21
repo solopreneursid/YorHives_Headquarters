@@ -34,7 +34,9 @@ jobs:
         run: |
           node -e "const m=require('./hq-release.json'); console.log('EXPECTED_CURRENT_VERSION='+m.sourceWorkerVersion)" >> "$GITHUB_ENV"
       - name: Verify Products trends before release (offline)
-        run: node scripts/test-products-trends.mjs
+        run: |
+          node scripts/test-products-trends.mjs
+          node scripts/test-products-evidence.mjs
       - name: Deploy ONLY with founder-approved environment and scoped Worker token
         env:
           HQ_RELEASE_TOKEN: ${{ secrets.HQ_RELEASE_TOKEN }}
