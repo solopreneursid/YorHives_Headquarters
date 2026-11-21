@@ -5,7 +5,7 @@
   "sourceWorkerVersion": "8ef0a04b-645a-4a9e-aa39-a95b0b1700d2",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "0f247c048c0c5d203dce23f1d7cdb6d7a0abd733",
+    "hq-worker.mjs": "508996bc6e5dd307f11e97b4c1faac0c985695b6",
     "watchdog-evidence.mjs": "f3c47a3fad7589f0c9b6aadd5ff613e528ef40e7",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
@@ -67,7 +67,8 @@
     "Source directories that restrict collection remain respected; dashboard shows links from permitted public launch feeds as link-only unverified candidates.",
     "Current live HQ version and five module hashes are pinned separately from the six-module release candidate.",
     "No automatic release and no autonomous HQ deploy permissions; founder approval required.",
-    "Source conflict guard: a Hacker News item ID with contradictory product titles is quarantined from ranked recommendations; link-only source leads remain separately labeled."
+    "Source conflict guard: a Hacker News item ID with contradictory product titles is quarantined from ranked recommendations; link-only source leads remain separately labeled.",
+    "Products displays the Top 10 evidence-graded recommendations first; additional ranked research stays in a collapsed disclosure."
   ],
   "previousWorkerVersion": "0aa5ea9f-9d8d-4e56-966d-8920ffc5fff1",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
@@ -95,5 +96,5 @@
     "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
     "product-intelligence.mjs": "b0f21738244fe1c620303229c5d5b67686dbb5a6"
   },
-  "candidateStatus": "Development PR only; not deployed; requires founder-approved workflow_dispatch on main"
+  "candidateStatus": "Merged Products upgrades on main; production release pending manual founder-approved workflow_dispatch"
 }
