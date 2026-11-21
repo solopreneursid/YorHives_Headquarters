@@ -45,4 +45,7 @@ assert.match(src,/verifyAccess\(request,env,ctx\)/);
 assert.match(src,/if\(!decisionWrite/);
 const ranker=readFileSync(new URL('../src/products-ranker.mjs',import.meta.url),'utf8');
 assert.doesNotMatch(ranker,/\bfetch\s*\(|\bPOST\b|\bPUT\b|\bDELETE\b/);
-console.log('PASS Products: repeat observations, one-shot downgrade, decline, diverse links, no false revenue/traffic, private read-only contract');
+const hnDuplicate={...h,id:'h-other',title:'Show HN: Incorrect unrelated launch'};
+assert.equal(rankProducts([h,hnDuplicate],data,now).length,0,'conflicting HN labels for one discussion must be quarantined');
+assert.equal(rankProducts([h],data,now).length,1,'a single verified-source HN title remains eligible');
+console.log('PASS Products: repeat observations, one-shot downgrade, decline, diverse links, no false revenue/traffic, HN conflict quarantine, private read-only contract');
