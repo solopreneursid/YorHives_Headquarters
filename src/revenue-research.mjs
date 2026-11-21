@@ -5,8 +5,12 @@
  */
 const minuteMs=60000;
 const specs=Object.freeze([
+ {id:'hn-affiliates',hour:3,minute:25,kind:'affiliate',term:'affiliate',site:'https://hn.algolia.com/api',name:'Hacker News · publicly discussed affiliate programs'},
+ {id:'hn-sponsors',hour:6,minute:25,kind:'sponsorship',term:'sponsor',site:'https://hn.algolia.com/api',name:'Hacker News · public sponsorship interest'},
  {id:'hn-mrr',hour:9,minute:25,kind:'hn',term:'mrr',site:'https://hn.algolia.com/api',name:'Hacker News · maker revenue conversations'},
+ {id:'hn-clients',hour:12,minute:25,kind:'client',term:'looking for',site:'https://hn.algolia.com/api',name:'Hacker News · potential public client requests'},
  {id:'makers',hour:15,minute:25,kind:'feed',site:'https://indiemakerlist.com/feed.xml',name:'IndieMakerList · public maker feed'},
+ {id:'hn-partners',hour:18,minute:25,kind:'partnership',term:'partner',site:'https://hn.algolia.com/api',name:'Hacker News · publicly discussed partnerships'},
  {id:'hn-pricing',hour:21,minute:25,kind:'hn',term:'pricing',site:'https://hn.algolia.com/api',name:'Hacker News · pricing discussions'}
 ]);
 const clean=(x,n=200)=>String(x??'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,n);
@@ -50,6 +54,66 @@ export function normalizeHnRevenue(hits,at,term){
  }
  return out;
 }
+
+const clientIntent=/\b(?:looking for|need(?:ing)?|seeking|hiring|want to hire)\b/i;
+const actionableWork=/\b(?:developer|freelancer|designer|automation|script|website|web\s?app|pdf|agent|workflow|dashboard|api|tool|integration|software)\b/i;
+const audience=/\b(?:our|we|my|me|business|team|company|project|budget|contract|customer)\b/i;
+const partnershipIntent=/\b(?:looking for.{0,35}partners?|seeking.{0,35}partners?|partnership|collaborat(?:e|ion)|integration partners?)\b/i;
+const commercialTopic=/\b(?:software|startup|business|saas|developer|product|tool|app|automation|api|service|tech)\b/i;
+const affiliateIntent=/\b(?:affiliate program|affiliate partner|referral program|affiliate commission|refer customers|revenue share)\b/i;
+const sponsorIntent=/\b(?:sponsor|sponsorship|sponsored)\b/i;
+const sponsorAudience=/\b(?:newsletter|website|blog|app|tool|open source|podcast|conference|creator|developer|community)\b/i;
+const maskContacts=s=>String(s||'').replace(/[a-z0-9.+_-]+@[a-z0-9.-]+\.[a-z]{2,}/gi,'[contact in source]')
+ .replace(/(?:\+?\d[\d ()-]{8,}\d)/g,'[contact in source]');
+// A matching public request is a lead to investigate, NOT a client or a contract.
+// Never gather email/phone details, send replies, or claim the writer is still looking.
+export function normalizeRevenueOpportunities(hits,at,kind){
+ const now=validDate(at),seen=new Set(),out=[];
+ if(!now||!Array.isArray(hits)||!['client','affiliate','partnership','sponsorship'].includes(kind))return [];
+ for(const hit of hits.slice(0,35)){
+  const id=String(hit?.objectID||''),time=validDate(hit?.created_at);
+  if(!/^\d+$/.test(id)||!time||time>now+minuteMs||days(now,time)>(kind==='client'?14:30)||seen.has(id))continue;
+  const title=clean(hit?.title||hit?.story_title,120);
+  const summary=clean(maskContacts(hit?.comment_text||hit?.story_text||hit?.title),260);
+  const subject=title+' '+summary;
+  if(!title||restricted.test(subject))continue;
+  let qualifies=false,confidence='Low — public mention only',action='',label='',risk='';
+  if(kind==='client'){
+   qualifies=clientIntent.test(summary)&&actionableWork.test(summary)&&audience.test(summary);
+   confidence='Unqualified potential client request — context and availability unknown';
+   label='Potential client request: '+title;
+   action='Open the original public request, confirm the author actually seeks paid help, scope, date, geographic fit and budget. Founder decides whether to offer a service; do not auto-contact.';
+   risk='The request may be expired, noncommercial, unrelated to YorpHives, or a personal request. No contract, buyer or budget is verified.';
+  }else if(kind==='affiliate'){
+   qualifies=affiliateIntent.test(subject)&&commercialTopic.test(subject);
+   label='Affiliate program mention: '+title;
+   action='Find the actual first-party affiliate program, verify active registration, regional availability, permitted marketing and disclosures before considering an editorial referral.';
+   risk='This is community discussion, not a verified offer, approval, commission rate or permission to insert affiliate links.';
+  }else if(kind==='partnership'){
+   qualifies=partnershipIntent.test(subject)&&commercialTopic.test(subject);
+   label='Potential partner discussion: '+title;
+   action='Verify whether a real organization seeks collaborations relevant to Free Tools or HQventures, and what each side would deliver. Founder approves any outreach.';
+   risk='No open partnership, client relationship, or commercial terms are verified.';
+  }else{
+   qualifies=sponsorIntent.test(subject)&&sponsorAudience.test(subject);
+   label='Sponsorship discussion: '+title;
+   action='Check whether the source expresses genuine demand for an advertising placement or sponsor, and whether our audience is relevant. No automatic offer or placement.';
+   risk='Not a confirmed advertiser or funding offer; site audience and sponsorship value are not established.';
+  }
+  if(!qualifies)continue;
+  const points=Number(hit?.points||0),comments=Number(hit?.num_comments||0);
+  if(kind!=='client'&&(!Number.isSafeInteger(points)||points<2||!Number.isSafeInteger(comments)||comments<1))continue;
+  seen.add(id);
+  out.push({id:'rl-'+kind+'-'+id,title:clean(label,115),
+   description:confidence+'. Public text: '+summary.slice(0,200)+'. Information may be incomplete; verify original context.',
+   recommendation:'INVESTIGATE: '+action+' Risk: '+risk,source_url:'https://news.ycombinator.com/item?id='+id,
+   observed_at:new Date(time).toISOString(),score:kind==='client'?58:kind==='partnership'?45:kind==='sponsorship'?44:39,
+   kind:'revenue-'+kind});
+  if(out.length>=5)break;
+ }
+ return out;
+}
+
 const decode=x=>String(x||'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
 const field=(v,name)=>{const re=new RegExp('<'+name+'(?:\\s[^>]*)?>([\\s\\S]*?)<\\/'+name+'>','i');return decode(v.match(re)?.[1]||'').replace(/^<!\[CDATA\[/,'').replace(/\]\]>$/,'').trim()};
 export function normalizeMakerFeed(xml,at){
@@ -99,12 +163,14 @@ export async function runRevenueResearch(env,scheduledTime,{reserveFetch,fetchFn
  try{
   if(!await reserveFetch(env))throw Error('public-fetch-budget-exhausted');
   let entries=[];
-  if(source.kind==='hn'){
-   const url='https://hn.algolia.com/api/v1/search_by_date?tags=story&query='+encodeURIComponent(source.term)+
-    '&numericFilters='+encodeURIComponent('created_at_i>'+(Math.floor(Date.parse(since)/1000)))+'&hitsPerPage=20';
+  if(source.kind!=='feed'){
+   const tags=source.kind==='client'?'comment':'story';
+   const url='https://hn.algolia.com/api/v1/search_by_date?tags='+tags+'&query='+encodeURIComponent(source.term)+
+    '&numericFilters='+encodeURIComponent('created_at_i>'+(Math.floor(Date.parse(since)/1000)))+'&hitsPerPage=35';
    const payload=JSON.parse(await boundedGet(url,{fetchFn}));
    if(!Array.isArray(payload?.hits))throw Error('invalid-public-search-response');
-   entries=normalizeHnRevenue(payload.hits,at,source.term);
+   entries=source.kind==='hn'?normalizeHnRevenue(payload.hits,at,source.term):
+    normalizeRevenueOpportunities(payload.hits,at,source.kind);
   }else entries=normalizeMakerFeed(await boundedGet(source.site,{fetchFn}),at);
   for(const e of entries){
    await env.DB.prepare('INSERT INTO opportunities(id,title,description,recommendation,source_url,observed_at,score,kind) VALUES(?,?,?,?,?,?,?,?) '+
@@ -117,7 +183,7 @@ export async function runRevenueResearch(env,scheduledTime,{reserveFetch,fetchFn
   .bind(statusKey,result,at).run();
  // Own evidence only, bounded retention, no changes to unrelated source data.
  if(source.id==='hn-pricing')
-  await env.DB.prepare("DELETE FROM opportunities WHERE kind='revenue-research' AND observed_at<?")
+  await env.DB.prepare("DELETE FROM opportunities WHERE kind IN ('revenue-research','revenue-client','revenue-affiliate','revenue-partnership','revenue-sponsorship') AND observed_at<?")
    .bind(new Date(Date.parse(at)-120*86400000).toISOString()).run();
  return source.id+':'+result;
 }
