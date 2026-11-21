@@ -22,14 +22,16 @@ function businessAssessment(title){
  const s=String(title||'').toLowerCase();
  if(/(?:^|[ /-])(?:sdk|awesome|curated list|example projects|tutorial|boilerplate)(?:$|[ /-])|alibabacloud.*sdk/.test(s))
   return {fit:'reference',audience:'Developers researching building blocks',mvp:'Treat as implementation reference, not a standalone customer product.',revenueTest:'Find an actual workflow and paying buyer first.',effort:'not estimated'};
- if(/job|career|resume|cv match|recruit|applicat|interview|ats/.test(s))
+ if(/job|career|resume|cv match|recruit|interview|\bats\b/.test(s))
   return {fit:'existing-product',audience:'Job seekers using GovRadar',mvp:'Offer a private job-to-CV fit checklist and saved application workflow.',revenueTest:'Ask GovRadar users about paid tailored exports before building.',effort:'medium'};
- if(/pdf|document|file|ocr|converter/.test(s))
+ if(/pdf|ocr|converter|file handling|file transfer|file manager/.test(s))
   return {fit:'existing-tools',audience:'Visitors using YorpHives Free Tools',mvp:'Test one private, no-login document task with accessible bulk actions.',revenueTest:'Validate demand for paid batch/offline team workflows.',effort:'low-to-medium'};
  if(/meeting|transcrib|minutes|note.?tak/.test(s))
   return {fit:'new-market',audience:'People needing private meeting notes',mvp:'Test a local-first, consent-aware meeting summary workflow.',revenueTest:'Validate paid exports and transcription operating costs.',effort:'high'};
- if(/agent|workflow|automat|assistant|browser/.test(s))
+ if(/agent|workflow|automat|assistant|browser|agent memory/.test(s))
   return {fit:'new-market',audience:'Teams with repeatable manual workflows',mvp:'Test one narrow model-neutral, self-hostable assistant task.',revenueTest:'Validate a paid setup/support pilot with real users.',effort:'high'};
+ if(/document|file/.test(s))
+  return {fit:'existing-tools',audience:'Visitors using YorpHives Free Tools',mvp:'Test one private, no-login document task with accessible bulk actions.',revenueTest:'Validate demand for paid batch/offline team workflows.',effort:'low-to-medium'};
  if(/server|deploy|monitor|secur|backup|analytic/.test(s))
   return {fit:'new-market',audience:'Self-hosted operators',mvp:'Test one narrow audit/health dashboard with secure defaults.',revenueTest:'Validate paid deployment support rather than assuming SaaS demand.',effort:'high'};
  if(/image|photo|design|video|pixel/.test(s))
