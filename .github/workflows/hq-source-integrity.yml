@@ -25,6 +25,8 @@ jobs:
       - name: Verify exact source blobs, access guard, 4-button UI, and read-only policy
         run: |
           node --check src/hq-worker.mjs
+          node --check src/product-intelligence.mjs
+          node --check src/products-ranker.mjs
           node --check src/growth-evidence.mjs
           node --check src/watchdog-evidence.mjs
           node --check src/agent-demand-evidence.mjs
