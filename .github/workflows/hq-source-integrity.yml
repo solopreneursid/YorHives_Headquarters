@@ -35,7 +35,9 @@ jobs:
           node scripts/verify-current-hq.mjs
           node --check scripts/release-hq-manual.mjs
           node scripts/test-release-post-upload.mjs
+          node --check scripts/check-hq-auto-scope.mjs
+          node scripts/test-hq-auto-scope.mjs
           node scripts/test-revenue-intelligence.mjs
           node scripts/test-revenue-research.mjs
-      - name: Confirm no automatic deployment
+      - name: Confirm CI itself has no production release secrets or deployment permission
         run: echo 'This CI is observation/testing only. It has no production token or deployment step.'
