@@ -12,7 +12,14 @@ assert.equal(base.readOnly,true);
 assert.deepEqual(base.verifiedEarnings,{available:false,amount:null,currency:null,
  reason:'No authenticated YorpHives payout, sales or accounting data connected. Unknown is not zero.'});
 assert.equal(base.activity.available,false);
-assert.deepEqual(base.opportunities.map(x=>x.channel),['HQventures','Free Tools only','Free Tools only']);
+assert.equal(base.opportunities.length,7,'Live Revenue fallback covers services, affiliate and partner pathways');
+assert.deepEqual(new Set(base.opportunities.map(x=>x.channel)),new Set([
+ 'HQventures','Free Tools only','Paid services · possible clients','Affiliate · optional editorial','Partnership · research'
+]));
+assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://www.namecheap.com/affiliates/'));
+assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://www.digitalocean.com/affiliates'));
+assert.ok(base.opportunities.some(x=>x.sourceUrl==='https://www.cloudflare.com/partners/power-up-program/'));
+assert.equal(base.sources.length,7);
 assert.equal(base.constraints.advertisingScope,'Free Tools only');
 assert.ok(base.constraints.adFreeAreas.includes('HQventures'));
 assert.ok(base.constraints.adFreeAreas.includes('YorpHivesHQ'));
@@ -36,7 +43,7 @@ const ext=[
 const withSignals=buildRevenueIntelligence({externalRows:ext,now});
 assert.equal(withSignals.marketSignals.length,1);
 assert.equal(withSignals.marketSignals[0].sourceUrl,'https://trustmrr.com/newsletter');
-assert.equal(withSignals.opportunities.length,3,'Unverified external earnings may not outrank actionable company channels');
+assert.equal(withSignals.opportunities.length,7,'Unverified external earnings may not outrank company opportunities');
 assert.ok(!withSignals.opportunities.some(x=>x.sourceUrl==='https://trustmrr.com/newsletter'));
 const glowy=buildRevenueIntelligence({externalRows:[{kind:'revenue-trend',title:'AI photo creation — Glowy',
   source_url:'https://trustmrr.com/newsletter',observed_at:now,score:71,description:'Third-party revenue claim',
@@ -44,11 +51,35 @@ const glowy=buildRevenueIntelligence({externalRows:[{kind:'revenue-trend',title:
 assert.equal(glowy.marketSignals.length,1,'Third-party claim remains accessible with original evidence');
 assert.equal(glowy.marketSignals[0].category,'hqventures','AI photo generation is not automatically a Free Tools ad opportunity');
 assert.equal(glowy.marketSignals[0].effortHypothesis,'high');
-assert.equal(glowy.opportunities.length,3,'An unverified reported amount alone is not a Top Revenue Opportunity');
+assert.equal(glowy.opportunities.length,7,'An unverified reported amount alone is not a Top Revenue Opportunity');
 
 assert.equal(withSignals.marketSignals[0].yorphivesRevenue,false);
 assert.equal(withSignals.marketSignals[0].profitVerified,false);
 assert.equal(withSignals.verifiedEarnings.amount,null);
+
+// Public requests are unqualified until the founder reviews the original and budget.
+const client=buildRevenueIntelligence({now,sourceStatuses:[
+ {key:'revenue_research_hn_clients',value:'ok:1',checked_at:now}
+],researchRows:[
+ {kind:'revenue-client',title:'Potential client request: PDF automation help',source_url:'https://news.ycombinator.com/item?id=500111',
+  description:'Unqualified public request. A team may need help; scope and payment unknown.',
+  recommendation:'INVESTIGATE: Check the original public request before deciding if it is a fit.',
+  score:58,observed_at:now},
+ {kind:'revenue-affiliate',title:'Affiliate program mention: Startup referral',
+  source_url:'https://news.ycombinator.com/item?id=500112',observed_at:now,
+  description:'Public community mention only.',recommendation:'Verify official terms',score:39}
+]});
+assert.ok(client.opportunities.some(x=>x.channel==='Potential client · unqualified'));
+const lead=client.opportunities.find(x=>x.channel==='Potential client · unqualified');
+assert.equal(lead.buyerDemandVerified,false);
+assert.equal(lead.revenueVerified,false);
+assert.ok(lead.priorityScore>70,'New public client intent is prioritized for founder investigation');
+assert.ok(!client.marketSignals.some(x=>x.sourceUrl===lead.sourceUrl),'No duplicated client lead in lower list');
+assert.ok(client.marketSignals.some(x=>x.category==='affiliate'),'Community program chatter is not proof of a real offer');
+assert.equal(client.verifiedEarnings.amount,null);
+assert.equal(client.sourceScansCompleted,1);
+assert.equal(client.sources.length,7);
+
 const growth={available:true,source:'https://yorphives.com/api/insights/growth',
  generatedAt:now,ranked:[{url:'tools/image-resize/',name:'Image Resize',completedActions7d:40},
  {url:'apps/internal/',name:'HQventures',completedActions7d:100},
@@ -75,4 +106,4 @@ assert.match(ui,/\/api\/revenue-intelligence/);
 assert.doesNotMatch(ui,/document\.write\(/);
 const pure=readFileSync(new URL('../src/revenue-intelligence.mjs',import.meta.url),'utf8');
 assert.doesNotMatch(pure,/\bfetch\s*\(|\bPOST\b|\bPUT\b|\bDELETE\b/);
-console.log('PASS HQ Revenue: distinct earnings/research, two business areas, source links, privacy and founder-only launch gates');
+console.log('PASS HQ Revenue: verified vs unqualified income; affiliate/partner programs and client leads; read-only founder gates');
