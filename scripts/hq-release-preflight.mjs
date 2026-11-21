@@ -54,7 +54,7 @@ for(const part of content.split(boundary).slice(1)){
  assert.ok(name&&split>=0,'Malformed remote Worker module');
  modules.set(name,part.slice(split+4).replace(new RegExp(crlf+'$'),''));
 }
-assert.equal(modules.size,7,'Unexpected current live module count');
+assert.equal(modules.size,8,'Unexpected current live module count');
 for(const [name,sha] of Object.entries(release.liveModuleGitBlobs)){
  assert.ok(modules.has(name),'Missing deployed module '+name);
  assert.equal(gitBlob(modules.get(name)),sha,'Deployed source differs from approved snapshot for '+name);

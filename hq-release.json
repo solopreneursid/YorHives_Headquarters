@@ -2,17 +2,17 @@
   "schemaVersion": 1,
   "application": "YorpHives HQ",
   "productionWorker": "yorphives-hq-free-pilot",
-  "sourceWorkerVersion": "efdb1d2a-2d56-4a4f-89c2-8505fa4dfa1c",
+  "sourceWorkerVersion": "6057bd41-ca23-46ae-bc7a-472fa7832a2a",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "3231451698945d416c880e6690802619060684b9",
+    "hq-worker.mjs": "79d7e5f96f6f3ee74f248df19ff8ad82a0d1f3ba",
     "watchdog-evidence.mjs": "f3c47a3fad7589f0c9b6aadd5ff613e528ef40e7",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
     "product-intelligence.mjs": "1afd4abb92978bda8abc97287bbbf760534e9e72",
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
-    "revenue-intelligence.mjs": "2d17ba692a89dd517f62233eb4f8092171158e69",
-    "revenue-research.mjs": "25a851ad90db88876b51adb1e60b714b9196899c"
+    "revenue-intelligence.mjs": "3a6879e5b7c3f9670023ec35fda878a1d332b599",
+    "revenue-research.mjs": "2b0fd7a13ce42b9321eae4aa595186cfc82bf76d"
   },
   "navigation": [
     "home",
@@ -81,22 +81,26 @@
     "Source-status evidence written only to existing local D1; retain 120d of our own revenue-research findings. All market claims, third-party earnings and demand remain unverified.",
     "Revenue top view is evidence-ranked by YorpHives business fit and public signals; empty scans never produce fabricated opportunity cards.",
     "2026-11-21 correction: third-party self-reported earnings remain in Market Revenue Intelligence and do not alone outrank founder-actionable Revenue Opportunities.",
-    "Duplicate external research cards are removed from the secondary Market Intelligence list; AI photo/creative inference products are HQventures research with high unverified operating costs, not Free Tools ad placements."
+    "Duplicate external research cards are removed from the secondary Market Intelligence list; AI photo/creative inference products are HQventures research with high unverified operating costs, not Free Tools ad placements.",
+    "2026-11-21: revenue finds multiple ways YorpHives could earn: AdSense-eligible Free Tools (approval-dependent), official affiliate programs, service/partner offers, sponsorship discussions, public potential client requests and founder-approved HQventures products.",
+    "All collected client requests are unqualified public signals; no contact harvesting, outbound communication, purchases, partner registration, ads insertion or automated billing.",
+    "Multi-source collector adds scheduled research windows on the same 5-minute cron using the existing bounded HTTP allowance. No new host, binding or credential.",
+    "Official program pages are public references, not a claim of acceptance, current compensation, or suitability; Free Tools remain free and HQ no ads."
   ],
-  "previousWorkerVersion": "2536fdf8-450c-47c9-8ef3-a84e1081ac96",
+  "previousWorkerVersion": "efdb1d2a-2d56-4a4f-89c2-8505fa4dfa1c",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
   "releaseVerification": {
-    "githubWorkflowRun": 44866812658,
-    "acceptedAt": "2026-11-21T04:35:21.371841Z",
-    "outcome": "Founder-approved eight-module Revenue research source is deployed and at 100% traffic; source hashes, bindings, schedule and Access independently verified.",
-    "verifiedBy": "GitHub release workflow + Cloudflare deployments/content/v2/settings/schedules/Access",
+    "githubWorkflowRun": 44868381659,
+    "acceptedAt": "2026-11-21T07:40:27.203877Z",
+    "outcome": "Successful safe automatic rollout; all eight current Cloudflare modules checked against approved source, HQ Access founder-only and bound settings preserved.",
+    "verifiedBy": "GitHub completed successful run and independently checked Cloudflare deployed source checksum",
     "modulesMatched": 8,
     "bindingsMatched": 9,
     "cron": "*/5 * * * *",
-    "manualFounderApproved": true,
+    "manualFounderApproved": false,
     "productionBrowserSessionVerified": false,
     "sourceCollectorsVerified": false,
-    "recordType": "verified current live baseline, not candidate result",
+    "recordType": "verified eight-module live baseline for distinct multi-channel candidate",
     "candidateVerifiedInProduction": false
   },
   "privateSnapshotKey": "hq-authoritative-snapshot__2026-11-19__b2fa6a0a-b872-48f4-888f-e675e84fa0a5",
@@ -108,8 +112,8 @@
     "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
     "product-intelligence.mjs": "1afd4abb92978bda8abc97287bbbf760534e9e72",
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
-    "revenue-intelligence.mjs": "46657886f9ae99daec670a55179b0f9fb9ed5113",
+    "revenue-intelligence.mjs": "2d17ba692a89dd517f62233eb4f8092171158e69",
     "revenue-research.mjs": "25a851ad90db88876b51adb1e60b714b9196899c"
   },
-  "candidateStatus": "Revenue recommendation quality correction candidate only; live eight-module Worker unchanged until founder-approved manual release."
+  "candidateStatus": "Multi-channel client/affiliate/partner/sponsor collector and private API changes: reviewed candidate only, NOT auto-deploy eligible; must pass founder manual release."
 }
