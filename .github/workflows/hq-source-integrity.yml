@@ -10,6 +10,7 @@ on:
       - 'scripts/release-hq-manual.mjs'
       - 'scripts/test-release-post-upload.mjs'
       - 'scripts/test-free-tools-operations.mjs'
+      - 'scripts/test-revenue-intelligence.mjs'
       - '.github/workflows/hq-source-integrity.yml'
   workflow_dispatch:
 permissions:
