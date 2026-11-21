@@ -31,6 +31,7 @@ jobs:
           node --check src/revenue-research.mjs
           node --check src/growth-evidence.mjs
           node --check src/watchdog-evidence.mjs
+          node scripts/test-free-tools-operations.mjs
           node --check src/agent-demand-evidence.mjs
           node scripts/verify-current-hq.mjs
           node --check scripts/release-hq-manual.mjs
