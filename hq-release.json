@@ -2,16 +2,17 @@
   "schemaVersion": 1,
   "application": "YorpHives HQ",
   "productionWorker": "yorphives-hq-free-pilot",
-  "sourceWorkerVersion": "319b26ea-a4ca-4695-8c1e-e565105c69eb",
+  "sourceWorkerVersion": "2536fdf8-450c-47c9-8ef3-a84e1081ac96",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "f02ad99b1d87d7c787ab1f78fe41fe0a3e4b1f55",
+    "hq-worker.mjs": "3231451698945d416c880e6690802619060684b9",
     "watchdog-evidence.mjs": "f3c47a3fad7589f0c9b6aadd5ff613e528ef40e7",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
     "product-intelligence.mjs": "1afd4abb92978bda8abc97287bbbf760534e9e72",
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
-    "revenue-intelligence.mjs": "bde96975451c666c14d3c9edb6124f8a2452069c"
+    "revenue-intelligence.mjs": "46657886f9ae99daec670a55179b0f9fb9ed5113",
+    "revenue-research.mjs": "25a851ad90db88876b51adb1e60b714b9196899c"
   },
   "navigation": [
     "home",
@@ -75,33 +76,37 @@
     "Revenue candidate adds a seventh isolated, portable, deterministic module. Current production source stays six modules, pinned separately.",
     "Revenue channel guardrails: AdSense/sponsored advertisements on Free Tools only; Home/HQventures/HQconnect/HQ ad-free; Free Tools remain free; support button remains disabled.",
     "Revenue always reports income unavailable/null until independently verified by a connected payout/accounting source; third-party market claims are not YorpHives earnings.",
-    "Revenue module has no mutation capabilities; no agents, ad publishing, payments, or infrastructure changes; releases remain founder-approved."
+    "Revenue module has no mutation capabilities; no agents, ad publishing, payments, or infrastructure changes; releases remain founder-approved.",
+    "2026-11-21 Revenue research candidate: three allowlisted public GET windows/day with strict time/body limits; HN Algolia maker conversations and IndieMakerList public feed.",
+    "Source-status evidence written only to existing local D1; retain 120d of our own revenue-research findings. All market claims, third-party earnings and demand remain unverified.",
+    "Revenue top view is evidence-ranked by YorpHives business fit and public signals; empty scans never produce fabricated opportunity cards."
   ],
-  "previousWorkerVersion": "de401248-ba02-42b7-8cd1-cc3de55a0f78",
+  "previousWorkerVersion": "319b26ea-a4ca-4695-8c1e-e565105c69eb",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
   "releaseVerification": {
-    "githubWorkflowRun": 44863848319,
-    "acceptedAt": "2026-11-21T03:59:58.094487Z",
-    "outcome": "Protected Products source-quality release successful; Cloudflare deployed version at 100% traffic.",
-    "verifiedBy": "GitHub manual workflow and Cloudflare deployment/module hash API",
-    "modulesMatched": 6,
+    "githubWorkflowRun": 44865173111,
+    "acceptedAt": "2026-11-21T04:15:36.325436Z",
+    "outcome": "Founder-reviewed seven-module Revenue baseline live at 100% traffic.",
+    "verifiedBy": "GitHub successful manual release and independently confirmed Cloudflare live source hashes",
+    "modulesMatched": 7,
     "bindingsMatched": 9,
     "cron": "*/5 * * * *",
     "manualFounderApproved": true,
     "productionBrowserSessionVerified": false,
     "sourceCollectorsVerified": false,
-    "recordType": "historical 2026-11-21 Products quality live baseline; NOT verification of Revenue candidate",
+    "recordType": "historical live baseline for next candidate; new research collector not yet published",
     "candidateVerifiedInProduction": false
   },
   "privateSnapshotKey": "hq-authoritative-snapshot__2026-11-19__b2fa6a0a-b872-48f4-888f-e675e84fa0a5",
   "moduleTreeSha256": null,
   "liveModuleGitBlobs": {
-    "hq-worker.mjs": "508996bc6e5dd307f11e97b4c1faac0c985695b6",
+    "hq-worker.mjs": "f02ad99b1d87d7c787ab1f78fe41fe0a3e4b1f55",
     "watchdog-evidence.mjs": "f3c47a3fad7589f0c9b6aadd5ff613e528ef40e7",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
     "product-intelligence.mjs": "1afd4abb92978bda8abc97287bbbf760534e9e72",
-    "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af"
+    "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
+    "revenue-intelligence.mjs": "bde96975451c666c14d3c9edb6124f8a2452069c"
   },
-  "candidateStatus": "Revenue Intelligence candidate; NOT deployed; requires separate founder-approved manual release"
+  "candidateStatus": "Revenue research intelligence candidate merged only after CI; production remains unchanged until founder-approved workflow."
 }
