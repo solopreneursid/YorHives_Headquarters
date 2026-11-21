@@ -48,9 +48,26 @@ const mock={
      sourceUrl:'https://news.ycombinator.com/item?id=991',buildEffortHypothesis:'high'},
     {id:'free-tools-research',rank:5,channel:'Free Tools · research',title:'Investigate: Paid PDF workflow',
      stage:'Founder research',evidenceStatus:'Discussion only',evidence:'A related market signal.',nextAction:'Review tool usage.',risk:'No paywall.',
-     sourceUrl:'https://indiemakerlist.com/makers/pdf-sample',buildEffortHypothesis:'low-to-medium'}
-  ],sources:[{name:'Hacker News · maker revenue',status:'ok:2',checkedAt:now},
+     sourceUrl:'https://indiemakerlist.com/makers/pdf-sample',buildEffortHypothesis:'low-to-medium'},
+    {id:'public-client-request',rank:6,channel:'Potential client · unqualified',title:'Investigate: Public request for PDF automation',
+     stage:'Founder research',evidenceStatus:'Public request; payment unverified',evidence:'A public requester may want a workflow.',
+     nextAction:'Read original and validate scope, budget and date.',risk:'Unqualified inquiry.',
+     sourceUrl:'https://news.ycombinator.com/item?id=501'},
+    {id:'official-affiliate',rank:7,channel:'Affiliate · optional editorial',title:'Evaluate Namecheap domain affiliate program',
+     stage:'Published program page',evidenceStatus:'Enrolment unknown',evidence:'Official page only.',
+     nextAction:'Verify audience and permitted affiliate disclosures.',risk:'No confirmed commissions.',
+     sourceUrl:'https://www.namecheap.com/affiliates/'},
+    {id:'official-partner',rank:8,channel:'Partnership · research',title:'Evaluate Cloudflare PowerUP service-partner fit',
+     stage:'Published program page',evidenceStatus:'Approval unknown',evidence:'Official program page.',
+     nextAction:'Check entry requirements.',risk:'No partner agreement.',
+     sourceUrl:'https://www.cloudflare.com/partners/power-up-program/'}
+  ],sources:[
+     {name:'Hacker News · affiliate mentions',status:'not-yet-checked',checkedAt:null},
+     {name:'Hacker News · sponsorship mentions',status:'not-yet-checked',checkedAt:null},
+     {name:'Hacker News · maker revenue',status:'ok:2',checkedAt:now},
+     {name:'Hacker News · potential public client requests',status:'not-yet-checked',checkedAt:null},
      {name:'IndieMakerList · maker feed',status:'ok:1',checkedAt:now},
+     {name:'Hacker News · partnership mentions',status:'not-yet-checked',checkedAt:null},
      {name:'Hacker News · pricing',status:'not-yet-checked',checkedAt:null}],
    sourceScansCompleted:2,marketSignals:[{title:'External reported startup earnings',classification:'Third-party reported claim · not independently verified',summary:'Reported third-party earnings.',nextAction:'Investigate only',sourceUrl:'https://trustmrr.com/newsletter',yorphivesRevenue:false}]
  },
@@ -108,12 +125,15 @@ try{
   await page.getByText('Research relevant tool sponsorship').waitFor({timeout:10000});
   await page.getByText('Investigate: Maker reported paid SaaS').waitFor({timeout:10000});
   await page.getByText('Investigate: Paid PDF workflow').waitFor({timeout:10000});
-  await page.getByText('Recorded public checks: 2 of 3.',{exact:false}).waitFor({timeout:10000});
+  await page.getByText('Investigate: Public request for PDF automation').waitFor({timeout:10000});
+  await page.getByText('Evaluate Namecheap domain affiliate program').waitFor({timeout:10000});
+  await page.getByText('Evaluate Cloudflare PowerUP service-partner fit').waitFor({timeout:10000});
+  await page.getByText('Recorded public checks: 2 of 7.',{exact:false}).waitFor({timeout:10000});
   await page.getByText('External reported startup earnings').waitFor({timeout:10000});
   const external=page.getByRole('link',{name:'Original report'});
   assert.equal(await external.getAttribute('href'),'https://trustmrr.com/newsletter');
   assert.equal(await external.getAttribute('rel'),'noopener noreferrer');
-  assert.equal(await page.locator('main .revenue-row').count(),6,'Five opportunities plus one external source');
+  assert.equal(await page.locator('main .revenue-row').count(),9,'Eight different opportunity classes plus one external report');
   await page.goBack({waitUntil:'networkidle'});
   assert.equal(await page.locator('main h1').textContent(),'Products','Browser Back must restore Products');
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
