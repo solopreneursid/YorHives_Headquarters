@@ -4,7 +4,7 @@ import {buildRevenueIntelligence} from './revenue-intelligence.mjs';
 import {runRevenueResearch} from './revenue-research.mjs';
 import {loadGrowthEvidence} from './growth-evidence.mjs';
 import {loadWatchdogEvidence} from './watchdog-evidence.mjs';
-import {loadFreeToolsOperations} from './free-tools-operations.mjs';
+import {loadFreeToolsOperations} from './watchdog-evidence.mjs';
 import {loadAgentDemand} from './agent-demand-evidence.mjs';
 /**
  * YorpHives Headquarters — zero-additional-subscription Cloudflare adapter.
