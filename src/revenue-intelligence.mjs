@@ -24,6 +24,7 @@ function growthEvidence(growth){
 function revenueFit(title){
  const s=String(title||'').toLowerCase();
  if(/\b(job|career|resume|cv|recruit|interview)\b/.test(s))return {lane:'HQventures · research',category:'govradar',audience:'GovRadar jobseekers',effort:'medium',next:'Verify repeat GovRadar use and interview jobseekers about one useful paid application workflow.',risk:'Candidate privacy, job-source rights and ongoing data accuracy.'};
+ if(/(?:(?:\bai\b|\bgenerative\b|\bcredits\b).*(?:\bimage\b|\bphoto\b)|(?:\bimage\b|\bphoto\b).*(?:\bai\b|\bgenerative\b|\bcredits\b))/.test(s))return {lane:'HQventures · research',category:'hqventures',audience:'Buyers of a privacy-focused creative AI product',effort:'high',next:'Check paying demand for a narrowly differentiated image workflow, compare existing free tools, and independently estimate model inference cost before proposing any credits or subscriptions.',risk:'AI compute costs, image rights, privacy, market competition, paid unit economics and customer acquisition are not validated.'};
  if(/\b(pdf|image|photo|file|convert|compress|browser|tool|extension|document)\b/.test(s))return {lane:'Free Tools · research',category:'free-tools',audience:'People using a private no-login tool',effort:'low-to-medium',next:'Check real usage of related Free Tools, improve the free workflow and only consider ads with eligible traffic.',risk:'Do not paywall Free Tools or reduce usability with ads.'};
  if(/\b(agent|automation|workflow|saas|ai|startup|mobile|app|business|software|marketing|creator|newsletter|subscription|product)\b/.test(s))return {lane:'HQventures · research',category:'hqventures',audience:'Potential buyers for a narrow tool or app',effort:'high',next:'Verify buyer pain, competition, legal rights and operating cost; propose a founder-approved one-feature pilot only after validation.',risk:'Support, model cost, security, maintenance and price acceptance unverified.'};
  return {lane:'Market watch',category:'unclassified',audience:'Unverified',effort:'unassessed',next:'Identify an actual buyer and relevance to YorpHives before treating this as an opportunity.',risk:'Unvalidated business fit and costs.'};
@@ -83,7 +84,8 @@ export function buildRevenueIntelligence({growth=null,externalRows=[],researchRo
  const marketSignals=normalizeMarket([...(Array.isArray(externalRows)?externalRows:[]),...(Array.isArray(researchRows)?researchRows:[])],now);
  const filtered=[],byCategory=new Map(),byType=new Map();
  for(const lead of marketSignals){
-  if(lead.category==='unclassified'||(byCategory.get(lead.category)||0)>=3||
+  // Source-reported revenue stays in Market Intelligence; never auto-promote a claim to an investment priority.
+  if(lead.sourceType!=='public-discussion'||lead.category==='unclassified'||(byCategory.get(lead.category)||0)>=3||
      (byType.get(lead.sourceType)||0)>=5)continue;
   filtered.push({id:'revenue-lead-'+filtered.length+'-'+lead.sourceUrl.slice(-18),
    channel:lead.channel,title:'Investigate: '+lead.title,stage:'Founder research',
@@ -106,7 +108,7 @@ export function buildRevenueIntelligence({growth=null,externalRows=[],researchRo
   constraints:{advertisingScope:'Free Tools only',adFreeAreas:['Home','HQventures','HQconnect','YorpHivesHQ'],
    freeToolsRemainFree:true,hqventuresOnlyFounderApprovedProducts:true,supportButton:'remains disabled',
    noAutomaticPublishing:true,noAutomaticMonetization:true,noPurchases:true},
-  activity,opportunities:ranked,marketSignals:marketSignals.slice(0,10),sources,
+  activity,opportunities:ranked,marketSignals:marketSignals.filter(x=>!filtered.some(f=>f.sourceUrl===x.sourceUrl)).slice(0,10),sources,
   researchedOpportunities:filtered.length,sourceScansCompleted:sources.filter(x=>x.checkedAt!==null).length,
   disclaimer:'Opportunity cards and third-party claims are research hypotheses, not verified YorpHives earnings, customer demand or projections.'};
 }
