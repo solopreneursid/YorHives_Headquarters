@@ -36,6 +36,16 @@ const ext=[
 const withSignals=buildRevenueIntelligence({externalRows:ext,now});
 assert.equal(withSignals.marketSignals.length,1);
 assert.equal(withSignals.marketSignals[0].sourceUrl,'https://trustmrr.com/newsletter');
+assert.equal(withSignals.opportunities.length,3,'Unverified external earnings may not outrank actionable company channels');
+assert.ok(!withSignals.opportunities.some(x=>x.sourceUrl==='https://trustmrr.com/newsletter'));
+const glowy=buildRevenueIntelligence({externalRows:[{kind:'revenue-trend',title:'AI photo creation — Glowy',
+  source_url:'https://trustmrr.com/newsletter',observed_at:now,score:71,description:'Third-party revenue claim',
+  recommendation:'Niche premium packs require independent validation'}],now});
+assert.equal(glowy.marketSignals.length,1,'Third-party claim remains accessible with original evidence');
+assert.equal(glowy.marketSignals[0].category,'hqventures','AI photo generation is not automatically a Free Tools ad opportunity');
+assert.equal(glowy.marketSignals[0].effortHypothesis,'high');
+assert.equal(glowy.opportunities.length,3,'An unverified reported amount alone is not a Top Revenue Opportunity');
+
 assert.equal(withSignals.marketSignals[0].yorphivesRevenue,false);
 assert.equal(withSignals.marketSignals[0].profitVerified,false);
 assert.equal(withSignals.verifiedEarnings.amount,null);

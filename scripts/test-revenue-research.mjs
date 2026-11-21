@@ -36,14 +36,26 @@ const activity=buildRevenueIntelligence({now:at,researchRows:normal.concat(feed)
  {key:'revenue_research_hn_mrr',value:'ok:2',checked_at:at},
  {key:'revenue_research_makers',value:'ok:1',checked_at:at}
 ]});
-assert.equal(activity.marketSignals.length,3);
+assert.equal(activity.marketSignals.length,0,'Research leads already recommended should not be repeated in Market Intelligence');
 assert.equal(activity.researchedOpportunities,3);
 assert.equal(activity.opportunities.length,6,'Three baseline channels plus three qualified outside hypotheses');
 assert.equal(activity.sourceScansCompleted,2);
 assert.equal(activity.verifiedEarnings.available,false);
 assert.equal(activity.verifiedEarnings.amount,null);
 assert.ok(activity.opportunities.every(x=>x.approvalRequired===true&&x.autoExecute===false&&x.revenueVerified===false));
-assert.ok(activity.marketSignals.every(x=>x.yorphivesRevenue===false&&x.buyerDemandVerified===false));
+assert.ok(activity.opportunities.filter(x=>x.stage==='Founder research').every(x=>x.revenueVerified===false&&x.buyerDemandVerified===false));
+const withReported=buildRevenueIntelligence({now:at,researchRows:normal.concat(feed),externalRows:[{
+ kind:'revenue-trend',title:'AI photo creation — Glowy',score:71,
+ source_url:'https://trustmrr.com/newsletter',observed_at:'2026-11-20T12:00:00Z',
+ description:'Outside report only, not YorpHives sales.',
+ recommendation:'Investigate independent evidence before proposing a product.'
+}]});
+assert.equal(withReported.marketSignals.length,1,'Unverified reported earnings remain in Market Intelligence');
+assert.equal(withReported.marketSignals[0].title,'AI photo creation — Glowy');
+assert.equal(withReported.marketSignals[0].category,'hqventures','Commercial AI generation needs verified compute economics');
+assert.equal(withReported.researchedOpportunities,3,'Reported figures must not gain a recommendation slot');
+assert.ok(withReported.opportunities.every(x=>x.sourceUrl!=='https://trustmrr.com/newsletter'));
+assert.equal(withReported.verifiedEarnings.amount,null);
 const many=[...normal,...Array.from({length:20},(_,i)=>({
  kind:'revenue-research',title:'A PDF tool earns paying customers '+i,
  description:'Public discussion, not verified revenue.',
