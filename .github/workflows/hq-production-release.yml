@@ -1,9 +1,11 @@
-name: HQ production release (manual, founder approved)
+name: HQ production release (safe auto / sensitive founder manual)
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       founder_confirmation:
-        description: "Confirm the protected HQ source publication; founder environment approval is still required"
+        description: "Required for sensitive manual HQ publication"
         required: true
         default: "RELEASE_FOUR_BUTTON_HQ"
         type: string
@@ -13,10 +15,78 @@ concurrency:
   group: hq-production-release
   cancel-in-progress: false
 jobs:
-  deploy-private-hq:
-    if: github.ref == 'refs/heads/main'
+  auto-scope:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 4
+    outputs:
+      eligible: ${{ steps.gate.outputs.eligible }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check that this is a routine, source-limited HQ update
+        id: gate
+        run: |
+          node scripts/test-hq-auto-scope.mjs
+          node scripts/check-hq-auto-scope.mjs
+  safe-auto-release:
+    needs: auto-scope
+    if: github.event_name == 'push' && needs.auto-scope.outputs.eligible == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 19
+    environment: hq-production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Independently reconfirm permitted paths and reviewed module SHAs
+        run: |
+          node scripts/check-hq-auto-scope.mjs
+          node --check src/hq-worker.mjs
+          node --check src/products-ranker.mjs
+          node --check src/revenue-intelligence.mjs
+          node --check src/revenue-research.mjs
+          node --check scripts/release-hq-manual.mjs
+          node scripts/verify-current-hq.mjs
+          node scripts/test-release-post-upload.mjs
+      - name: Run deterministic product and revenue safety regressions
+        run: |
+          node scripts/test-products-trends.mjs
+          node scripts/test-products-evidence.mjs
+          node scripts/test-revenue-intelligence.mjs
+          node scripts/test-revenue-research.mjs
+      - name: Install pinned test-only browser
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts --no-fund --no-audit playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Validate four-button HQ desktop and mobile before deployment
+        run: node scripts/test-four-button-browser.mjs
+      - name: Deploy only the reviewed private HQ Worker after all tests pass
+        env:
+          HQ_RELEASE_TOKEN: ${{ secrets.HQ_RELEASE_TOKEN }}
+          HQ_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.HQ_CLOUDFLARE_ACCOUNT_ID }}
+          HQ_APPROVED_SOURCE_SHA: ${{ github.sha }}
+          HQ_AUTO_RELEASE: 'true'
+          HQ_AUTO_SCOPE_OK: 'true'
+        run: node scripts/release-hq-manual.mjs
+      - name: Record release restrictions
+        if: always()
+        run: |
+          echo 'Automatic publication is limited to reviewed models and embedded UI changes.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Private HQ agents cannot edit source or publish. Access policies, schedules and bindings remain unchanged.' >> "$GITHUB_STEP_SUMMARY"
+  deploy-private-hq:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: hq-production
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +95,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify approved private source (does not deploy)
+      - name: Verify reviewed source and founder-approved manual publication
         run: |
           node --check scripts/release-hq-manual.mjs
           node scripts/verify-current-hq.mjs
@@ -33,15 +103,14 @@ jobs:
         shell: bash
         run: |
           node -e "const m=require('./hq-release.json'); console.log('EXPECTED_CURRENT_VERSION='+m.sourceWorkerVersion)" >> "$GITHUB_ENV"
-      - name: Verify Products trends before release (offline)
+      - name: Verify all Products and Revenue regression tests
         run: |
           node scripts/test-products-trends.mjs
           node scripts/test-products-evidence.mjs
-      - name: Verify Revenue evidence and founder-only rules before release (offline)
-        run: |
           node scripts/test-revenue-intelligence.mjs
           node scripts/test-revenue-research.mjs
-      - name: Deploy ONLY with founder-approved environment and scoped Worker token
+          node scripts/test-hq-auto-scope.mjs
+      - name: Publish only with scoped HQ token and explicit founder confirmation
         env:
           HQ_RELEASE_TOKEN: ${{ secrets.HQ_RELEASE_TOKEN }}
           HQ_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.HQ_CLOUDFLARE_ACCOUNT_ID }}
@@ -50,4 +119,4 @@ jobs:
         run: node scripts/release-hq-manual.mjs
       - name: Scope notice
         if: always()
-        run: echo 'Source/bindings checked. Cloudflare Access login and external uptime must be verified separately.' >> "$GITHUB_STEP_SUMMARY"
+        run: echo 'Manual exception path: sensitive HQ changes still require explicit founder dispatch. No public site or other Worker may be changed.' >> "$GITHUB_STEP_SUMMARY"
