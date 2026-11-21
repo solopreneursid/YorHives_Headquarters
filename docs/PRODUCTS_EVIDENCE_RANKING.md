@@ -2,7 +2,7 @@
 
 ## Founder-facing behavior
 
-The Products tab keeps the existing four-button HQ navigation. It shows product names, the original public source link, dated evidence, a proposed narrow improvement, and a non-promissory revenue experiment. A second disclosure lists product URLs independently found in permitted public launch feeds; these entries stay explicitly `link-only-unverified`.
+The Products tab keeps the existing four-button HQ navigation. Its landing view presents the 10 highest-ranked candidates; up to 20 more remain available behind an expandable **More research candidates** disclosure, without adding navigation. It shows product names, the original public source link, dated evidence, a proposed narrow improvement, and a non-promissory revenue experiment. A second disclosure lists product URLs independently found in permitted public launch feeds; these entries stay explicitly `link-only-unverified`.
 
 If stored records attach two different titles to the same Hacker News discussion ID, neither title is ranked against those discussion points. The conflicting records are quarantined from recommendations pending source verification; previously discovered public URLs stay in the separately labeled link-only area. This handles evidence inconsistency without mutating historical database records.
 
