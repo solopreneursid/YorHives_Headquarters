@@ -40,6 +40,15 @@ const mock={
   verifiedEarnings:{available:false,amount:null,currency:null,reason:'No actual payout data connected.'},
   activity:{available:false,status:'Not connected'},
   opportunities:[
+   {id:'gov-it-tender',rank:1,channel:'Government project · verify eligibility',
+    title:'Investigate: Government tender · Website and digital forms development',
+    stage:'Official tender listing',evidenceStatus:'Official source with future deadline',
+    whoMightPay:'Government issuing body — confirm buyer in original tender.',
+    whyPay:'An authority published a procurement request for digital services.',
+    nextAction:'Search tender reference NIC-IT/WEB/2026/7 and confirm eligibility.',
+    bidDeadline:'2026-11-29 15:30 IST',
+    evidence:'Tender reference NIC-IT/WEB/2026/7, deadline in IST. Eligibility unverified.',
+    risk:'Experience requirements and DSC not verified.',sourceUrl:'https://eprocure.gov.in/eprocure/app'},
    {id:'hqventures-product-sales',rank:1,channel:'HQventures',title:'Validate a paid HQventures product',stage:'Research first',evidenceStatus:'No customers verified',evidence:'No verified orders.',nextAction:'Review one approved product.',risk:'Payment handling.',sourceUrl:'https://yorphives.com/hqventures/'},
    {id:'free-tools-advertising',rank:2,channel:'Free Tools only',title:'Evaluate advertising on Free Tools',stage:'Research first',evidenceStatus:'AdSense not verified',evidence:'Ads not enabled.',nextAction:'Review page evidence.',risk:'Publisher compliance.',sourceUrl:'https://yorphives.com/free-tools/'},
    {id:'free-tools-sponsorship',rank:3,channel:'Free Tools only',title:'Research relevant tool sponsorship',stage:'Research first',evidenceStatus:'No sponsor',evidence:'Hypothesis.',nextAction:'Test sponsor interest.',risk:'Disclosure.',sourceUrl:'https://yorphives.com/free-tools/'}
@@ -62,13 +71,15 @@ const mock={
      nextAction:'Check entry requirements.',risk:'No partner agreement.',
      sourceUrl:'https://www.cloudflare.com/partners/power-up-program/'}
   ],sources:[
+     {name:'India · official central eProcurement',status:'not-yet-checked',checkedAt:null},
      {name:'Hacker News · affiliate mentions',status:'not-yet-checked',checkedAt:null},
      {name:'Hacker News · sponsorship mentions',status:'not-yet-checked',checkedAt:null},
      {name:'Hacker News · maker revenue',status:'ok:2',checkedAt:now},
      {name:'Hacker News · potential public client requests',status:'not-yet-checked',checkedAt:null},
      {name:'IndieMakerList · maker feed',status:'ok:1',checkedAt:now},
      {name:'Hacker News · partnership mentions',status:'not-yet-checked',checkedAt:null},
-     {name:'Hacker News · pricing',status:'not-yet-checked',checkedAt:null}],
+     {name:'Hacker News · pricing',status:'not-yet-checked',checkedAt:null},
+     {name:'Jharkhand · official state eProcurement',status:'not-yet-checked',checkedAt:null}],
    sourceScansCompleted:2,marketSignals:[{title:'External reported startup earnings',classification:'Third-party reported claim · not independently verified',summary:'Reported third-party earnings.',nextAction:'Investigate only',sourceUrl:'https://trustmrr.com/newsletter',yorphivesRevenue:false}]
  },
  '/api/tool-coverage':{available:true,declaredCanonicalPages:143,checkedCanonicalPages:143,
@@ -121,6 +132,13 @@ try{
   assert.equal(await page.locator('main h1').textContent(),'Revenue');
   await page.getByText('Verified YorpHives earnings: Not connected.',{exact:false}).waitFor({timeout:10000});
   await page.getByText('Validate a paid HQventures product').waitFor({timeout:10000});
+  await page.getByText('Government tender · Website and digital forms development',{exact:false}).waitFor({timeout:10000});
+  await page.getByText('Who might pay:',{exact:false}).first().waitFor({timeout:10000});
+  await page.getByText('Why they might pay:',{exact:false}).first().waitFor({timeout:10000});
+  await page.getByText('Tender deadline (IST): 2026-11-29 15:30 IST',{exact:false}).waitFor({timeout:10000});
+  const officialPortal=page.getByRole('link',{name:'Open official procurement portal'});
+  assert.equal(await officialPortal.getAttribute('href'),'https://eprocure.gov.in/eprocure/app');
+  assert.equal(await officialPortal.getAttribute('rel'),'noopener noreferrer');
   await page.getByText('Evaluate advertising on Free Tools').waitFor({timeout:10000});
   await page.getByText('Research relevant tool sponsorship').waitFor({timeout:10000});
   await page.getByText('Investigate: Maker reported paid SaaS').waitFor({timeout:10000});
@@ -128,12 +146,12 @@ try{
   await page.getByText('Investigate: Public request for PDF automation').waitFor({timeout:10000});
   await page.getByText('Evaluate Namecheap domain affiliate program').waitFor({timeout:10000});
   await page.getByText('Evaluate Cloudflare PowerUP service-partner fit').waitFor({timeout:10000});
-  await page.getByText('Recorded public checks: 2 of 7.',{exact:false}).waitFor({timeout:10000});
+  await page.getByText('Recorded public checks: 2 of 9.',{exact:false}).waitFor({timeout:10000});
   await page.getByText('External reported startup earnings').waitFor({timeout:10000});
   const external=page.getByRole('link',{name:'Original report'});
   assert.equal(await external.getAttribute('href'),'https://trustmrr.com/newsletter');
   assert.equal(await external.getAttribute('rel'),'noopener noreferrer');
-  assert.equal(await page.locator('main .revenue-row').count(),9,'Eight different opportunity classes plus one external report');
+  assert.equal(await page.locator('main .revenue-row').count(),10,'Government tender, eight revenue opportunities and one external report');
   await page.goBack({waitUntil:'networkidle'});
   assert.equal(await page.locator('main h1').textContent(),'Products','Browser Back must restore Products');
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
