@@ -61,7 +61,7 @@ const audience=/\b(?:our|we|my|me|business|team|company|project|budget|contract|
 const partnershipIntent=/\b(?:looking for.{0,35}partners?|seeking.{0,35}partners?|partnership|collaborat(?:e|ion)|integration partners?)\b/i;
 const commercialTopic=/\b(?:software|startup|business|saas|developer|product|tool|app|automation|api|service|tech)\b/i;
 const affiliateIntent=/\b(?:affiliate program|affiliate partner|referral program|affiliate commission|refer customers|revenue share)\b/i;
-const sponsorIntent=/\b(?:sponsor|sponsorship|sponsored)\b/i;
+const sponsorIntent=/\b(?:sponsors?|sponsoring|sponsorship|sponsored)\b/i;
 const sponsorAudience=/\b(?:newsletter|website|blog|app|tool|open source|podcast|conference|creator|developer|community)\b/i;
 const maskContacts=s=>String(s||'').replace(/[a-z0-9.+_-]+@[a-z0-9.-]+\.[a-z]{2,}/gi,'[contact in source]')
  .replace(/(?:\+?\d[\d ()-]{8,}\d)/g,'[contact in source]');
