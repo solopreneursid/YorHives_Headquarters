@@ -31,3 +31,31 @@ Run node scripts/test-revenue-intelligence.mjs, node scripts/verify-current-hq.m
 ## Future validation
 
 Before execution, obtain reliable traffic / permitted ad impressions for Free Tools and confirmed customer demand / price acceptance for HQventures. Paid integrations and any analytics/financial connection require explicit founder approval. No estimated RPM, profit or subscriber counts without defensible evidence.
+
+## V2 — continuous research intelligence candidate (2026-11-21)
+
+### Data sources and attribution
+
+An isolated portable `src/revenue-research.mjs` module uses three explicit public GET windows on the **existing** 5-minute scheduler. It has no own independent scheduler, API keys or external agent communication:
+
+1. 09:25 UTC — HN Algolia public API, dated stories mentioning maker revenue, MRR, paid users, subscription or related evidence.
+2. 15:25 UTC — published IndieMakerList `/feed.xml`. Only RSS/Atom entries with dated, matching titles and valid original links on that publisher's domain can qualify. This publisher says its public maker data is CC BY 4.0 and openly sourced; only short attributed titles and links are retained.
+3. 21:25 UTC — HN Algolia public API, dated pricing, paid customer and startup monetization conversations.
+
+Each run uses the existing shared public-fetch quota, **one** allowlisted HTTPS request, 8-second timeout, manual redirect prevention, 96kB response cap, 20 search hits or 50 feed entries examined, and **at most six** persisted evidence items. No bypass of robots/access restrictions and no paid proxy. Host, path and protocol are hardcoded. Public HN engagement thresholds are at least five points and two comments, restricted/irrelevant items are excluded, and no old or undated items are treated as fresh. Feed entries may legitimately produce no candidates; failures are recorded as unavailable instead of inventing data.
+
+Evidence is stored in existing D1 `opportunities` using `kind='revenue-research'`, while `status` holds per-source checks. The 21:25 UTC maintenance path removes **only** these research records older than 120 days, never unrelated Products or founder records. Stored outside-source claims are never called verified customer revenue.
+
+### Ranking and actionable recommendations
+
+The deterministic `src/revenue-intelligence.mjs` model combines existing founder business channel hypotheses with qualified current research rows. It uses a simple market-fit heuristic for GovRadar jobseeker workflows, Free Tools niches (PDF/image/file/browser) and HQventures app/agent workflows; unclassified outside ideas remain in Market Revenue Intelligence rather than being pushed as YorpHives launches.
+
+The API returns **up to 10** ranked opportunities, with at most seven sourced additional candidates, three per business category and five per outside source type. It may show fewer until independently retrieved evidence meets the eligibility filter. A score is an investigation heuristic, not a financial forecast. Each sourced candidate includes date, original link, speculative buyer, next founder validation, rough effort and risk. Source statuses show last scan and public access failures. `verifiedEarnings.available` stays false and `amount` stays null; buyer demand, ad impressions, revenue and traffic are never inferred from HN votes or outside maker statements.
+
+The Revenue UI keeps exactly the four established tabs and now consists of **Earnings & evidence**, **Top Revenue Opportunities**, **Market Revenue Intelligence**, and **Research sources & freshness** within the Revenue tab. No signup or UI controls perform monetization or send external transactions. The site's existing Support us feature remains disabled; no ads are added outside Free Tools.
+
+### Tests, boundaries, release
+
+`scripts/test-revenue-research.mjs` checks source parsing, freshness, unverified claims, three daily scan windows, GET-only behaviour, D1 evidence-only writes, allowed retention, fetch budget failures, and ranked opportunity limits. Run it with `scripts/test-revenue-intelligence.mjs`, the exact-source integrity checker, Products regression, and mocked mobile/desktop browser regression. No production credentials or real authenticated browser session are used in CI.
+
+Live seven-module baseline: `2536fdf8-450c-47c9-8ef3-a84e1081ac96`. The eight-module candidate requires the manual `workflow_dispatch` protected `hq-production` environment review; Git merge cannot publish it. After approval, the first successful scan happens at the next scheduled UTC slot, not immediately. No promises that the publisher feed is currently accessible or that genuine new revenue reports will be found on every scan.
