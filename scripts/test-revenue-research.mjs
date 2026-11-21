@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {normalizeHnRevenue,normalizeMakerFeed,revenueResearchWindow,runRevenueResearch} from '../src/revenue-research.mjs';
+import {normalizeHnRevenue,normalizeMakerFeed,normalizeRevenueOpportunities,revenueResearchWindow,runRevenueResearch} from '../src/revenue-research.mjs';
 import {buildRevenueIntelligence} from '../src/revenue-intelligence.mjs';
 
 const at='2026-11-21T09:25:00Z';
@@ -19,10 +19,38 @@ assert.equal(normal.length,2,'Only relevant, fresh and engaged public discussion
 assert.ok(normal.every(x=>x.kind==='revenue-research'&&x.source_url.startsWith('https://news.ycombinator.com/item?id=')));
 assert.ok(normal.every(x=>x.description.includes('unverified')&&x.recommendation.includes('No verified YorpHives revenue')));
 assert.deepEqual(normalizeHnRevenue(hits,at,'invalid'),[]);
+assert.equal(revenueResearchWindow('2026-11-21T03:25:00Z').id,'hn-affiliates');
+assert.equal(revenueResearchWindow('2026-11-21T06:25:00Z').id,'hn-sponsors');
 assert.equal(revenueResearchWindow('2026-11-21T09:25:00Z').id,'hn-mrr');
+assert.equal(revenueResearchWindow('2026-11-21T12:25:00Z').id,'hn-clients');
+assert.equal(revenueResearchWindow('2026-11-21T18:25:00Z').id,'hn-partners');
 assert.equal(revenueResearchWindow('2026-11-21T15:25:00Z').id,'makers');
 assert.equal(revenueResearchWindow('2026-11-21T21:25:00Z').id,'hn-pricing');
 assert.equal(revenueResearchWindow('2026-11-21T10:25:00Z'),null);
+
+const request=(id,body,date='2026-11-20T12:00:00Z')=>({
+ objectID:String(id),story_title:'Ask HN: Help building products',comment_text:body,created_at:date,
+ points:0,num_comments:0
+});
+const clientHits=[request(501,'We need a developer for our PDF automation project with a budget.'),
+ request(502,'I need to find a job.'),request(503,'Contact owner@private.example.com: we need a freelancer for our API project.')];
+const clientLeads=normalizeRevenueOpportunities(clientHits,'2026-11-21T12:25:00Z','client');
+assert.equal(clientLeads.length,2,'Strict buyer/request and project terms required');
+assert.ok(clientLeads.every(x=>x.kind==='revenue-client'));
+assert.ok(clientLeads.every(x=>x.source_url.startsWith('https://news.ycombinator.com/item?id=')));
+assert.ok(clientLeads.every(x=>!x.description.includes('owner@private.example.com')),'Emails are masked in stored evidence');
+assert.ok(clientLeads.every(x=>x.recommendation.includes('do not auto-contact')));
+assert.equal(normalizeRevenueOpportunities([request(509,'I need a developer for my project.','2026-10-01T00:00:00Z')],
+ '2026-11-21T12:25:00Z','client').length,0,'Expired public requests are not active leads');
+const hna=(id,title,pts=8,c=3)=>hn(id,title,pts,c);
+const affiliateHits=[hna(601,'New affiliate program with commission for SaaS tool referrals')];
+const partnerHits=[hna(602,'Seeking partners for our developer automation product')];
+const sponsorHits=[hna(603,'Sponsoring developer newsletters and open source tools')];
+assert.equal(normalizeRevenueOpportunities(affiliateHits,'2026-11-21T03:25:00Z','affiliate').length,1);
+assert.equal(normalizeRevenueOpportunities(partnerHits,'2026-11-21T18:25:00Z','partnership').length,1);
+assert.equal(normalizeRevenueOpportunities(sponsorHits,'2026-11-21T06:25:00Z','sponsorship').length,1);
+assert.deepEqual(normalizeRevenueOpportunities(clientHits,at,'unapproved-kind'),[]);
+
 const xml='<rss><channel>'+
 '<item><title>Bootstrapping a paid PDF product</title><link>https://indiemakerlist.com/makers/sample</link><pubDate>Fri, 20 Nov 2026 12:00:00 GMT</pubDate><description>Monthly revenue</description></item>'+
 '<item><title>My unrelated story</title><link>https://indiemakerlist.com/makers/unrelated</link><pubDate>Fri, 20 Nov 2026 12:00:00 GMT</pubDate></item>'+
@@ -38,7 +66,7 @@ const activity=buildRevenueIntelligence({now:at,researchRows:normal.concat(feed)
 ]});
 assert.equal(activity.marketSignals.length,0,'Research leads already recommended should not be repeated in Market Intelligence');
 assert.equal(activity.researchedOpportunities,3);
-assert.equal(activity.opportunities.length,6,'Three baseline channels plus three qualified outside hypotheses');
+assert.equal(activity.opportunities.length,10,'Seven channel/program hypotheses plus three qualified outside leads');
 assert.equal(activity.sourceScansCompleted,2);
 assert.equal(activity.verifiedEarnings.available,false);
 assert.equal(activity.verifiedEarnings.amount,null);
@@ -72,29 +100,38 @@ const db={prepare(sql){const obj={bind(...vals){state.push({sql,vals});return ob
 const requests=[];
 const fetchFn=async (url,options)=>{requests.push({url,method:options.method,redirect:options.redirect});
  if(url.startsWith('https://indiemakerlist.com'))return new Response(xml,{status:200,headers:{'content-type':'application/xml'}});
- return new Response(JSON.stringify({hits}),{status:200,headers:{'content-type':'application/json'}})
+ const qs=new URL(url).searchParams,term=qs.get('query');
+ const selected=term==='looking for'?clientHits:term==='affiliate'?affiliateHits:
+  term==='partner'?partnerHits:term==='sponsor'?sponsorHits:hits;
+ return new Response(JSON.stringify({hits:selected}),{status:200,headers:{'content-type':'application/json'}});
 };
 const env={DB:db};
 const args={reserveFetch:async()=>true,fetchFn};
-const r1=await runRevenueResearch(env,at,args);
-const r2=await runRevenueResearch(env,'2026-11-21T15:25:00Z',args);
-const r3=await runRevenueResearch(env,'2026-11-21T21:25:00Z',args);
-assert.match(r1,/hn-mrr:ok:2/);
-assert.match(r2,/makers:ok:1/);
-assert.match(r3,/hn-pricing:ok:2/);
-assert.equal(requests.length,3,'Only three research source GETs per day');
+const results=await Promise.all([
+ runRevenueResearch(env,'2026-11-21T03:25:00Z',args),
+ runRevenueResearch(env,'2026-11-21T06:25:00Z',args),
+ runRevenueResearch(env,at,args),
+ runRevenueResearch(env,'2026-11-21T12:25:00Z',args),
+ runRevenueResearch(env,'2026-11-21T15:25:00Z',args),
+ runRevenueResearch(env,'2026-11-21T18:25:00Z',args),
+ runRevenueResearch(env,'2026-11-21T21:25:00Z',args)
+]);
+for(const [i,name,count] of [[0,'hn-affiliates',1],[1,'hn-sponsors',1],[2,'hn-mrr',2],
+ [3,'hn-clients',2],[4,'makers',1],[5,'hn-partners',1],[6,'hn-pricing',2]])
+ assert.match(results[i],new RegExp(name+':ok:'+count));
+assert.equal(requests.length,7,'Only seven public research GETs per day across all monetization lanes');
 assert.ok(requests.every(x=>x.method==='GET'&&x.redirect==='manual'));
-assert.equal(ops.filter(s=>s.includes('INSERT INTO opportunities')).length,5);
-assert.ok(ops.filter(s=>s.includes('DELETE')).every(s=>s.includes("kind='revenue-research'")),'Retention affects own evidence only');
+assert.equal(ops.filter(s=>s.includes('INSERT INTO opportunities')).length,10);
+assert.ok(ops.filter(s=>s.includes('DELETE')).every(s=>s.includes("kind IN ('revenue-research'")),'Retention affects only own evidence');
 assert.equal(await runRevenueResearch(env,'2026-11-21T10:30:00Z',args),'outside-window');
 const noBudget=await runRevenueResearch(env,'2026-11-22T09:25:00Z',{reserveFetch:async()=>false,fetchFn:()=>{throw Error('Must not fetch after budget exhaustion')}});
 assert.match(noBudget,/unavailable:public-fetch-budget-exhausted/);
-assert.equal(requests.length,3);
+assert.equal(requests.length,7);
 const worker=readFileSync(new URL('../src/hq-worker.mjs',import.meta.url),'utf8');
 assert.match(worker,/runRevenueResearch\(env,scheduledTime,\{reserveFetch\}\)/);
-assert.match(worker,/WHERE kind='revenue-research'/);
+assert.match(worker,/IN \('revenue-research','revenue-client','revenue-affiliate'/);
 assert.match(worker,/revenue_research_%/);
 assert.match(worker,/\/api\/revenue-intelligence/);
 const collector=readFileSync(new URL('../src/revenue-research.mjs',import.meta.url),'utf8');
 assert.doesNotMatch(collector,/method:'POST'|method:'PUT'|method:'DELETE'|cloudflare\.request/);
-console.log('PASS Revenue research: three bounded sources; source links; strict business evidence; zero false earnings; no external writes');
+console.log('PASS Revenue research: seven bounded sources for client/affiliate/partnership/sponsor, source links, no outreach or fake income');
