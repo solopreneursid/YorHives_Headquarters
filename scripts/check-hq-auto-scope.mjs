@@ -12,6 +12,7 @@ const BOOTSTRAP_FILES=new Set([
  'scripts/release-hq-manual.mjs',
  'scripts/check-hq-auto-scope.mjs',
  'scripts/test-hq-auto-scope.mjs',
+ 'scripts/test-release-post-upload.mjs',
  'docs/HQ_AUTOMATIC_RELEASES.md'
 ]);
 const ROUTINE_FILES=new Set([
