@@ -59,3 +59,13 @@ The Revenue UI keeps exactly the four established tabs and now consists of **Ear
 `scripts/test-revenue-research.mjs` checks source parsing, freshness, unverified claims, three daily scan windows, GET-only behaviour, D1 evidence-only writes, allowed retention, fetch budget failures, and ranked opportunity limits. Run it with `scripts/test-revenue-intelligence.mjs`, the exact-source integrity checker, Products regression, and mocked mobile/desktop browser regression. No production credentials or real authenticated browser session are used in CI.
 
 Live seven-module baseline: `2536fdf8-450c-47c9-8ef3-a84e1081ac96`. The eight-module candidate requires the manual `workflow_dispatch` protected `hq-production` environment review; Git merge cannot publish it. After approval, the first successful scan happens at the next scheduled UTC slot, not immediately. No promises that the publisher feed is currently accessible or that genuine new revenue reports will be found on every scan.
+
+## Revenue quality review — 2026-11-21 10:10 IST
+
+The founder's first post-release Revenue screen was reviewed against stored source and scheduled-check evidence. Three `revenue_research_*` statuses were all `not-yet-checked`, expected before the first scheduled 09:25 UTC / 14:55 IST public research window. This is not proof that any source is reachable or that the next run will record credible leads.
+
+The initial model displayed the same unverified **Glowy** outside revenue claim in both the ranked Top Opportunities and the Market Intelligence list; it also automatically treated a purported AI image-credits business as a low/medium-complexity Free Tools advertising candidate. Both are unsupported leaps.
+
+The corrected logic leaves unverified third-party revenue figures in **Market Revenue Intelligence** only, until meaningful independent customer and operating-cost evidence justifies founder investigation. Research discussion leads may be promoted into Top Opportunities as speculative validation experiments but, once promoted, are excluded from the redundant Market list. An AI photo generation/paid credits product is evaluated as a possible HQventures product with *high, unverified inference costs*; ordinary private PDF/image editing may still be appropriate for Free Tools.
+
+No change to collectors, scheduling, source restrictions, website monetization, cash accounting, founder permissions or existing production configuration. This correction requires the same manual founder-approved HQ release; current live eight-module version is `efdb1d2a-2d56-4a4f-89c2-8505fa4dfa1c`.
