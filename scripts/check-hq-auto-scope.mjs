@@ -13,6 +13,7 @@ const BOOTSTRAP_FILES=new Set([
  'scripts/check-hq-auto-scope.mjs',
  'scripts/test-hq-auto-scope.mjs',
  'scripts/test-release-post-upload.mjs',
+ '.github/workflows/hq-source-integrity.yml',
  'docs/HQ_AUTOMATIC_RELEASES.md'
 ]);
 const ROUTINE_FILES=new Set([
