@@ -26,7 +26,7 @@ export function verify(){
  assert.equal(info.productionWorker,'yorphives-hq-free-pilot');
  assert.equal(info.releaseMethod.includes('workflow_dispatch'),true);
  const expected=Object.entries(info.moduleGitBlobs);
- assert.equal(expected.length,7,'Seven reviewed Worker modules required, including Products and Revenue intelligence');
+ assert.equal(expected.length,8,'Eight reviewed Worker modules required, including a bounded Revenue research collector');
  const imported=[];
  for(const [name,sha] of expected){
   const src=load('src/'+name);
