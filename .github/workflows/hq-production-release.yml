@@ -119,4 +119,5 @@ jobs:
         run: node scripts/release-hq-manual.mjs
       - name: Scope notice
         if: always()
-        run: echo 'Manual exception path: sensitive HQ changes still require explicit founder dispatch. No public site or other Worker may be changed.' >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo 'Manual exception path: sensitive HQ changes still require explicit founder dispatch. No public site or other Worker may be changed.' >> "$GITHUB_STEP_SUMMARY"
