@@ -5,13 +5,13 @@
   "sourceWorkerVersion": "c94c89a0-e314-4a43-bd8b-da879e3bab1d",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "8d4279db4e234f14439ddebd4e3b2b2a5e6b99c9",
+    "hq-worker.mjs": "08ad013afd9900a20d24f2f8cc25a97e2efbb6c0",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "c061648122c8d9e2867dc61ff4a3dcf57b174867",
     "product-intelligence.mjs": "1afd4abb92978bda8abc97287bbbf760534e9e72",
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
-    "revenue-intelligence.mjs": "990c94539ee4672c31854cfbf0e38933428ba4bd",
+    "revenue-intelligence.mjs": "2dee923a45b1537e930bb1004c7f743543478635",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
   "navigation": [
@@ -119,5 +119,5 @@
     "revenue-intelligence.mjs": "990c94539ee4672c31854cfbf0e38933428ba4bd",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "Private Free Tools Operations integration prepared; live baseline verified from eight deployed modules. Sensitive backend extension requires founder-reviewed manual release; website and HQ remain read-only."
+  "candidateStatus": "Founder-reviewed Free Tools revenue-readiness baseline: 7-day sitewide browser-reported pageviews and actions, no visitor/impression/income claims, read-only HQ Revenue panel; publication gated by source-scope CI."
 }
