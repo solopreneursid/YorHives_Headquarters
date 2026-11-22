@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {inbox,notify} from '../src/hqconnect-inbox-worker.mjs';
+import service,{inbox,notify} from '../src/hqconnect-inbox-worker.mjs';
 import hq from '../src/hq-worker.mjs';
 import {planInboxBinding} from './hq-binding-policy.mjs';
 
@@ -55,6 +55,16 @@ const ctx={access:{aud:hqenv.ACCESS_AUD,getIdentity:async()=>({email:'owner@exam
 res=await hq.fetch(req(),hqenv,ctx);assert.equal(res.status,200);assert.equal(calls,1);assert.equal(res.headers.get('cache-control'),'no-store');
 assert.equal((await hq.fetch(new Request(req(),{method:'POST'}),hqenv,ctx)).status,405);assert.equal(calls,1);
 assert.equal((await hq.fetch(new Request('https://hq.example.test/api/hqconnect-inbox?before=oops'),hqenv,ctx)).status,400);
+const waits=[],scheduledCalls=[];
+const cronEnv={HQCONNECT_INBOX:{fetch:async r=>{scheduledCalls.push({method:r.method,path:new URL(r.url).pathname});return new Response(null,{status:204})}}};
+await hq.scheduled({scheduledTime:Date.parse('2026-11-22T00:15:00Z')},cronEnv,{waitUntil:p=>waits.push(p)});
+await Promise.all(waits);assert.deepEqual(scheduledCalls,[{method:'POST',path:'/notify'}]);
+await hq.scheduled({scheduledTime:Date.parse('2026-11-22T00:20:00Z')},cronEnv,{waitUntil:p=>waits.push(p)});
+assert.equal(scheduledCalls.length,1,'Notification check runs once per 15 minutes');
+assert.equal((await service.fetch(new Request('https://inbox.internal/notify'),env)).status,404);
+const fresh=fakeDb();
+assert.equal((await service.fetch(new Request('https://inbox.internal/notify',{method:'POST'}),{...env,HQCONNECT_DB:fresh})).status,200);
+assert.equal(fresh.state.last,12);
 const oldBindings=[{name:'DB',type:'d1'},{name:'AI',type:'ai'}];
 const expected=[...oldBindings,{name:'HQCONNECT_INBOX',type:'service'}];
 const addition=planInboxBinding(oldBindings,expected,true);

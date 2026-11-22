@@ -1,6 +1,6 @@
 // Private service-binding-only HQconnect reader and batched notification adapter.
-// The HQ-facing fetch contract is GET-only. It cannot update enquiries, access
-// source code, deploy, or send customer information to an AI model.
+// The founder-facing inbox contract is GET-only; the internal scheduler can
+// request a generic alert. It cannot update enquiries, deploy, or access source.
 const headers={'content-type':'application/json; charset=utf-8','cache-control':'no-store, private','x-content-type-options':'nosniff'};
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers});
 const cursor=value=>/^\d{1,15}$/.test(String(value||''))&&Number.isSafeInteger(Number(value))?Number(value):null;
@@ -49,5 +49,13 @@ async function notify(env){
  await db.prepare('INSERT INTO hqconnect_notification_checkpoint(id,last_rowid,last_created_at,last_attempt_at,last_accepted_at,last_error_at) VALUES(1,?,?,?,?,NULL) ON CONFLICT(id) DO UPDATE SET last_rowid=excluded.last_rowid,last_created_at=excluded.last_created_at,last_attempt_at=excluded.last_attempt_at,last_accepted_at=excluded.last_accepted_at,last_error_at=NULL').bind(Math.max(sequence,last),created>lastCreated?created:lastCreated,now,now).run();
  return {newEnquiries:true,accepted:true};
 }
-export default {fetch:inbox,async scheduled(_controller,env){await notify(env)}};
+export default {async fetch(request,env){
+ const url=new URL(request.url);
+ // This endpoint is available only through the private service binding. The
+ // founder-facing HQ HTTP router exposes the GET inbox, never this action.
+ if(request.method==='POST'&&url.pathname==='/notify'&&!url.search){
+  try{await notify(env);return json({ok:true})}catch{return json({ok:false},503)}
+ }
+ return inbox(request,env);
+}};
 export {inbox,notify};
