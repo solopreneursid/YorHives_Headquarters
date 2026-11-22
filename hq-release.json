@@ -5,7 +5,7 @@
   "sourceWorkerVersion": "d374797f-41d3-4940-95a6-58a9d329b3ea",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "a8db215995d708de763e4697ae5fba6e32fac3e7",
+    "hq-worker.mjs": "f100a8893088303e391bb6a2fbcc48e4dc89a58f",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
