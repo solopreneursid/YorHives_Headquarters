@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Source-of-truth checks for the CURRENT four-button HQ, not historic HQpulse.
+// Source-of-truth checks for the CURRENT five-tab HQ, not historic HQpulse.
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
@@ -46,10 +46,17 @@ export function verify(){
  const css=asset(hq,'/hq-simple.css');
  assert.match(html,/<meta name="robots" content="noindex">/);
  const nav=[...html.matchAll(/data-tab="([^"]+)"/g)].map(x=>x[1]);
- assert.deepEqual(nav,info.navigation,'UI must have exactly Home, Health, Products, Revenue');
+ assert.deepEqual(nav,info.navigation,'UI must have Home, Health, Products, Revenue and HQconnect');
  assert.ok(!html.includes('data-tab="discover"')&&!html.includes('data-tab="control"'));
  new Function(js); // syntax only; does not execute the browser application
  assert.match(js,/Verify signed-in session/);
+ assert.match(js,/deleteInboxMessage/,'HQconnect Delete UI missing');
+ assert.match(js,/recommendations\.csv/,'CSV download actions missing');
+ assert.match(hq,/async function exportRecommendations/,'Server-side CSV export missing');
+ assert.match(hq,/const inboxDelete=/,'Founder-scoped message deletion missing');
+ const inbox=load('src/hqconnect-inbox-service.mjs');
+ assert.match(inbox,/DELETE FROM hqconnect_requests WHERE id=\?/,'Exact-ID deletion missing');
+ assert.match(inbox,/SELECT id,rowid AS sequence/,'Inbox message IDs missing');
  assert.match(js,/browserCheck/);
  assert.match(js,/credentials:'same-origin'/);
  assert.match(css,/max-width:600px|@media/,'Mobile CSS breakpoint must exist');
