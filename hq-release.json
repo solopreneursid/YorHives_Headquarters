@@ -5,7 +5,7 @@
   "sourceWorkerVersion": "d374797f-41d3-4940-95a6-58a9d329b3ea",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "87c53c4a33dd9682220cd32a1b18a97ecc7c1410",
+    "hq-worker.mjs": "d1dd69b77546959485aab53d58615df0aa40ed93",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
@@ -125,5 +125,5 @@
     "revenue-intelligence.mjs": "2644dae372695729d43b6f4945f93e156036e223",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "The private inbox and eight HQ Worker modules are deployed; notification health service and release safeguards are prepared for review."
+  "candidateStatus": "Founder UI shows enquiry-check health without claiming confirmed email delivery."
 }

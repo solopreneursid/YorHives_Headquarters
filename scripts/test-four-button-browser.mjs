@@ -16,7 +16,7 @@ const assets={'/':asset(source,'/index.html'),'/index.html':asset(source,'/index
 const contentTypes={'/':'text/html','/index.html':'text/html','/hq-simple.js':'text/javascript','/hq-simple.css':'text/css'};
 const now=new Date().toISOString();
 const mock={
- '/api/hqconnect-inbox':{available:true,readOnly:true,records:[{created_at:now,request_type:'Other',name:'Synthetic founder test',email:'synthetic@example.test',project:'Example',message:'<img src=x onerror=alert(1)>',timeline:'Flexible',budget:''}],next:null,notification:{}},
+ '/api/hqconnect-inbox':{available:true,readOnly:true,records:[{created_at:now,request_type:'Other',name:'Synthetic founder test',email:'synthetic@example.test',project:'Example',message:'<img src=x onerror=alert(1)>',timeline:'Flexible',budget:''}],next:null,notification:{health:{state:'current',checkedAt:now}}},
  '/api/report':{schemaVersion:'yorphives.hq-intelligence.v1',findings:[],securityWatch:[],changes:[],
    incidents:[],incidentEvents:[],opportunities:[{id:'trend-mock-home',title:'Private PDF Studio',kind:'trend-measured',recommendation:'Monetization: Paid exports.',description:'GitHub attention'}],comparisons:[]},
  '/api/health-self-check':{schemaVersion:1,authenticated:true,healthy:true,api:'responding',
@@ -132,6 +132,7 @@ try{
   await page.locator('nav button[data-tab="revenue"]').click();
   assert.equal(await page.locator('main h1').textContent(),'Revenue');
   await page.getByText('Synthetic founder test').waitFor({timeout:10000});
+  await page.getByText('Enquiry checks are current. Email delivery has not yet been verified.').waitFor({timeout:10000});
   assert.equal(await page.locator('#hqconnect-inbox img').count(),0,'Enquiry text must not become HTML');
   assert.equal(await page.getByRole('link',{name:'Reply to synthetic@example.test'}).getAttribute('href'),'mailto:synthetic%40example.test');
   await page.getByText('Verified YorpHives earnings: Not connected.',{exact:false}).waitFor({timeout:10000});
