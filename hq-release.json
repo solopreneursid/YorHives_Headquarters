@@ -5,7 +5,7 @@
   "sourceWorkerVersion": "d374797f-41d3-4940-95a6-58a9d329b3ea",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "d1dd69b77546959485aab53d58615df0aa40ed93",
+    "hq-worker.mjs": "a8db215995d708de763e4697ae5fba6e32fac3e7",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
@@ -18,7 +18,8 @@
     "home",
     "health",
     "products",
-    "revenue"
+    "revenue",
+    "hqconnect"
   ],
   "compatibilityDate": "2026-11-15",
   "expectedBindings": [
@@ -96,7 +97,8 @@
     "Monetization follow-up: never claim a government award or supplier eligibility from a tender portal homepage; all proposals/tenders require founder review.",
     "2026-11-21: Revenue model distinguishes source check with zero qualifying matches vs unreachable source, and ranks real tender notices ahead of mere portal search links without implying bidder eligibility.",
     "Founder-manual inbox transition adds one internal read-only service binding; customer enquiries never enter AI research or public endpoints.",
-    "Notification health records only generic scheduler and transport-check status; no enquiry content or counts are exposed. Email acceptance is not delivery verification."
+    "Notification health records only generic scheduler and transport-check status; no enquiry content or counts are exposed. Email acceptance is not delivery verification.",
+    "2026-11-22: HQconnect separate private fifth tab; only founder-confirmed DELETE of one message is permitted through authenticated same-origin HQ proxy to private service Worker; no authority to alter site, products or infrastructure."
   ],
   "previousWorkerVersion": "9396a967-e8a7-4814-9232-d3eabda774d3",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
@@ -125,5 +127,5 @@
     "revenue-intelligence.mjs": "2644dae372695729d43b6f4945f93e156036e223",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "Founder UI shows enquiry-check health without claiming confirmed email delivery."
+  "candidateStatus": "2026-11-22 candidate: fifth HQconnect tab, founder-only per-message deletion, Health/Products/Revenue CSV export of all recorded recommendations; live deployment pending manual release verification. Private inbox service must deploy first with public workers.dev disabled."
 }
