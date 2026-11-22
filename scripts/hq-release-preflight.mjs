@@ -7,6 +7,8 @@ import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 import {verify,gitBlob} from './verify-current-hq.mjs';
 import {planInboxBinding} from './hq-binding-policy.mjs';
+import {execFileSync} from 'node:child_process';
+import {singleLiveVersion,isReviewedSource} from './hq-release-baseline.mjs';
 
 const root=dirname(dirname(fileURLToPath(import.meta.url)));
 const release=JSON.parse(readFileSync(join(root,'hq-release.json'),'utf8'));
@@ -37,8 +39,7 @@ const [deployment,settings,schedules,content]=await Promise.all([
  json(encodeURIComponent(worker)+'/schedules'),
  get(encodeURIComponent(worker)+'/content/v2').then(r=>r.text()),
 ]);
-const live=deployment.deployments?.[0]?.versions?.[0]?.version_id;
-assert.equal(live,release.sourceWorkerVersion,'Live HQ Worker version changed; review before any release');
+singleLiveVersion(deployment);
 assert.equal(settings.compatibility_date,release.compatibilityDate,'HQ compatibility date changed');
 planInboxBinding(settings.bindings||[],release.expectedBindings,true);
 assert.deepEqual((schedules.schedules||[]).map(x=>x.cron),release.expectedSchedules,'Live HQ cron changed');
@@ -55,10 +56,9 @@ for(const part of content.split(boundary).slice(1)){
  modules.set(name,part.slice(split+4).replace(new RegExp(crlf+'$'),''));
 }
 assert.equal(modules.size,8,'Unexpected current live module count');
-for(const [name,sha] of Object.entries(release.liveModuleGitBlobs)){
- assert.ok(modules.has(name),'Missing deployed module '+name);
- assert.equal(gitBlob(modules.get(name)),sha,'Deployed source differs from approved snapshot for '+name);
-}
+const prior=JSON.parse(execFileSync('git',['show','HEAD^:hq-release.json'],{encoding:'utf8',maxBuffer:300000}));
+assert.ok(isReviewedSource(modules,prior.moduleGitBlobs)||isReviewedSource(modules,release.moduleGitBlobs),
+ 'Deployed source differs from both the previous and current reviewed main-branch snapshots');
 
 // A separate, already-known Worker must be inaccessible to this HQ-only token.
 // Do not request its code. Check only its deployment metadata. No mutation.

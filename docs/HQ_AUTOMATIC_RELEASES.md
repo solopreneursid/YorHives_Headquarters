@@ -20,7 +20,7 @@ Other HQ Workers, frontend website, scanner implementations, credentials, cron s
 
 ## Manual route (rare)
 
-The existing GitHub Actions `workflow_dispatch` option remains available for sensitive reviewed changes, requiring literal `RELEASE_FOUR_BUTTON_HQ` and a pinned current live Worker baseline. It does not grant production mutation rights to any HQ research agent.
+The existing GitHub Actions `workflow_dispatch` option remains available for sensitive reviewed changes, requiring literal `RELEASE_FOUR_BUTTON_HQ`. Manual and routine publication both compare the eight live modules against the previous reviewed main-branch commit and reject missing, split, or unexpected source. The publisher rechecks the live deployment version immediately before uploading. This avoids a manually refreshed version pin after every successful release without giving HQ agents production mutation rights. The read-only preflight also accepts the current reviewed source when it is already deployed.
 
 ## One-time configuration
 

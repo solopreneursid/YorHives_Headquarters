@@ -4,6 +4,11 @@
 const headers={'content-type':'application/json; charset=utf-8','cache-control':'no-store, private','x-content-type-options':'nosniff'};
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers});
 const cursor=value=>/^\d{1,15}$/.test(String(value||''))&&Number.isSafeInteger(Number(value))?Number(value):null;
+function healthState(row,now=Date.now()){
+ const time=Date.parse(row?.last_checked_at||''),age=now-time;
+ if(!Number.isFinite(time)||age< -300000||age>2700000)return 'unknown';
+ return row?.last_result==='ok'?'current':row?.last_result==='error'?'attention':'unknown';
+}
 async function inbox(request,env){
  if(request.method!=='GET')return json({available:false},405);
  const url=new URL(request.url);
@@ -17,9 +22,12 @@ async function inbox(request,env){
   const records=Array.isArray(rows.results)?rows.results:[];
   const page=records.slice(0,25);
   const status=await env.HQCONNECT_DB.prepare('SELECT last_attempt_at,last_accepted_at,last_error_at FROM hqconnect_notification_checkpoint WHERE id=1').first();
+  let health=null;
+  try{health=await env.HQCONNECT_DB.prepare('SELECT last_checked_at,last_result FROM hqconnect_notification_health WHERE id=1').first()}catch{}
   return json({available:true,readOnly:true,records:page.map(({sequence,...record})=>record),
    next:records.length>25?String(page.at(-1).sequence):null,
-   notification:{lastAttemptAt:status?.last_attempt_at||null,lastAcceptedAt:status?.last_accepted_at||null,lastErrorAt:status?.last_error_at||null}});
+   notification:{lastAttemptAt:status?.last_attempt_at||null,lastAcceptedAt:status?.last_accepted_at||null,lastErrorAt:status?.last_error_at||null,
+    health:{state:healthState(health),checkedAt:health?.last_checked_at||null}}});
  }catch{return json({available:false,reason:'inbox-unavailable'},503)}
 }
 // Sending is deliberately a narrow adapter. A self-hosted implementation can
@@ -49,13 +57,25 @@ async function notify(env){
  await db.prepare('INSERT INTO hqconnect_notification_checkpoint(id,last_rowid,last_created_at,last_attempt_at,last_accepted_at,last_error_at) VALUES(1,?,?,?,?,NULL) ON CONFLICT(id) DO UPDATE SET last_rowid=excluded.last_rowid,last_created_at=excluded.last_created_at,last_attempt_at=excluded.last_attempt_at,last_accepted_at=excluded.last_accepted_at,last_error_at=NULL').bind(Math.max(sequence,last),created>lastCreated?created:lastCreated,now,now).run();
  return {newEnquiries:true,accepted:true};
 }
+// A successful empty check proves the scheduler and configuration responded,
+// not that a future email will be delivered. A stale/missing heartbeat fails closed.
+async function checkNotification(env){
+ let outcome='error';
+ try{await notify(env);outcome='ok'}
+ finally{
+  if(env.HQCONNECT_DB){
+   await env.HQCONNECT_DB.prepare('INSERT INTO hqconnect_notification_health(id,last_checked_at,last_result) VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET last_checked_at=excluded.last_checked_at,last_result=excluded.last_result')
+    .bind(new Date().toISOString(),outcome).run();
+  }
+ }
+}
 export default {async fetch(request,env){
  const url=new URL(request.url);
  // This endpoint is available only through the private service binding. The
  // founder-facing HQ HTTP router exposes the GET inbox, never this action.
  if(request.method==='POST'&&url.pathname==='/notify'&&!url.search){
-  try{await notify(env);return json({ok:true})}catch{return json({ok:false},503)}
+  try{await checkNotification(env);return json({ok:true})}catch{return json({ok:false},503)}
  }
  return inbox(request,env);
 }};
-export {inbox,notify};
+export {inbox,notify,healthState,checkNotification};

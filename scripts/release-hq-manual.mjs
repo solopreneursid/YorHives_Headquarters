@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {verify,gitBlob} from './verify-current-hq.mjs';
 import {planInboxBinding} from './hq-binding-policy.mjs';
+import {singleLiveVersion,isReviewedSource} from './hq-release-baseline.mjs';
 
 const root=dirname(dirname(fileURLToPath(import.meta.url)));
 const info=JSON.parse(readFileSync(join(root,'hq-release.json'),'utf8'));
@@ -27,8 +28,6 @@ if(auto){
 }
 fail(/^[0-9a-f]{40}$/.test(env.HQ_APPROVED_SOURCE_SHA||''),'Source commit SHA input invalid');
 fail(env.HQ_APPROVED_SOURCE_SHA===env.GITHUB_SHA,'Approved SHA must match workflow checked-out commit');
-if(manual)fail(env.EXPECTED_CURRENT_VERSION===info.sourceWorkerVersion,
-  'Current Worker version must match the review manifest (prevents stale releases)');
 fail(Boolean(env.HQ_RELEASE_TOKEN)&&Boolean(env.HQ_CLOUDFLARE_ACCOUNT_ID),
   'Missing founder-configured, scoped release token or Cloudflare account ID');
 
@@ -68,10 +67,8 @@ function sameSource(remote){
  if(remote.size!==expected.size)return false;
  return [...expected].every(([name,sha])=>remote.has(name)&&gitBlob(remote.get(name))===sha);
 }
-const deployments=await data(prefix+'/deployments');
-const version=deployments?.deployments?.[0]?.versions?.[0]?.version_id;
-if(manual)fail(version===env.EXPECTED_CURRENT_VERSION,'Live HQ version changed. Release denied.');
-const parent=auto?execFileSync('git',['rev-parse','HEAD^'],{encoding:'utf8'}).trim():null;
+const version=singleLiveVersion(await data(prefix+'/deployments'));
+const parent=execFileSync('git',['rev-parse','HEAD^'],{encoding:'utf8'}).trim();
 const bootstrap=auto&&parent==='bc0601193e5e2902545bec95a7567bab5c8dbc12';
 if(bootstrap)fail(version===info.sourceWorkerVersion,'Bootstrap Worker version changed; release denied.');
 const [settings,schedules]=await Promise.all([data(prefix+'/settings'),data(prefix+'/schedules')]);
@@ -81,15 +78,6 @@ const currentSchedule=(schedules?.schedules||[]).map(x=>x.cron);
 fail(equalJson(currentSchedule,info.expectedSchedules),'Live scheduler differs; release denied');
 const sourceResponse=await request(prefix+'/content/v2');
 const current=parseModules(await sourceResponse.text());
-// For routine updates the previously merged main commit is the expected deployed
-// source, so auto-release does not require hand-updating a Worker version after every deploy.
-const priorManifest=auto&&!bootstrap?JSON.parse(execFileSync('git',['show','HEAD^:hq-release.json'],
- {encoding:'utf8',maxBuffer:300000})):null;
-const pinnedLive=new Map(Object.entries(auto&&!bootstrap?
- (priorManifest?.moduleGitBlobs||{}):(info.liveModuleGitBlobs||{})));
-fail(current.size===pinnedLive.size&&[...pinnedLive].every(([name,sha])=>current.has(name)&&gitBlob(current.get(name))===sha),
- 'Currently deployed Worker module source drifted from founder-reviewed live baseline. Release denied.');
-
 const local=new Map(Object.keys(info.moduleGitBlobs).map(name=>[name,readFileSync(join(root,'src',name),'utf8')]));
 fail(local.size===8&&[...local].every(([name,src])=>gitBlob(src)===info.moduleGitBlobs[name]),
  'Local Worker module checksum changed. Release denied.');
@@ -98,6 +86,16 @@ if(sameSource(current)){
  console.log('PASS: live HQ modules already match approved private repo source; no deployment necessary.');
  process.exit(0);
 }
+// Both manual and routine releases compare the live source with the previously
+// approved main commit. This is stable across Worker version changes and fails
+// closed if any intervening source was not actually deployed.
+const priorManifest=!bootstrap?JSON.parse(execFileSync('git',['show','HEAD^:hq-release.json'],
+ {encoding:'utf8',maxBuffer:300000})):null;
+const pinnedLive=!bootstrap?(priorManifest?.moduleGitBlobs||{}):(info.liveModuleGitBlobs||{});
+fail(isReviewedSource(current,pinnedLive),
+ 'Currently deployed Worker module source drifted from founder-reviewed live baseline. Release denied.');
+fail(singleLiveVersion(await data(prefix+'/deployments'))===version,
+ 'Live HQ version changed while checking its source. Release denied.');
 const upload=new FormData();
 const metadata={main_module:'hq-worker.mjs',compatibility_date:settings.compatibility_date,
  bindings:[...settings.bindings,...addedBindings]};

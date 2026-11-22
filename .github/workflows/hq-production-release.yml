@@ -91,6 +91,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          fetch-depth: 2
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -99,10 +100,6 @@ jobs:
         run: |
           node --check scripts/release-hq-manual.mjs
           node scripts/verify-current-hq.mjs
-      - name: Set expected live version from the reviewed release manifest
-        shell: bash
-        run: |
-          node -e "const m=require('./hq-release.json'); console.log('EXPECTED_CURRENT_VERSION='+m.sourceWorkerVersion)" >> "$GITHUB_ENV"
       - name: Verify all Products and Revenue regression tests
         run: |
           node scripts/test-products-trends.mjs
