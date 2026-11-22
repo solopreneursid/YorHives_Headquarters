@@ -4383,6 +4383,46 @@ async function privateAiAnalyze(request,env){
 
 function json(value,status=200) {return new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});}
 
+function csvQuote(value){
+ let valueText=String(value==null?"":value).replace(/\u0000/g,"");
+ // Prevent spreadsheet formula execution when CSV is opened in Excel/Sheets.
+ if(/^\s*[=+\-@]/.test(valueText))valueText="'"+valueText;
+ return '"'+valueText.replace(/"/g,'""')+'"';
+}
+async function exportRecommendations(env,request){
+ const u=new URL(request.url),scope=u.searchParams.get("scope")||"all";
+ if(!["all","products","revenue","health"].includes(scope)||[...u.searchParams.keys()].some(k=>k!=="scope"))
+  return json({error:"Invalid recommendation export scope"},400);
+ if(!env.DB)return json({error:"Evidence store unavailable"},503);
+ const [findings,opportunities,hypotheses]=await Promise.all([
+  env.DB.prepare("SELECT id,category,priority,asset,title,description,recommendation,evidence,observed_at,status FROM findings WHERE TRIM(recommendation)<>'' ORDER BY observed_at DESC").all(),
+  env.DB.prepare("SELECT id,kind,title,description,recommendation,source_url,observed_at,score FROM opportunities WHERE TRIM(recommendation)<>'' ORDER BY observed_at DESC").all(),
+  env.DB.prepare("SELECT id,product_url,product_name,competing_title,competing_url,evidence_summary,recommendation,status,observed_at FROM product_hypotheses WHERE TRIM(recommendation)<>'' ORDER BY observed_at DESC").all()
+ ]);
+ const table=[["section","record_type","id","category_or_kind","title","description","recommendation","evidence","source_url","score","status_or_priority","observed_at"]];
+ if(scope==="all"||scope==="health")for(const x of findings.results||[])table.push([
+  "Health","finding",x.id,x.category,x.title,x.description,x.recommendation,x.evidence,x.asset,"",String(x.status||"")+" / "+String(x.priority||""),x.observed_at]);
+ for(const x of opportunities.results||[]){
+  const kind=String(x.kind||"");
+  const isRevenue=/^revenue-/i.test(kind)||(!/^trend-/i.test(kind)&&/revenue|monetiz|affiliate|advertis|sponsor|paid|guest.post|subscription|pricing|income/i.test([x.title,x.description,kind,x.recommendation].join(" ")));
+  const section=isRevenue?"Revenue":"Products";
+  if(scope!=="all"&&scope!==section.toLowerCase())continue;
+  table.push([section,"opportunity",x.id,kind,x.title,x.description,x.recommendation,"",x.source_url,x.score,"research / unverified",x.observed_at]);
+ }
+ if(scope==="all"||scope==="products")for(const x of hypotheses.results||[])table.push([
+  "Products","product_hypothesis",x.id,"competitor-comparison",x.product_name,
+  "Compared with: "+x.competing_title,x.recommendation,x.evidence_summary,x.competing_url||x.product_url,"",x.status,x.observed_at]);
+ table.splice(1,table.length-1,...table.slice(1).sort((a,b)=>String(b[11]||"").localeCompare(String(a[11]||""))));
+ const body="\uFEFF"+table.map(row=>row.map(csvQuote).join(",")).join("\r\n")+"\r\n";
+ return new Response(body,{status:200,headers:{
+  "content-type":"text/csv; charset=utf-8",
+  "content-disposition":'attachment; filename="yorphives-hq-recommendations-'+scope+'-'+nowIso().slice(0,10)+'.csv"',
+  "cache-control":"private, no-store","x-content-type-options":"nosniff",
+  "x-frame-options":"DENY","content-security-policy":"default-src 'none'"
+ }});
+}
+
+
 // Four-view founder HQ UI; independent of legacy dashboard assets.
 PILOT_STATIC_BUNDLE["/index.html"] = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>YorpHives HQ</title><link rel=\"stylesheet\" href=\"/hq-simple.css\"><script src=\"/hq-simple.js\" defer></script></head><body><header><strong>YorpHives HQ</strong><span>Private · Read only</span></header><nav><button data-tab=\"home\">Home</button><button data-tab=\"health\">Health</button><button data-tab=\"products\">Products</button><button data-tab=\"revenue\">Revenue</button></nav><main id=\"main\">Loading...</main></body></html>";
 PILOT_STATIC_BUNDLE["/hq-simple.css"] = "*{box-sizing:border-box}body{font-family:system-ui,sans-serif;background:#f5f7fc;color:#182b4c;max-width:940px;margin:0 auto;padding:16px}header{display:flex;justify-content:space-between;align-items:center;margin:8px 0 18px}header strong{font-size:20px}header span{font-size:12px;color:#23725d}nav{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;position:sticky;top:0;padding:12px 0;background:#f5f7fc}nav button{border:1px solid #dde5f2;background:white;color:#31456b;font-weight:700;min-height:48px;border-radius:12px;cursor:pointer}nav button[aria-current=page]{background:#1b3059;color:white}button:focus-visible{outline:3px solid #3fb6db}h1{font-size:30px;margin:25px 0 8px}h2{font-size:18px;margin:8px 0 14px}.sub{font-size:14px;color:#71809d;margin-bottom:24px}.card{background:white;border:1px solid #e0e7f2;border-radius:16px;padding:22px;margin:14px 0}.card p{font-size:13px;color:#60718f;line-height:1.7}.item{border-top:1px solid #edf1f7;padding:12px 0}.item strong{font-size:14px}.tag{display:inline-block;border-radius:16px;background:#eef3fe;color:#3156ab;padding:3px 7px;font-size:11px}.big{font-weight:800;font-size:23px}.go{width:100%;margin-top:12px;padding:14px;text-align:left;border:1px solid #dce5f4;border-radius:12px;background:white;font-weight:700;color:#233e6b;cursor:pointer}@media(max-width:550px){body{padding:12px}nav{gap:5px}nav button{font-size:12px}.card{padding:16px}}\n.card{display:block;background:#fff!important;border:1px solid #e0e7f2!important;border-radius:16px!important;padding:22px!important;margin:14px 0!important;box-shadow:0 5px 20px #10254d0a!important}.item{padding:12px 0!important;border-top:1px solid #edf1f7}.item strong{font-weight:700}.card h3{margin-top:20px}.card p{line-height:1.55!important;margin:6px 0!important}@media(max-width:550px){.card{padding:16px!important}}\n.card details{margin:12px 0;border:1px solid #e1e9f3;border-radius:12px;background:#fbfcff;overflow:hidden}.card details summary{padding:13px 15px;cursor:pointer;font-weight:700;font-size:13px;color:#244166}.card details>div{padding:5px 15px 12px}.card details .item p{overflow-wrap:anywhere}.card details summary:focus-visible{outline:3px solid #3093c4;outline-offset:-3px}.card h3{margin:22px 0 8px}.card>p{line-height:1.55}\n\n/* Products: simple, responsive evidence-led cards. */\n.trend-row{padding:16px 0;border-top:1px solid #e7edf5;overflow-wrap:anywhere}\n.trend-row:first-child{border-top:0}.trend-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}\n.trend-title{font-size:16px;line-height:1.35}.trend-badge{flex:none;border-radius:999px;background:#eaf6ef;color:#155c46;font-size:11px;font-weight:750;padding:5px 10px}\n.trend-row p{margin:8px 0;font-size:13px;line-height:1.58;color:#405573}.trend-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;font-size:12px;margin-top:10px}\n.trend-foot a{color:#294db8;font-weight:700;text-decoration:underline;text-underline-offset:2px}.trend-foot small{color:#73839e}\n@media(max-width:600px){.trend-head{flex-direction:column;gap:7px}.trend-row{padding:15px 0}.trend-title{font-size:15px}}\n\n/* Revenue: compact founder-only evidence cards. */\n.revenue-row{padding:16px 0;border-top:1px solid #e7edf5;overflow-wrap:anywhere}\n.revenue-row:first-child{border-top:0}.revenue-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px}\n.revenue-head strong{font-size:16px;line-height:1.35}.revenue-head span{font-size:12px;font-weight:700;color:#155c46;background:#eaf6ef;border-radius:999px;padding:5px 9px}\n.revenue-row p{font-size:13px;line-height:1.55;color:#405573;margin:9px 0}.revenue-row a{display:inline-block;font-weight:700;color:#294db8;font-size:13px;margin-top:7px;text-decoration:underline;text-underline-offset:2px}\n@media(max-width:600px){.revenue-row{padding:14px 0}.revenue-head{flex-direction:column}.revenue-head strong{font-size:15px}}\n";
@@ -4395,8 +4435,30 @@ export default {
     const learningWrite=route==="/api/learning/review"&&request.method==="POST";
     const researchReviewWrite=route==="/api/research/review"&&request.method==="POST";
     const gateEvidenceWrite=route==="/api/experiment/evidence"&&request.method==="POST";
-    if(!decisionWrite&&!privateAiWrite&&!learningWrite&&!researchReviewWrite&&!gateEvidenceWrite&&!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
+    const inboxDelete=/^\/api\/hqconnect-inbox\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(route)&&request.method==="DELETE";
+    if(!decisionWrite&&!privateAiWrite&&!learningWrite&&!researchReviewWrite&&!gateEvidenceWrite&&!inboxDelete&&!["GET","HEAD"].includes(request.method)) return new Response("Read-only",{status:405});
     if(!(await verifyAccess(request,env,ctx))) return new Response("Private Headquarters access not configured or unauthorized",{status:403,headers:{"cache-control":"no-store","x-content-type-options":"nosniff"}});
+    if(route==="/api/recommendations.csv"&&request.method==="GET"){
+      try{return await exportRecommendations(env,request);}
+      catch{return json({error:"Recommendations export temporarily unavailable"},503);}
+    }
+    if(inboxDelete){
+      // Only an authenticated founder's same-origin, explicit browser action may delete a message.
+      if(request.headers.get("origin")!==new URL(request.url).origin||
+        request.headers.get("x-hq-action")!=="delete-enquiry"||
+        request.headers.get("sec-fetch-site")==="cross-site")return json({error:"Founder action denied"},403);
+      if(!env.HQCONNECT_INBOX?.fetch)return json({error:"Inbox service unavailable"},503);
+      const id=route.slice("/api/hqconnect-inbox/".length);
+      try{
+        const target=new URL("https://inbox.internal/inbox/"+id);
+        const r=await env.HQCONNECT_INBOX.fetch(new Request(target,{method:"DELETE",signal:AbortSignal.timeout(5000)}));
+        if(r.status===404)return json({error:"Message no longer exists"},404);
+        if(r.status!==200)return json({error:"Message was not deleted"},503);
+        const payload=await r.json();
+        if(payload.deleted!==true)return json({error:"Message was not deleted"},503);
+        return json({deleted:true});
+      }catch{return json({error:"Message deletion failed; retry later"},503);}
+    }
     if(route==="/api/hqconnect-inbox"&&request.method==="GET"){
       if(!env.HQCONNECT_INBOX?.fetch)return json({available:false,reason:"inbox-not-connected",readOnly:true},503);
       const input=new URL(request.url),before=input.searchParams.get("before");
