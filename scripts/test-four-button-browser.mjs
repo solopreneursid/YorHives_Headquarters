@@ -169,7 +169,7 @@ try{
   assert.equal(await external.getAttribute('rel'),'noopener noreferrer');
   assert.equal(await page.locator('main .revenue-row').count(),10,'Government tender, eight revenue opportunities and one external report');
   await page.locator('nav button[data-tab="hqconnect"]').click();
-  assert.equal(await page.locator('main h1').textContent(),'Hqconnect');
+  assert.equal(await page.locator('main h1').textContent(),'HQconnect');
   await page.getByText('Synthetic founder test').waitFor({timeout:10000});
   await page.getByText('Enquiry checks are current. Email delivery has not yet been verified.').waitFor({timeout:10000});
   assert.equal(await page.locator('#hqconnect-inbox img').count(),0,'Enquiry text must not become HTML');
