@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import service,{inbox,notify} from '../src/hqconnect-inbox-worker.mjs';
 import hq from '../src/hq-worker.mjs';
 import {planInboxBinding} from './hq-binding-policy.mjs';
+import {DatabaseSync} from 'node:sqlite';
+import {readFileSync} from 'node:fs';
 
 const sample={sequence:12,created_at:'2026-11-22T00:00:00.000Z',request_type:'Other',name:'Synthetic test',email:'synthetic@example.test',project:'Test',message:'A synthetic message that is never sent.',timeline:'',budget:'',status:'new'};
 function fakeDb({records=[sample],last=0}={}){
@@ -73,4 +75,17 @@ assert.throws(()=>planInboxBinding(oldBindings,expected,false),/founder-manual/)
 assert.throws(()=>planInboxBinding([...oldBindings,{...addition[0],service:'other-worker'}],expected,true));
 assert.throws(()=>planInboxBinding([...oldBindings,{name:'UNEXPECTED',type:'d1'}],expected,true));
 assert.deepEqual(planInboxBinding([...oldBindings,...addition],expected,false),[]);
+// Exercise the real SQL and migration against a disposable in-memory SQLite DB.
+const sqlite=new DatabaseSync(':memory:');
+sqlite.exec('CREATE TABLE hqconnect_requests (id TEXT PRIMARY KEY, created_at TEXT, request_type TEXT, name TEXT, email TEXT, project TEXT, message TEXT, timeline TEXT, budget TEXT, status TEXT)');
+sqlite.exec(readFileSync(new URL('../migrations/hqconnect-notification-checkpoint.sql',import.meta.url),'utf8'));
+sqlite.prepare('INSERT INTO hqconnect_requests VALUES (?,?,?,?,?,?,?,?,?,?)').run('synthetic-id',sample.created_at,sample.request_type,sample.name,sample.email,sample.project,sample.message,sample.timeline,sample.budget,sample.status);
+const sqliteAdapter={prepare(sql){const stmt=sqlite.prepare(sql);let params=[];return {bind(...v){params=v;return this},async first(){return stmt.get(...params)||null},async all(){return {results:stmt.all(...params)}},async run(){return stmt.run(...params)}}}};
+const liveLike={...env,HQCONNECT_DB:sqliteAdapter,NOTIFY_EMAIL:{send:async()=>{throw Error('offline')}}};
+await assert.rejects(notify(liveLike));
+assert.equal(sqlite.prepare('SELECT last_rowid FROM hqconnect_notification_checkpoint').get().last_rowid,0);
+assert.deepEqual(await notify({...liveLike,NOTIFY_EMAIL:{send:async()=>{}}}),{newEnquiries:true,accepted:true});
+assert.equal(sqlite.prepare('SELECT last_rowid FROM hqconnect_notification_checkpoint').get().last_rowid,1);
+assert.equal((await (await inbox(get('/inbox'),{HQCONNECT_DB:sqliteAdapter})).json()).records.length,1);
+sqlite.close();
 console.log('PASS synthetic private inbox: founder guard, pagination, read-only access, no-store, alert retry and no customer details in email.');
