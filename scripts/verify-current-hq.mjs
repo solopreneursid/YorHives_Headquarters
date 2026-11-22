@@ -62,11 +62,11 @@ export function verify(){
  assert.ok(hq.includes('sourceManifest')||hq.includes('sourceManifest:'),'Lockfile-aware OSV audit missing');
  assert.deepEqual(info.expectedSchedules,['*/5 * * * *']);
  const bindings=info.expectedBindings.map(x=>x.name).sort();
- assert.equal(bindings.length,9);
- assert.equal(new Set(bindings).size,9);
+ assert.equal(bindings.length,10);
+ assert.equal(new Set(bindings).size,10);
  assert.deepEqual(bindings,[
   'ACCESS_AUD','ACCESS_OWNER_EMAIL','ACCESS_TEAM_DOMAIN','AI','ANALYTICS_SQL',
-  'DB','EDGE_WATCHDOG','HQ_DECISIONS_ENABLED','HQ_PERIMETER_MONITOR'].sort());
+  'DB','EDGE_WATCHDOG','HQCONNECT_INBOX','HQ_DECISIONS_ENABLED','HQ_PERIMETER_MONITOR'].sort());
  return {worker:info.productionWorker,version:info.sourceWorkerVersion,modules:imported,
   nav,bindings:bindings.length,embeddedAssets:[html.length,js.length,css.length]};
 }

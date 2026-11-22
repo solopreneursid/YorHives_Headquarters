@@ -110,6 +110,7 @@ jobs:
           node scripts/test-revenue-intelligence.mjs
           node scripts/test-revenue-research.mjs
           node scripts/test-hq-auto-scope.mjs
+          node scripts/test-hqconnect-inbox.mjs
       - name: Publish only with scoped HQ token and explicit founder confirmation
         env:
           HQ_RELEASE_TOKEN: ${{ secrets.HQ_RELEASE_TOKEN }}
