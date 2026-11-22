@@ -6,6 +6,7 @@ import {dirname,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 import {verify,gitBlob} from './verify-current-hq.mjs';
+import {planInboxBinding} from './hq-binding-policy.mjs';
 
 const root=dirname(dirname(fileURLToPath(import.meta.url)));
 const release=JSON.parse(readFileSync(join(root,'hq-release.json'),'utf8'));
@@ -39,8 +40,7 @@ const [deployment,settings,schedules,content]=await Promise.all([
 const live=deployment.deployments?.[0]?.versions?.[0]?.version_id;
 assert.equal(live,release.sourceWorkerVersion,'Live HQ Worker version changed; review before any release');
 assert.equal(settings.compatibility_date,release.compatibilityDate,'HQ compatibility date changed');
-const sorted=(xs)=>xs.map(x=>({name:x.name,type:x.type})).sort((a,b)=>a.name.localeCompare(b.name));
-assert.deepEqual(sorted(settings.bindings||[]),sorted(release.expectedBindings),'Live HQ binding names/types changed');
+planInboxBinding(settings.bindings||[],release.expectedBindings,true);
 assert.deepEqual((schedules.schedules||[]).map(x=>x.cron),release.expectedSchedules,'Live HQ cron changed');
 
 // Verify actual remote source modules, without printing Worker code or bindings.

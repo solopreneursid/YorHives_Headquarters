@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {verify,gitBlob} from './verify-current-hq.mjs';
+import {planInboxBinding} from './hq-binding-policy.mjs';
 
 const root=dirname(dirname(fileURLToPath(import.meta.url)));
 const info=JSON.parse(readFileSync(join(root,'hq-release.json'),'utf8'));
@@ -74,8 +75,7 @@ const parent=auto?execFileSync('git',['rev-parse','HEAD^'],{encoding:'utf8'}).tr
 const bootstrap=auto&&parent==='bc0601193e5e2902545bec95a7567bab5c8dbc12';
 if(bootstrap)fail(version===info.sourceWorkerVersion,'Bootstrap Worker version changed; release denied.');
 const [settings,schedules]=await Promise.all([data(prefix+'/settings'),data(prefix+'/schedules')]);
-fail(equalJson(sortedBindings(settings.bindings),sortedBindings(info.expectedBindings)),
- 'Live bindings differ from reviewed inventory. Release denied.');
+const addedBindings=planInboxBinding(settings.bindings,info.expectedBindings,manual);
 fail(settings.compatibility_date===info.compatibilityDate,'Compatibility date differs; release denied');
 const currentSchedule=(schedules?.schedules||[]).map(x=>x.cron);
 fail(equalJson(currentSchedule,info.expectedSchedules),'Live scheduler differs; release denied');
@@ -94,12 +94,13 @@ const local=new Map(Object.keys(info.moduleGitBlobs).map(name=>[name,readFileSyn
 fail(local.size===8&&[...local].every(([name,src])=>gitBlob(src)===info.moduleGitBlobs[name]),
  'Local Worker module checksum changed. Release denied.');
 if(sameSource(current)){
+ fail(addedBindings.length===0,'Approved source is already deployed but the inbox binding is absent; review the deployment before retrying.');
  console.log('PASS: live HQ modules already match approved private repo source; no deployment necessary.');
  process.exit(0);
 }
 const upload=new FormData();
 const metadata={main_module:'hq-worker.mjs',compatibility_date:settings.compatibility_date,
- bindings:settings.bindings};
+ bindings:[...settings.bindings,...addedBindings]};
 if(Array.isArray(settings.compatibility_flags))metadata.compatibility_flags=settings.compatibility_flags;
 for(const [name,content] of local)upload.append(name,new Blob([content],{type:'application/javascript+module'}),name);
 upload.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));
@@ -129,6 +130,7 @@ const newSettings=await data(prefix+'/settings');
 const newSchedules=await data(prefix+'/schedules');
 fail(equalJson(sortedBindings(newSettings.bindings),sortedBindings(info.expectedBindings)),
  'Post-upload binding inventory mismatch');
+planInboxBinding(newSettings.bindings,info.expectedBindings,false);
 fail(equalJson((newSchedules?.schedules||[]).map(x=>x.cron),info.expectedSchedules),
  'Post-upload scheduler mismatch');
 const finalDeployment=await data(prefix+'/deployments');

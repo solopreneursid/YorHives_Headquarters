@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "application": "YorpHives HQ",
   "productionWorker": "yorphives-hq-free-pilot",
-  "sourceWorkerVersion": "3a706c0e-814e-4991-b36f-7ab661144b96",
+  "sourceWorkerVersion": "1f6ea8a4-c4db-46cd-b4d9-42b730036baa",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "a6ab75b18cab251408423b6461833569216024b0",
+    "hq-worker.mjs": "87c53c4a33dd9682220cd32a1b18a97ecc7c1410",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
@@ -57,6 +57,10 @@
     {
       "name": "HQ_PERIMETER_MONITOR",
       "type": "service"
+    },
+    {
+      "name": "HQCONNECT_INBOX",
+      "type": "service"
     }
   ],
   "expectedSchedules": [
@@ -90,7 +94,8 @@
     "Only future-dated tenders with relevant software/IT scope AND published tender reference/closing time are promoted; unknown bidder eligibility, buyer name, EMD, budget, status remain explicitly unverified.",
     "All ranked Revenue opportunities expose whoMightPay, whyPay, nextAction, verified earnings null and founder approval required; HQ cannot register/bid/contact/pay.",
     "Monetization follow-up: never claim a government award or supplier eligibility from a tender portal homepage; all proposals/tenders require founder review.",
-    "2026-11-21: Revenue model distinguishes source check with zero qualifying matches vs unreachable source, and ranks real tender notices ahead of mere portal search links without implying bidder eligibility."
+    "2026-11-21: Revenue model distinguishes source check with zero qualifying matches vs unreachable source, and ranks real tender notices ahead of mere portal search links without implying bidder eligibility.",
+    "Founder-manual inbox transition adds one internal read-only service binding; customer enquiries never enter AI research or public endpoints."
   ],
   "previousWorkerVersion": "9396a967-e8a7-4814-9232-d3eabda774d3",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
@@ -117,7 +122,7 @@
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
     "product-intelligence.mjs": "1afd4abb92978bda8abc97287bbbf760534e9e72",
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
-    "revenue-intelligence.mjs": "18fda8b95f716a15a43364cca09d407104a89bdf",
+    "revenue-intelligence.mjs": "2644dae372695729d43b6f4945f93e156036e223",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
   "candidateStatus": "Verified in deployed HQ Worker: Free Tools Revenue baseline, private read-only tool pageview monitoring and no fabricated earnings. Browser session verification separate."
