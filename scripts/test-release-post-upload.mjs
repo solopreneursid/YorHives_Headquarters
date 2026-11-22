@@ -3,13 +3,15 @@
 // against simulated temporary Cloudflare errors; no network, tokens or writes.
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
+import {singleLiveVersion,isReviewedSource} from './hq-release-baseline.mjs';
+import {gitBlob} from './verify-current-hq.mjs';
 const src=readFileSync(new URL('./release-hq-manual.mjs',import.meta.url),'utf8');
 assert.equal((src.match(/await data\(prefix,\{method:'PUT',body:upload\}\);/g)||[]).length,1,
  'Exactly one upload operation; retries must never repeat a write');
 assert.match(src,/GITHUB_EVENT_NAME==='workflow_dispatch'/);
 assert.match(src,/HQ_FOUNDER_CONFIRMATION==='RELEASE_FOUR_BUTTON_HQ'/);
 assert.match(src,/HQ_APPROVED_SOURCE_SHA===env\.GITHUB_SHA/);
-assert.match(src,/fail\(version===env\.EXPECTED_CURRENT_VERSION/);
+assert.match(src,/singleLiveVersion\(await data\(prefix\+'\/deployments'\)\)===version/);
 const a=src.indexOf('async function verifyPublishedModules(){');
 const b=src.indexOf('\nawait verifyPublishedModules();',a);
 assert.ok(a>0&&b>a,'Missing post-upload GET verification');
@@ -44,7 +46,18 @@ assert.equal(permanent.requests.length,7,'Post-upload verification attempts must
 assert.match(src,/const auto=env\.GITHUB_EVENT_NAME==='push'&&env\.HQ_AUTO_RELEASE==='true'/);
 assert.match(src,/HQ_AUTO_SCOPE_OK==='true'/);
 assert.match(src,/GITHUB_WORKFLOW_REF\?\.includes/);
-assert.match(src,/const priorManifest=auto&&!bootstrap/);
+assert.match(src,/const priorManifest=!bootstrap/);
 assert.match(src,/parent==='bc0601193e5e2902545bec95a7567bab5c8dbc12'/);
-assert.match(src,/manual\)fail\(version===env\.EXPECTED_CURRENT_VERSION/);
+assert.match(src,/isReviewedSource\(current,pinnedLive\)/);
+const id='d374797f-41d3-4940-95a6-58a9d329b3ea';
+const deployment=versions=>({deployments:[{versions}]});
+assert.equal(singleLiveVersion(deployment([{version_id:id,percentage:100}])),id);
+for(const versions of [[],[{version_id:id,percentage:50}],
+ [{version_id:id,percentage:50},{version_id:id,percentage:50}],[{version_id:'not-a-version',percentage:100}]])
+ assert.throws(()=>singleLiveVersion(deployment(versions)));
+const modules=new Map(Array.from({length:8},(_,i)=>['module'+i,'reviewed source '+i]));
+const hashes=Object.fromEntries([...modules].map(([name,content])=>[name,gitBlob(content)]));
+assert.equal(isReviewedSource(modules,hashes),true);
+assert.equal(isReviewedSource(new Map([...modules,['module0','unexpected change']]),hashes),false);
+assert.equal(isReviewedSource(new Map([...modules,['extra','source']]),hashes),false);
 console.log('PASS HQ founder manual and safe automatic release: retries read-only GET after temporary 404; never retries PUT or 403');

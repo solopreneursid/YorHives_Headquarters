@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import service,{inbox,notify} from '../src/hqconnect-inbox-worker.mjs';
+import service,{inbox,notify,healthState} from '../src/hqconnect-inbox-worker.mjs';
 import hq from '../src/hq-worker.mjs';
 import {planInboxBinding} from './hq-binding-policy.mjs';
 import {DatabaseSync} from 'node:sqlite';
@@ -67,6 +67,13 @@ assert.equal((await service.fetch(new Request('https://inbox.internal/notify'),e
 const fresh=fakeDb();
 assert.equal((await service.fetch(new Request('https://inbox.internal/notify',{method:'POST'}),{...env,HQCONNECT_DB:fresh})).status,200);
 assert.equal(fresh.state.last,12);
+assert.equal(fresh.state.updates.at(-1).params[1],'ok','Successful scheduled checks record a heartbeat');
+const badConfig=fakeDb({records:[]});
+assert.equal((await service.fetch(new Request('https://inbox.internal/notify',{method:'POST'}),{HQCONNECT_DB:badConfig})).status,503);
+assert.equal(badConfig.state.updates.at(-1).params[1],'error','Missing transport must not look healthy');
+assert.equal(healthState({last_checked_at:new Date().toISOString(),last_result:'ok'}),'current');
+assert.equal(healthState({last_checked_at:new Date().toISOString(),last_result:'error'}),'attention');
+assert.equal(healthState({last_checked_at:new Date(Date.now()-46*60000).toISOString(),last_result:'ok'}),'unknown');
 const oldBindings=[{name:'DB',type:'d1'},{name:'AI',type:'ai'}];
 const expected=[...oldBindings,{name:'HQCONNECT_INBOX',type:'service'}];
 const addition=planInboxBinding(oldBindings,expected,true);
@@ -79,6 +86,7 @@ assert.deepEqual(planInboxBinding([...oldBindings,...addition],expected,false),[
 const sqlite=new DatabaseSync(':memory:');
 sqlite.exec('CREATE TABLE hqconnect_requests (id TEXT PRIMARY KEY, created_at TEXT, request_type TEXT, name TEXT, email TEXT, project TEXT, message TEXT, timeline TEXT, budget TEXT, status TEXT)');
 sqlite.exec(readFileSync(new URL('../migrations/hqconnect-notification-checkpoint.sql',import.meta.url),'utf8'));
+sqlite.exec(readFileSync(new URL('../migrations/hqconnect-notification-health.sql',import.meta.url),'utf8'));
 sqlite.prepare('INSERT INTO hqconnect_requests VALUES (?,?,?,?,?,?,?,?,?,?)').run('synthetic-id',sample.created_at,sample.request_type,sample.name,sample.email,sample.project,sample.message,sample.timeline,sample.budget,sample.status);
 const sqliteAdapter={prepare(sql){const stmt=sqlite.prepare(sql);let params=[];return {bind(...v){params=v;return this},async first(){return stmt.get(...params)||null},async all(){return {results:stmt.all(...params)}},async run(){return stmt.run(...params)}}}};
 const liveLike={...env,HQCONNECT_DB:sqliteAdapter,NOTIFY_EMAIL:{send:async()=>{throw Error('offline')}}};
@@ -86,6 +94,8 @@ await assert.rejects(notify(liveLike));
 assert.equal(sqlite.prepare('SELECT last_rowid FROM hqconnect_notification_checkpoint').get().last_rowid,0);
 assert.deepEqual(await notify({...liveLike,NOTIFY_EMAIL:{send:async()=>{}}}),{newEnquiries:true,accepted:true});
 assert.equal(sqlite.prepare('SELECT last_rowid FROM hqconnect_notification_checkpoint').get().last_rowid,1);
+assert.equal((await service.fetch(new Request('https://inbox.internal/notify',{method:'POST'}),liveLike)).status,200);
+assert.equal(sqlite.prepare('SELECT last_result FROM hqconnect_notification_health').get().last_result,'ok');
 assert.equal((await (await inbox(get('/inbox'),{HQCONNECT_DB:sqliteAdapter})).json()).records.length,1);
 sqlite.close();
 console.log('PASS synthetic private inbox: founder guard, pagination, read-only access, no-store, alert retry and no customer details in email.');
