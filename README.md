@@ -1,8 +1,8 @@
-# YorpHives HQ — Four-Button Source of Truth
+# YorpHives HQ — Five-Tab Source of Truth
 
-**Current application: Home · Health · Products · Revenue.**
+**Current application: Home · Health · Products · Revenue · HQconnect.**
 
-This repository contains the **exact four-module source** recovered from the running
+This repository contains the **verified modular source** recovered from the running
 `yorphives-hq-free-pilot` Cloudflare Worker (verified on 18 November 2026). The old
 six-page HQpulse implementation is **retired** and must not be deployed. Its commits remain
 available in Git history for investigation, not as production source.
@@ -13,6 +13,8 @@ available in Git history for investigation, not as production source.
 - **Health:** monitoring, bugs, broken links, dependency vulnerabilities, evidence and recommended fixes.
 - **Products:** internet/open-source discovery, evaluation and proposed integrations.
 - **Revenue:** research and recommendations; never pretend projections are verified earnings.
+- **HQconnect:** founder-only message inbox; per-message irreversible deletion requires confirmation and Cloudflare Access, while website and HQ operational capabilities remain read-only.
+- **Exports:** signed-in founder can download all recorded Health, Products and Revenue recommendations as CSV.
 
 Deployed HQ workers and AI agents are **observation, research, analysis and recommendation only**.
 They may not change the website or HQ source, deploy, pay, or mutate infrastructure.
@@ -37,9 +39,9 @@ The founder is the sole production release approver.
 
 ## Tests and scope
 
-`node scripts/verify-current-hq.mjs` checks the four pages, embedded frontend syntax,
+`node scripts/verify-current-hq.mjs` checks the five tabs, embedded frontend syntax,
 required Health/Products endpoints, module integrity, authentication guard and binding inventory.
-`scripts/test-four-button-browser.mjs` uses local mocked data to exercise the four pages
+`scripts/test-four-button-browser.mjs` uses local mocked data to exercise the five tabs
 in Chromium (desktop/mobile) without production credentials or writes.
 **Only** the signed-in browser's "Verify signed-in session" button checks a real
 founder-authenticated HQ API, collector and database. That self-test is not
@@ -57,3 +59,7 @@ as deployment gates or merge old changes into this current source.
 Do not commit Cloudflare API tokens, password values, owner identity details,
 D1 dumps or access cookies. The repository is **public during development by founder choice**; do not commit secrets. Make it private before launch.
 Avoid pushing a source snapshot to any public website repository.
+
+## HQconnect deletion release order
+
+The separate `src/hqconnect-inbox-service.mjs` module is deployed only as the private `yorphives-hqconnect-inbox` service (workers.dev and preview URLs disabled). Release it before the HQ Worker; retain all existing D1 and notification bindings. The HQ release adds a single Access-verified, same-origin `DELETE /api/hqconnect-inbox/<UUID>` proxy. Deletion removes only the selected enquiry row, after explicit founder confirmation, and is never run by agents or scheduled checks. Do not run production deletion as a test; test with mocked D1. CSV export is GET-only and redacts no HQconnect data because messages are excluded from recommendations.

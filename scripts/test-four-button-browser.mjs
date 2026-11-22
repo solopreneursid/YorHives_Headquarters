@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Synthetic, local-only browser tests for CURRENT four-button HQ.
+// Synthetic, local-only browser tests for CURRENT five-tab HQ.
 // All APIs are mocked. This test never logs in to production or writes to D1.
 import {createServer} from 'node:http';
 import {readFileSync} from 'node:fs';
@@ -16,7 +16,7 @@ const assets={'/':asset(source,'/index.html'),'/index.html':asset(source,'/index
 const contentTypes={'/':'text/html','/index.html':'text/html','/hq-simple.js':'text/javascript','/hq-simple.css':'text/css'};
 const now=new Date().toISOString();
 const mock={
- '/api/hqconnect-inbox':{available:true,readOnly:true,records:[{created_at:now,request_type:'Other',name:'Synthetic founder test',email:'synthetic@example.test',project:'Example',message:'<img src=x onerror=alert(1)>',timeline:'Flexible',budget:''}],next:null,notification:{health:{state:'current',checkedAt:now}}},
+ '/api/hqconnect-inbox':{available:true,readOnly:true,records:[{id:'11111111-1111-4111-8111-111111111111',created_at:now,request_type:'Other',name:'Synthetic founder test',email:'synthetic@example.test',project:'Example',message:'<img src=x onerror=alert(1)>',timeline:'Flexible',budget:''}],next:null,notification:{health:{state:'current',checkedAt:now}}},
  '/api/report':{schemaVersion:'yorphives.hq-intelligence.v1',findings:[],securityWatch:[],changes:[],
    incidents:[],incidentEvents:[],opportunities:[{id:'trend-mock-home',title:'Private PDF Studio',kind:'trend-measured',recommendation:'Monetization: Paid exports.',description:'GitHub attention'}],comparisons:[]},
  '/api/health-self-check':{schemaVersion:1,authenticated:true,healthy:true,api:'responding',
@@ -89,8 +89,17 @@ const mock={
 const requests=[];
 const server=createServer((req,res)=>{
  requests.push({method:req.method,path:req.url});
- if(req.method!=='GET'){res.writeHead(405).end('Not permitted');return;}
  const path=new URL(req.url,'http://127.0.0.1').pathname;
+ if(req.method==='DELETE'&&path==='/api/hqconnect-inbox/11111111-1111-4111-8111-111111111111'
+    &&req.headers['x-hq-action']==='delete-enquiry'){
+  mock['/api/hqconnect-inbox'].records=[];
+  res.writeHead(200,{'content-type':'application/json'}).end('{"deleted":true}');return;
+ }
+ if(req.method!=='GET'){res.writeHead(405).end('Not permitted');return;}
+ if(path==='/api/recommendations.csv'){
+  res.writeHead(200,{'content-type':'text/csv','content-disposition':'attachment; filename="yorphives-hq-recommendations-products-test.csv"'})
+    .end('section,title,recommendation\r\nProducts,Private PDF Studio,Research only\r\n');return;
+ }
  if(Object.hasOwn(assets,path)){res.writeHead(200,{'content-type':contentTypes[path]+';charset=utf-8','cache-control':'no-store'}).end(assets[path]);return;}
  if(Object.hasOwn(mock,path)){res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'}).end(JSON.stringify(mock[path]));return;}
  res.writeHead(404).end('Unknown route');
@@ -101,12 +110,13 @@ let browser=null;
 try{
  browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  for(const width of [390,1366]){
+  mock['/api/hqconnect-inbox'].records=[{id:'11111111-1111-4111-8111-111111111111',created_at:now,request_type:'Other',name:'Synthetic founder test',email:'synthetic@example.test',project:'Example',message:'<img src=x onerror=alert(1)>',timeline:'Flexible',budget:''}];
   const context=await browser.newContext({viewport:{width,height:820},serviceWorkers:'block'});
   const page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.stack||e.message));
   await page.goto(origin+'/#home',{waitUntil:'networkidle',timeout:30000});
   const nav=await page.locator('nav button').evaluateAll(items=>items.map(x=>x.dataset.tab));
-  assert.deepEqual(nav,['home','health','products','revenue']);
+  assert.deepEqual(nav,['home','health','products','revenue','hqconnect']);
   assert.equal(await page.locator('main h1').textContent(),'Home');
   const homeCopy=await page.locator('main').innerText();
   assert.match(homeCopy,/Products[\s\S]*1 ideas/);
@@ -120,6 +130,10 @@ try{
   await page.locator('nav button[data-tab="products"]').click();
   assert.equal(await page.locator('main h1').textContent(),'Products');
   await page.getByText('Private PDF Studio').waitFor({timeout:10000});
+  const productExport=page.getByRole('link',{name:'⬇ Download all product recommendations (CSV)'});
+  assert.equal(await productExport.getAttribute('href'),'/api/recommendations.csv?scope=products');
+  const [exportFile]=await Promise.all([page.waitForEvent('download'),productExport.click()]);
+  assert.match(exportFile.suggestedFilename(),/yorphives-hq-recommendations-products/);
   await page.getByText('Not verified traffic.',{exact:false}).waitFor();
   await page.getByRole('link',{name:'View original source'}).waitFor();
   assert.equal(await page.getByRole('link',{name:'View original source'}).getAttribute('rel'),'noopener noreferrer');
@@ -131,10 +145,7 @@ try{
   assert.equal(await lead.getAttribute('rel'),'noopener noreferrer');
   await page.locator('nav button[data-tab="revenue"]').click();
   assert.equal(await page.locator('main h1').textContent(),'Revenue');
-  await page.getByText('Synthetic founder test').waitFor({timeout:10000});
-  await page.getByText('Enquiry checks are current. Email delivery has not yet been verified.').waitFor({timeout:10000});
-  assert.equal(await page.locator('#hqconnect-inbox img').count(),0,'Enquiry text must not become HTML');
-  assert.equal(await page.getByRole('link',{name:'Reply to synthetic@example.test'}).getAttribute('href'),'mailto:synthetic%40example.test');
+  assert.equal(await page.locator('#hqconnect-inbox').count(),0,'HQconnect must be separate from Revenue');
   await page.getByText('Verified YorpHives earnings: Not connected.',{exact:false}).waitFor({timeout:10000});
   await page.getByText('Validate a paid HQventures product').waitFor({timeout:10000});
   await page.getByText('Government tender · Website and digital forms development',{exact:false}).waitFor({timeout:10000});
@@ -157,6 +168,18 @@ try{
   assert.equal(await external.getAttribute('href'),'https://trustmrr.com/newsletter');
   assert.equal(await external.getAttribute('rel'),'noopener noreferrer');
   assert.equal(await page.locator('main .revenue-row').count(),10,'Government tender, eight revenue opportunities and one external report');
+  await page.locator('nav button[data-tab="hqconnect"]').click();
+  assert.equal(await page.locator('main h1').textContent(),'HQconnect');
+  await page.getByText('Synthetic founder test').waitFor({timeout:10000});
+  await page.getByText('Enquiry checks are current. Email delivery has not yet been verified.').waitFor({timeout:10000});
+  assert.equal(await page.locator('#hqconnect-inbox img').count(),0,'Enquiry text must not become HTML');
+  assert.equal(await page.getByRole('link',{name:'Reply to synthetic@example.test'}).getAttribute('href'),'mailto:synthetic%40example.test');
+  page.once('dialog',dialog=>dialog.accept());
+  await page.getByRole('button',{name:'Delete message from Synthetic founder test'}).click();
+  await page.getByText('No enquiries received yet.').waitFor({timeout:10000});
+  assert.equal(await page.getByText('Synthetic founder test').count(),0,'Deleted enquiry no longer appears');
+  await page.goBack({waitUntil:'networkidle'});
+  assert.equal(await page.locator('main h1').textContent(),'Revenue');
   await page.goBack({waitUntil:'networkidle'});
   assert.equal(await page.locator('main h1').textContent(),'Products','Browser Back must restore Products');
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
@@ -166,6 +189,7 @@ try{
   await context.close();
  }
  assert.ok(requests.length>=12,'No substantive HTTP requests captured');
- assert.ok(requests.every(x=>x.method==='GET'),'Synthetic HQ should make GET requests only');
- console.log('PASS HQ SYNTHETIC BROWSER: all routes read-only; no production credentials/data');
+ assert.ok(requests.every(x=>x.method==='GET'||(x.method==='DELETE'&&x.path==='/api/hqconnect-inbox/11111111-1111-4111-8111-111111111111')),'Only exact-enquiry DELETE is allowed');
+ assert.equal(requests.filter(x=>x.method==='DELETE').length,2,'Exactly one confirmed deletion per browser size');
+ console.log('PASS HQ SYNTHETIC BROWSER: GET-only research plus one simulated founder-confirmed deletion per device; no production credentials/data');
 }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
