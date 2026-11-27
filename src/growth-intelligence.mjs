@@ -32,11 +32,11 @@ export const PROJECTS=Object.freeze([
 export const SOURCE_HOSTS=Object.freeze([
   'news.ycombinator.com','hn.algolia.com','github.com','dev.to',
   'eprocure.gov.in','jharkhandtenders.gov.in','bidplus.gem.gov.in',
-  'yorphives.com','www.yorphives.com'
+  'yorphives.com','www.yorphives.com','www.npmjs.com','pdfbox.apache.org','developer.usajobs.gov','openfisca.org','docs.n8n.io'
 ]);
 const TYPE_ALLOW=new Set(['public-discussion','public-client-intent','official-tender-listing',
   'community-partner-mention','community-sponsorship-mention','public-repository',
-  'public-demand-signal','first-party-aggregate']);
+  'public-demand-signal','first-party-aggregate','public-package','official-product-page']);
 const STATE_ALLOW=new Set(['unreviewed','needs-evidence','approved-for-founder','rejected','founder-executed']);
 const clean=(v,max=400)=>String(v??'')
   .replace(/<[^>]*>/g,' ').replace(/[^\S\n]+/g,' ')
@@ -89,7 +89,7 @@ export function configureProjects(projects=PROJECTS){
 }
 export function assessBusinessFit(project,{sourceType,matchedKeywords=[]}={}){
  const profile=project.productProfile;
- const categories={'public-repository':'software-integration','community-partner-mention':'partnership',
+ const categories={'public-package':'software-integration','official-product-page':'documentation-research','public-repository':'software-integration','community-partner-mention':'partnership',
   'community-sponsorship-mention':'sponsorship','public-client-intent':'public-request',
   'official-tender-listing':'procurement-research','public-discussion':'community-research',
   'public-demand-signal':'audience-research','first-party-aggregate':'adoption-research'};
@@ -126,6 +126,7 @@ export function qualifyOpportunity(project,signal,{now=new Date().toISOString()}
   title,summary,sourceUrl:link,sourceType:kind,observedAt:new Date(timestamp).toISOString(),
   relevanceScore:score,matchedKeywords:matches,
   businessFit:assessBusinessFit(p,{sourceType:kind,matchedKeywords:matches}),
+  organization:kind==='official-product-page'?clean(signal.organization,100)||null:null,
   prospect:kind==='public-repository'&&signal?.provenance==='github-public-repository-search'&&/^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/.test(signal.organization||'')&&/^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/.test(signal.repository||'')&&link==='https://github.com/'+signal.organization+'/'+signal.repository?{organization:signal.organization,repository:signal.repository,organizationUrl:'https://github.com/'+signal.organization,organizationAccountObserved:true,legalEntityVerified:false,needVerified:false,contactPermissionVerified:false}:null,
   audienceHypothesis:p.audience[0],confidence:'unverified-public-signal',
   demandVerified:false,contactPermissionVerified:false,attributedUsers:null,verifiedRevenue:null,
