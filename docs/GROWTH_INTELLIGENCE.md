@@ -7,7 +7,8 @@ liveModuleGitBlobs map must not be rewritten to describe an unverified candidate
 ## Architecture
 
 Existing sources -> existing Revenue Intelligence -> growth-intelligence-adapter.mjs ->
-growth-intelligence.mjs -> founder-reviewed project dossiers.
+growth-intelligence.mjs -> founder-reviewed project dossiers ->
+growth-intelligence-store.mjs (optional internal D1 evidence persistence).
 Existing first-party aggregate Growth Evidence -> read-only metric adapter.
 Optional future D1 persistence -> migrations/growth/0001_growth_intelligence.sql.
 
@@ -32,6 +33,8 @@ boundary; **project IDs alone are not a tenant-security mechanism**.
 - Analytics that explicitly leave unique users, customers and revenue **null** when unknown.
 - Additive seven-table D1/SQLite schema (projects, audiences, sources, opportunities,
   reviews, drafts and outcomes) and offline migration constraint check.
+- Bounded parameterized internal D1 research upserts and project-scoped reads. The
+  store retains existing founder approval statuses when evidence is refreshed.
 - Isolated Node regression suite and workflow. The current Worker source and manual
   deployment manifest are deliberately unchanged.
 
