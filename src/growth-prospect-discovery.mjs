@@ -17,6 +17,27 @@ const day=t=>new Date(t).toISOString().slice(0,10);
 const clean=(v,n)=>String(v??'').replace(/<[^>]*>/g,' ').replace(/[\u0000-\u001f\u007f]/g,' ')
  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[redacted-contact]').replace(/\s+/g,' ').trim().slice(0,n);
 const key=id=>'growth_prospects_'+id;
+const COOLDOWN_KEY='growth_github_source_cooldown';
+export function githubCooldown(response,clockMs=Date.now()){
+ if(![403,429].includes(response?.status))return null;
+ const remaining=response.headers.get('x-ratelimit-remaining');
+ const retry=response.headers.get('retry-after');
+ const reset=response.headers.get('x-ratelimit-reset');
+ const retrySeconds=retry&&/^\d{1,7}$/.test(retry)?Number(retry):retry?Math.ceil((Date.parse(retry)-clockMs)/1000):0;
+ const resetSeconds=reset&&/^\d{1,12}$/.test(reset)?Math.ceil(Number(reset)-clockMs/1000):0;
+ const limited=response.status===429||remaining==='0'||Boolean(retry);
+ const hinted=Math.max(0,Number.isFinite(retrySeconds)?retrySeconds:0,remaining==='0'&&Number.isFinite(resetSeconds)?resetSeconds:0);
+ return {reason:limited?'github-rate-limited':'source-http-403',
+  durationMs:Math.max(limited?60000:12*3600000,Math.min(24*3600000,hinted*1000))};
+}
+async function applyCooldown(db,response,time){
+ const decision=githubCooldown(response);
+ if(!decision)return null;
+ const until=new Date(Number(time)+decision.durationMs).toISOString();
+ await db.prepare('INSERT INTO status(key,value,checked_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,checked_at=excluded.checked_at WHERE status.value<excluded.value')
+  .bind(COOLDOWN_KEY,until,new Date(time).toISOString()).run();
+ return decision.reason;
+}
 export function discoveryWindow(time){
  const t=new Date(time);
  if(!Number.isFinite(t.getTime())||t.getUTCMinutes()!==35)return null;
@@ -76,12 +97,16 @@ export async function runProspectDiscovery(env,time,{reserveFetch,fetchFn=fetch,
  if(!Number(claim.meta?.changes||0))return 'already-checked';
  let data={schemaVersion:1,projectId:spec.id,checkedAt:at,state:'unavailable',records:[]};
  try{
+  const cooldown=await env.DB.prepare('SELECT value FROM status WHERE key=?').bind(COOLDOWN_KEY).first();
+  if(cooldown&&Number.isFinite(Date.parse(cooldown.value))&&Date.parse(cooldown.value)>Date.parse(at))throw Error('github-source-cooldown');
   if(!await reserveFetch(env))throw Error('shared-fetch-budget-exhausted');
   const query=new URLSearchParams({q:spec.query+' archived:false fork:false is:public',sort:'updated',order:'desc',per_page:'12'});
   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),4500);
   try{
    const r=await fetchFn(HOST+'?'+query,{method:'GET',redirect:'error',cache:'no-store',
     headers:{accept:'application/vnd.github+json','user-agent':'YorpHivesHQ-ReadOnly'},signal:ctl.signal});
+   const restriction=await applyCooldown(env.DB,r,Date.parse(at));
+   if(restriction)throw Error(restriction);
    const raw=await boundedJson(r);
    if(raw.incomplete_results===true)throw Error('incomplete-public-search');
    const records=normalizeOrganizationRepositories(raw,spec.id,at);
@@ -91,8 +116,11 @@ export async function runProspectDiscovery(env,time,{reserveFetch,fetchFn=fetch,
     try{
      if(await reserveFetch(env)){
       const orgUrl='https://api.github.com/orgs/'+encodeURIComponent(candidate.organization);
-      const org=await boundedJson(await fetchFn(orgUrl,{method:'GET',redirect:'error',cache:'no-store',
-       headers:{accept:'application/vnd.github+json','user-agent':'YorpHivesHQ-ReadOnly'},signal:AbortSignal.timeout(4500)}));
+      const orgResponse=await fetchFn(orgUrl,{method:'GET',redirect:'error',cache:'no-store',
+       headers:{accept:'application/vnd.github+json','user-agent':'YorpHivesHQ-ReadOnly'},signal:AbortSignal.timeout(4500)});
+      const restriction=await applyCooldown(env.DB,orgResponse,Date.parse(at));
+      if(restriction)throw Error(restriction);
+      const org=await boundedJson(orgResponse);
       const valid=typeof org.login==='string'&&org.login.toLowerCase()===candidate.organization.toLowerCase()&&org.type==='Organization'&&org.html_url==='https://github.com/'+org.login;
       candidate.organizationCrossCheck=valid?'github-account-confirmed':'identity-mismatch';
       candidate.organizationAccountCrossChecked=valid;
@@ -102,7 +130,7 @@ export async function runProspectDiscovery(env,time,{reserveFetch,fetchFn=fetch,
    }
    data={...data,state:records.length?'observed':'checked-no-match',records};
   }finally{clearTimeout(timer);}
- }catch(error){data={...data,state:'unavailable',records:[],reason:/^(?:source-http-\d{3}|invalid-or-oversized-source|public-source-oversized|incomplete-public-search|shared-fetch-budget-exhausted)$/.test(error?.message||'')?error.message:'transport-or-parse-failure'};}
+ }catch(error){data={...data,state:'unavailable',records:[],reason:/^(?:source-http-\d{3}|invalid-or-oversized-source|public-source-oversized|incomplete-public-search|shared-fetch-budget-exhausted|github-rate-limited|github-source-cooldown)$/.test(error?.message||'')?error.message:'transport-or-parse-failure'};}
  await save(env.DB,spec.id,data);
  return spec.id+':'+data.state;
 }
