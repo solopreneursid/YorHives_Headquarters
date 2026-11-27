@@ -5,9 +5,12 @@ import sqlite3
 
 ROOT = Path(__file__).resolve().parent.parent
 SQL = (ROOT / "migrations/growth/0001_growth_intelligence.sql").read_text()
+REVIEW_SQL = (ROOT / "migrations/growth/0002_founder_review_journal.sql").read_text()
 with sqlite3.connect(":memory:") as db:
     db.executescript(SQL)
     db.executescript(SQL)  # idempotent
+    db.executescript(REVIEW_SQL)
+    db.executescript(REVIEW_SQL)
     names = {
         row[0] for row in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table'"
@@ -66,4 +69,32 @@ with sqlite3.connect(":memory:") as db:
     assert db.execute(
         "SELECT verified_revenue_minor FROM growth_outcomes WHERE id='ledger1'"
     ).fetchone() == (100,)
-print("PASS growth schema: idempotent, relational integrity, revenue provenance and bounds")
+    review_sql = """
+      INSERT INTO growth_reviews(opportunity_id,from_status,to_status,review_note,reviewed_at,reviewed_by)
+      SELECT o.id,o.approval_status,?,?,?,'founder' FROM growth_opportunities o
+      WHERE o.id=? AND o.approval_status=? AND
+      COALESCE((SELECT MAX(id) FROM growth_reviews WHERE opportunity_id=o.id),0)=?
+    """
+    def review(to_status, from_status, revision):
+        return db.execute(review_sql, (to_status,"Founder-reviewed synthetic evidence",
+                          "2026-11-27T07:00:00Z","g1",from_status,revision)).rowcount
+    try:
+        review("founder-executed","unreviewed",0)
+        raise AssertionError("Execution bypassed approval")
+    except sqlite3.IntegrityError:
+        pass
+    assert review("approved-for-founder","unreviewed",0) == 1
+    assert db.execute("SELECT approval_status FROM growth_opportunities WHERE id='g1'").fetchone() == ("approved-for-founder",)
+    assert review("rejected","unreviewed",0) == 0
+    revision = db.execute("SELECT MAX(id) FROM growth_reviews WHERE opportunity_id='g1'").fetchone()[0]
+    assert review("founder-executed","approved-for-founder",revision) == 1
+    assert review("rejected","approved-for-founder",revision) == 0
+    assert db.execute("SELECT COUNT(*) FROM growth_reviews").fetchone() == (2,)
+    for sql in ["UPDATE growth_reviews SET review_note='changed'","DELETE FROM growth_reviews"]:
+        try:
+            db.execute(sql)
+            raise AssertionError("Append-only review journal bypassed")
+        except sqlite3.IntegrityError:
+            pass
+    assert db.execute("SELECT approval_status FROM growth_opportunities WHERE id='g1'").fetchone() == ("founder-executed",)
+print("PASS growth schema: idempotent, relational integrity, revenue provenance, review revision and append-only projection")
