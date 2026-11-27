@@ -4333,10 +4333,14 @@ function privateAiConfig(env){
 }
 const HQ_CF_MODEL="@cf/ibm-granite/granite-4.0-h-micro";
 const HQ_CF_DAILY_LIMIT=2; // Bounded requests; Cloudflare enforces the account-wide free Neuron limit.
-function hqAiProvider(env){
- const local=privateAiConfig(env);
- if(local)return {provider:"founder-self-hosted",model:local.model};
- if(env?.AI&&typeof env.AI.run==="function")return {provider:"cloudflare-workers-ai",model:HQ_CF_MODEL};
+export function hqAiProvider(env){
+ const selected=String(env?.HQ_AI_PROVIDER||"cloudflare-workers-ai");
+ if(selected==="cloudflare-workers-ai")
+  return env?.AI&&typeof env.AI.run==="function"?{provider:"cloudflare-workers-ai",model:HQ_CF_MODEL}:null;
+ if(selected==="founder-self-hosted"){
+  const local=privateAiConfig(env);
+  return local?{provider:"founder-self-hosted",model:local.model}:null;
+ }
  return null;
 }
 function privateAiStatus(env){
@@ -4345,8 +4349,8 @@ function privateAiStatus(env){
   model:provider?.model||null,readOnly:true,noTools:true,
   dailyRequestLimit:provider?.provider==="cloudflare-workers-ai"?HQ_CF_DAILY_LIMIT:0,
   note:provider?.provider==="cloudflare-workers-ai"?
-    "Cloudflare Workers AI configured; real inference unverified until a founder-triggered request. Max 2 HQ requests/day, Cloudflare Free Neuron cap also applies.":
-    provider?"Founder-hosted model configured; inference not verified.":"Not connected. No model binding configured."};
+    "Cloudflare Workers AI is the default hosted provider; no personal server is required. Real inference is unverified until a founder-triggered request. HQ limit: 2 new requests/day; provider usage is metered separately.":
+    provider?"Optional founder-hosted model explicitly selected; not required for hosted HQ.":"No model provider connected. Deterministic monitoring continues without AI."};
 }
 async function reserveWorkersAiRequest(env){
  // SQLite atomic upsert prevents concurrent requests from bypassing the HQ limit.
@@ -4364,7 +4368,7 @@ async function cloudflareAiAnalyze(env,department,id,evidence,system){
  if(!env?.AI||typeof env.AI.run!=="function")return json({error:"Cloudflare AI binding unavailable"},503);
  if(!env.DB)return json({error:"Quota database unavailable"},503);
  const count=await reserveWorkersAiRequest(env);
- if(count===null)return json({error:"Daily free AI safety budget reached or unavailable; try tomorrow"},429);
+ if(count===null)return json({error:"Daily HQ AI safety budget reached or unavailable; try tomorrow"},429);
  const messages=[{role:"system",content:system.slice(0,500)},
    {role:"user",content:JSON.stringify(evidence).slice(0,2300)}];
  try{
