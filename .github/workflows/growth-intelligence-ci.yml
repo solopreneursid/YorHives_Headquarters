@@ -7,6 +7,9 @@ on:
       - 'src/growth-business-research.mjs'
       - 'src/growth-integration-intelligence.mjs'
       - 'src/growth-outcome-intelligence.mjs'
+      - 'src/growth-ranking-review.mjs'
+      - 'scripts/verify-growth-recovery.py'
+      - 'scripts/verify-growth-public-sources.mjs'
       - 'portable/growth/**'
       - 'src/hq-worker.mjs'
       - 'src/revenue-intelligence.mjs'
@@ -40,6 +43,9 @@ jobs:
           node --check src/growth-business-research.mjs
           node --check src/growth-integration-intelligence.mjs
           node --check src/growth-outcome-intelligence.mjs
+          node --check src/growth-ranking-review.mjs
+          node --check portable/growth/evidence-exchange.mjs
+          node --check portable/growth/entitlement.mjs
           node --check portable/growth/local-runtime.mjs
           node --check portable/growth/cli.mjs
           node --check tests/growth-intelligence.test.mjs
@@ -47,5 +53,17 @@ jobs:
         run: node --test tests/growth-intelligence*.test.mjs
       - name: Validate migration idempotence and integrity
         run: python3 scripts/verify-growth-schema.py
+      - name: Exercise disposable SQLite backup, restore and rollback
+        run: python3 scripts/verify-growth-recovery.py
       - name: Verify candidate source lock, retained live inventory and six-tab contract
         run: node scripts/verify-current-hq.mjs
+  public-source-observations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Bounded live public source check (isolated CI, no production)
+        run: node scripts/verify-growth-public-sources.mjs
