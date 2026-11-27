@@ -26,7 +26,7 @@ boundary; **project IDs alone are not a tenant-security mechanism**.
 - Multi-project configuration validation and reproducible evidence scoring.
 - Strict allowlist of public source hosts and source classifications; rejected stale
   evidence, future timestamps, HTTP URLs, credential-bearing URLs and off-allowlist hosts.
-- Bounded deduplication, PII-redacted descriptions and no auto-discovered contact lists.
+- Bounded deduplication, email-redacted descriptions and no auto-discovered contact lists.
 - Research dossier with explicit evidence links, scores, review state and warnings.
 - Pure founder review state machine and unsent, recipient-free communication drafts.
 - Adapter from existing Revenue Intelligence and first-party Growth Evidence response shapes.
