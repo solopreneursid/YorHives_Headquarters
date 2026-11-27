@@ -176,7 +176,7 @@ function explainOpportunity(o){
   nextAction:o.nextAction||o.nextValidation||'Review the original source and independently validate the opportunity before any founder decision.'};
 }
 
-function normalizeMarket(rows,now){
+export function normalizeMarket(rows,now){
  const nowMs=Date.parse(now)||Date.now(),out=[],seen=new Set();
  for(const x of (Array.isArray(rows)?rows:[])){
   if(!x||!['revenue-trend','revenue-research','revenue-client','revenue-affiliate','revenue-partnership','revenue-sponsorship','revenue-government'].includes(x.kind))continue;

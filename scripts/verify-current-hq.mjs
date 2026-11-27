@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Source-of-truth checks for the CURRENT five-tab HQ, not historic HQpulse.
+// Source-of-truth checks for the six-tab HQ candidate, not historic HQpulse.
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
@@ -26,7 +26,11 @@ export function verify(){
  assert.equal(info.productionWorker,'yorphives-hq-free-pilot');
  assert.equal(info.releaseMethod.includes('workflow_dispatch'),true);
  const expected=Object.entries(info.moduleGitBlobs);
- assert.equal(expected.length,8,'Eight reviewed Worker modules required, including a bounded Revenue research collector');
+ assert.equal(expected.length,18,'Eighteen candidate Worker modules required');
+ assert.equal(Object.keys(info.liveModuleGitBlobs).length,8,'Retain previous live module inventory');
+ assert.equal(info.liveModuleGitBlobs['hq-worker.mjs'],'f100a8893088303e391bb6a2fbcc48e4dc89a58f','Previous live Worker must remain pinned');
+ assert.equal(info.releaseVerification.candidateVerifiedInProduction,false);
+ assert.equal(info.releaseVerification.manualFounderApproved,false);
  const imported=[];
  for(const [name,sha] of expected){
   const src=load('src/'+name);
@@ -46,7 +50,7 @@ export function verify(){
  const css=asset(hq,'/hq-simple.css');
  assert.match(html,/<meta name="robots" content="noindex">/);
  const nav=[...html.matchAll(/data-tab="([^"]+)"/g)].map(x=>x[1]);
- assert.deepEqual(nav,info.navigation,'UI must have Home, Health, Products, Revenue and HQconnect');
+ assert.deepEqual(nav,info.navigation,'UI must have Home, Health, Products, Revenue, Growth Intelligence and HQconnect');
  assert.ok(!html.includes('data-tab="discover"')&&!html.includes('data-tab="control"'));
  new Function(js); // syntax only; does not execute the browser application
  assert.match(js,/Verify signed-in session/);
@@ -61,10 +65,17 @@ export function verify(){
  assert.match(js,/credentials:'same-origin'/);
  assert.match(css,/max-width:600px|@media/,'Mobile CSS breakpoint must exist');
  for(const endpoint of ['/api/report','/api/health-self-check','/api/dependency-audit',
-  '/api/tool-coverage','/api/hq-perimeter','/api/agent-demand','/api/revenue-intelligence']){
+  '/api/tool-coverage','/api/hq-perimeter','/api/agent-demand','/api/revenue-intelligence','/api/growth-intelligence']){
    assert.ok(hq.includes(endpoint),'Missing currently deployed endpoint '+endpoint);
  }
  assert.match(hq,/verifyAccess\(request,env,ctx\)/,'Auth guard must be enforced in the live source');
+ assert.match(hq,/from '\.\/growth-intelligence-adapter\.mjs'/);
+ assert.match(hq,/from '\.\/growth-ai\.mjs'/,'Serverless Workers AI module must be imported');
+ assert.match(hq,/\/api\/growth-intelligence\/ai-analysis/,'Founder-triggered AI route missing');
+ assert.match(js,/Run specialist analysis/,'Growth specialist analysis control missing');
+ assert.match(js,/loadGrowthIntelligence/);
+ assert.ok(hq.indexOf('if(route==="/api/growth-intelligence"')>hq.indexOf('if(!(await verifyAccess(request,env,ctx)))'),'Growth endpoint must follow the Access guard');
+ assert.ok(hq.includes('if(route==="/api/growth-intelligence"&&request.method==="GET")'),'Growth route must be GET-only');
  assert.match(hq,/async scheduled\(/,'Cloudflare scheduled collector entrypoint required');
  assert.ok(hq.includes('sourceManifest')||hq.includes('sourceManifest:'),'Lockfile-aware OSV audit missing');
  assert.deepEqual(info.expectedSchedules,['*/5 * * * *']);

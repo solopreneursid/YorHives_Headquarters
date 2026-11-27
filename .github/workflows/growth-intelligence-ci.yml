@@ -1,0 +1,79 @@
+name: Growth Intelligence candidate verification
+on:
+  pull_request:
+    paths:
+      - 'src/growth-intelligence*.mjs'
+      - 'src/growth-ai.mjs'
+      - 'src/growth-prospect-discovery.mjs'
+      - 'src/growth-business-research.mjs'
+      - 'src/growth-integration-intelligence.mjs'
+      - 'src/growth-outcome-intelligence.mjs'
+      - 'src/growth-ranking-review.mjs'
+      - 'scripts/verify-growth-recovery.py'
+      - 'scripts/verify-growth-public-sources.mjs'
+      - 'portable/growth/**'
+      - 'src/hq-worker.mjs'
+      - 'src/revenue-intelligence.mjs'
+      - 'hq-release.json'
+      - 'scripts/verify-current-hq.mjs'
+      - 'scripts/test-four-button-browser.mjs'
+      - 'tests/growth-intelligence*.test.mjs'
+      - 'migrations/growth/**'
+      - 'migrations/0015_hq_reporting_schema.sql'
+      - 'scripts/verify-growth-schema.py'
+      - 'scripts/verify-hq-staging-schema.py'
+      - '.github/workflows/growth-intelligence-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: growth-verification-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  growth-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check candidate JavaScript syntax
+        run: |
+          node --check src/hq-worker.mjs
+          node --check src/growth-intelligence.mjs
+          node --check src/growth-ai.mjs
+          node --check src/staging-entry.mjs
+          node --check src/growth-intelligence-adapter.mjs
+          node --check src/growth-intelligence-store.mjs
+          node --check src/growth-prospect-discovery.mjs
+          node --check src/growth-intelligence-review.mjs
+          node --check src/growth-business-research.mjs
+          node --check src/growth-integration-intelligence.mjs
+          node --check src/growth-outcome-intelligence.mjs
+          node --check src/growth-ranking-review.mjs
+          node --check portable/growth/evidence-exchange.mjs
+          node --check portable/growth/entitlement.mjs
+          node --check portable/growth/local-runtime.mjs
+          node --check portable/growth/cli.mjs
+          node --check tests/growth-intelligence.test.mjs
+      - name: Run deterministic qualification and governance tests
+        run: node --test tests/growth-intelligence*.test.mjs
+      - name: Validate migration idempotence and integrity
+        run: python3 scripts/verify-growth-schema.py
+      - name: Validate HQ reporting schema bootstrap and report query contract
+        run: python3 scripts/verify-hq-staging-schema.py
+      - name: Exercise disposable SQLite backup, restore and rollback
+        run: python3 scripts/verify-growth-recovery.py
+      - name: Verify candidate source lock, retained live inventory and six-tab contract
+        run: node scripts/verify-current-hq.mjs
+  public-source-observations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Bounded live public source check (isolated CI, no production)
+        run: node scripts/verify-growth-public-sources.mjs

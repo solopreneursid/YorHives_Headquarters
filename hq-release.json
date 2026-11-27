@@ -5,20 +5,31 @@
   "sourceWorkerVersion": "fdbef0dc-31ff-4428-854c-7852f27c9c65",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "f100a8893088303e391bb6a2fbcc48e4dc89a58f",
+    "hq-worker.mjs": "b2f9042823f91f9b7da7c1aab4bde02485409640",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
     "product-intelligence.mjs": "1afd4abb92978bda8abc97287bbbf760534e9e72",
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
-    "revenue-intelligence.mjs": "2644dae372695729d43b6f4945f93e156036e223",
-    "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
+    "revenue-intelligence.mjs": "ef4464f71119cf9df14c6b5b3c85daaf56b0af07",
+    "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba",
+    "growth-intelligence.mjs": "2d03590c91c08676542e95f4f4be235b87af3bba",
+    "growth-intelligence-adapter.mjs": "5c61dc6dc30e8d531fab4e6827ea034b7b0f5620",
+    "growth-prospect-discovery.mjs": "3ecb70903e394810acd57b4df3a386b499dab549",
+    "growth-intelligence-review.mjs": "6fa9970bda8ab8355fc8454e1105fbc4d302c3ea",
+    "growth-intelligence-store.mjs": "dd72384348c4fc765ff37b0b4c4af5b70d869556",
+    "growth-business-research.mjs": "37f2eea00f0d697d0fb4226397e3b57c71e101fc",
+    "growth-integration-intelligence.mjs": "94abaa1ff7fe8215d980939ab6171722a3eb006a",
+    "growth-outcome-intelligence.mjs": "1b27d36a1e0d966e83750a3bf6ae170141f01a5e",
+    "growth-ranking-review.mjs": "f8676f796d842956d8f1dbdbdc82734e032d3efc",
+    "growth-ai.mjs": "e151d1b74fefcc275ac342b4ef0ceeb6990ff20d"
   },
   "navigation": [
     "home",
     "health",
     "products",
     "revenue",
+    "growth",
     "hqconnect"
   ],
   "compatibilityDate": "2026-11-15",
@@ -99,22 +110,33 @@
     "Founder-manual inbox transition adds one internal read-only service binding; customer enquiries never enter AI research or public endpoints.",
     "Notification health records only generic scheduler and transport-check status; no enquiry content or counts are exposed. Email acceptance is not delivery verification.",
     "2026-11-22: HQconnect separate private fifth tab; only founder-confirmed DELETE of one message is permitted through authenticated same-origin HQ proxy to private service Worker; no authority to alter site, products or infrastructure.",
-    "Release 2026-11-22: founder-requested, connector-mediated controlled manual Cloudflare version deployments were used instead of the usual GitHub manual release workflow. Future upgrades should return to the workflow_dispatch approval gate."
+    "Release 2026-11-22: founder-requested, connector-mediated controlled manual Cloudflare version deployments were used instead of the usual GitHub manual release workflow. Future upgrades should return to the workflow_dispatch approval gate.",
+    "Growth candidate adds two runtime modules, a GET-only private research view and no additional scheduled collection, credentials or production database changes.",
+    "Growth organization scout uses four fixed daily public GitHub repository queries, subject to existing shared request budget. No contact harvesting or messaging.",
+    "Growth founder review is an internal audit-only POST with existing founder decisions flag, Access and same-origin guard. Requires explicit migration 0001/0002; no automated external execution.",
+    "Advanced growth candidate adds three runtime modules; 16 pinned candidate modules; retains prior live module inventory. Three additive migrations require explicit staging/release approval.",
+    "Readiness candidate adds at most four additional account metadata checks/day subject to existing quota; no changes to production Worker or D1. Shadow ranking is never applied automatically.",
+    "GitHub source-wide cooldown honors documented rate-limit hints and pauses ordinary 403 responses; no credentials, proxy bypass or retry loop. Billing scope unavailable; no staging cloud resources provisioned.",
+    "Staging feedback: Growth tab loads its independent authenticated API even when the general HQ report is unavailable. No synthetic general report or production DB connection.",
+    "Serverless Growth AI adds an append-only D1 analysis journal, idempotent daily request claims and a two-new-analysis UTC-day limit. Cloudflare Workers AI runs only after an authenticated founder action; outputs remain unverified advisory material. No personal always-on server, automatic outreach, repository writes or deployment.",
+    "Hosted staging review persisted exactly once despite false conflict response; acknowledge inserted audit row with RETURNING id instead of D1 meta.changes.",
+    "Staging-only rollout record: D1 migration 0004 applied with pre/post Time Travel bookmarks; Worker version 6 is active at 100% on the dedicated staging Worker; 19 uploaded modules were source-hash verified. Staging has no AI binding or AI feature flag and no schedule. Production Worker, D1 and schedules remain unchanged.",
+    "Staging integration correction: screenshots exposed missing core HQ report tables. Read-only production schema metadata was used to create migrations/0015_hq_reporting_schema.sql; only schema/index definitions were applied to staging. No production rows were copied. Post-migration bookmark and 25/25 report-query checks are recorded in docs/GROWTH_STAGING_RUNBOOK.md."
   ],
   "previousWorkerVersion": "935960d8-a6d4-41a5-a464-37a9f9c5655b",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
   "releaseVerification": {
     "githubWorkflowRun": null,
-    "acceptedAt": "2026-11-22T11:11:02.604409Z",
-    "outcome": "Founder-requested release completed through authenticated Cloudflare connector. HQ Worker 100% deployed at fdbef0dc-31ff-4428-854c-7852f27c9c65; private inbox service deployed first at a34b2139-e6c6-4c58-94cf-533ed4e6e8d7. Database record count preserved; no live deletion executed.",
-    "verifiedBy": "Cloudflare latest deployment versions 100%, Worker source Git blob match, binding inventory, cron, disabled private service subdomain, read-only D1 counts, mocked D1 service delete and mocked CSV. Browser-authenticated UI not verified.",
-    "modulesMatched": 8,
-    "bindingsMatched": 10,
-    "cron": "*/5 * * * *",
-    "manualFounderApproved": true,
+    "acceptedAt": null,
+    "outcome": "Growth Intelligence candidate only; no production deployment or founder release approval.",
+    "verifiedBy": null,
+    "modulesMatched": null,
+    "bindingsMatched": null,
+    "cron": null,
+    "manualFounderApproved": false,
     "productionBrowserSessionVerified": false,
     "sourceCollectorsVerified": false,
-    "candidateVerifiedInProduction": true
+    "candidateVerifiedInProduction": false
   },
   "privateSnapshotKey": "hq-authoritative-snapshot__2026-11-19__b2fa6a0a-b872-48f4-888f-e675e84fa0a5",
   "moduleTreeSha256": null,
@@ -128,5 +150,18 @@
     "revenue-intelligence.mjs": "2644dae372695729d43b6f4945f93e156036e223",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "Live 2026-11-22: recommendations CSV exports (all + products), private fifth HQconnect tab with founder-confirmed exact-message deletion; functional authenticated browser verification still pending. Existing owner access, ten HQ bindings, four inbox service bindings and cron preserved."
+  "candidateStatus": "Draft candidate: 18 locked runtime modules plus staging entrypoint; version 6 active on isolated staging. Growth schema and HQ reporting schema are present. Schema-only migration 0015 added 25 missing HQ tables and 36 indexes; 25/25 report SQL checks pass. AI binding and feature flag remain disabled pending authenticated browser/API and anonymous-denial verification. Production release remains unapproved.",
+  "previousReleaseVerification": {
+    "githubWorkflowRun": null,
+    "acceptedAt": "2026-11-22T11:11:02.604409Z",
+    "outcome": "Founder-requested release completed through authenticated Cloudflare connector. HQ Worker 100% deployed at fdbef0dc-31ff-4428-854c-7852f27c9c65; private inbox service deployed first at a34b2139-e6c6-4c58-94cf-533ed4e6e8d7. Database record count preserved; no live deletion executed.",
+    "verifiedBy": "Cloudflare latest deployment versions 100%, Worker source Git blob match, binding inventory, cron, disabled private service subdomain, read-only D1 counts, mocked D1 service delete and mocked CSV. Browser-authenticated UI not verified.",
+    "modulesMatched": 8,
+    "bindingsMatched": 10,
+    "cron": "*/5 * * * *",
+    "manualFounderApproved": true,
+    "productionBrowserSessionVerified": false,
+    "sourceCollectorsVerified": false,
+    "candidateVerifiedInProduction": true
+  }
 }

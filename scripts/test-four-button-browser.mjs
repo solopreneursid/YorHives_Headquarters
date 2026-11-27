@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Synthetic, local-only browser tests for CURRENT five-tab HQ.
+// Synthetic, local-only browser tests for six-tab HQ candidate.
 // All APIs are mocked. This test never logs in to production or writes to D1.
 import {createServer} from 'node:http';
 import {readFileSync} from 'node:fs';
@@ -16,6 +16,7 @@ const assets={'/':asset(source,'/index.html'),'/index.html':asset(source,'/index
 const contentTypes={'/':'text/html','/index.html':'text/html','/hq-simple.js':'text/javascript','/hq-simple.css':'text/css'};
 const now=new Date().toISOString();
 const mock={
+ '/api/growth-intelligence':{schemaVersion:1,module:'growth-intelligence',available:true,readOnly:true,autoOutreach:false,persistence:'not-connected',dossiers:[{project:{id:'yorphives',name:'YorpHives',audiences:['Visitors seeking private tools']},opportunities:[],analytics:{available:true,pageViews7d:42,completedActions7d:7}},{project:{id:'globalgov',name:'globalGOV',audiences:['Government jobseekers']},opportunities:[],analytics:{available:false}},{project:{id:'taxpulse',name:'TaxPulse',audiences:['Taxpayers']},opportunities:[{title:'Synthetic tax filing discussion',summary:'<img src=x onerror=alert(1)> Public tax filing evidence',sourceUrl:'https://news.ycombinator.com/item?id=123',observedAt:now,relevanceScore:65,nextAction:'Founder reviews original source.',communicationDraft:{subject:'Possible collaboration',body:'<script>synthetic text</script>',sent:false,published:false,recipient:null}}],analytics:{available:false}}],sourceStatuses:[{name:'Hacker News',status:'ok:1'}],caveat:'Existing research coverage is incomplete.'},
  '/api/hqconnect-inbox':{available:true,readOnly:true,records:[{id:'11111111-1111-4111-8111-111111111111',created_at:now,request_type:'Other',name:'Synthetic founder test',email:'synthetic@example.test',project:'Example',message:'<img src=x onerror=alert(1)>',timeline:'Flexible',budget:''}],next:null,notification:{health:{state:'current',checkedAt:now}}},
  '/api/report':{schemaVersion:'yorphives.hq-intelligence.v1',findings:[],securityWatch:[],changes:[],
    incidents:[],incidentEvents:[],opportunities:[{id:'trend-mock-home',title:'Private PDF Studio',kind:'trend-measured',recommendation:'Monetization: Paid exports.',description:'GitHub attention'}],comparisons:[]},
@@ -116,7 +117,7 @@ try{
   page.on('pageerror',e=>errors.push(e.stack||e.message));
   await page.goto(origin+'/#home',{waitUntil:'networkidle',timeout:30000});
   const nav=await page.locator('nav button').evaluateAll(items=>items.map(x=>x.dataset.tab));
-  assert.deepEqual(nav,['home','health','products','revenue','hqconnect']);
+  assert.deepEqual(nav,['home','health','products','revenue','growth','hqconnect']);
   assert.equal(await page.locator('main h1').textContent(),'Home');
   const homeCopy=await page.locator('main').innerText();
   assert.match(homeCopy,/Products[\s\S]*1 ideas/);
@@ -168,6 +169,20 @@ try{
   assert.equal(await external.getAttribute('href'),'https://trustmrr.com/newsletter');
   assert.equal(await external.getAttribute('rel'),'noopener noreferrer');
   assert.equal(await page.locator('main .revenue-row').count(),10,'Government tender, eight revenue opportunities and one external report');
+  await page.locator('nav button[data-tab="growth"]').click();
+  assert.equal(await page.locator('main h1').textContent(),'Growth Intelligence');
+  await page.getByText('Reported pageviews (7 days): 42').waitFor({timeout:10000});
+  await page.locator('#growth-project').selectOption('globalgov');
+  await page.getByText('Government jobseekers').waitFor();
+  await page.getByText('No matching public evidence observed.',{exact:false}).waitFor();
+  await page.locator('#growth-project').selectOption('taxpulse');
+  await page.getByText('Synthetic tax filing discussion').waitFor();
+  await page.getByText('Communication draft · unsent').click();
+  await page.getByText('<script>synthetic text</script>',{exact:true}).waitFor();
+  assert.equal(await page.locator('#growth-intelligence img,#growth-intelligence script').count(),0);
+  assert.equal(await page.getByRole('link',{name:'Original public evidence'}).getAttribute('rel'),'noopener noreferrer');
+  assert.equal(await page.getByRole('button',{name:/send|publish/i}).count(),0);
+  assert.equal(await page.getByRole('link',{name:/send|publish/i}).count(),0);
   await page.locator('nav button[data-tab="hqconnect"]').click();
   assert.equal(await page.locator('main h1').textContent(),'HQconnect');
   await page.getByText('Synthetic founder test').waitFor({timeout:10000});
@@ -179,6 +194,8 @@ try{
   await page.getByText('No enquiries received yet.').waitFor({timeout:10000});
   assert.equal(await page.getByText('Synthetic founder test').count(),0,'Deleted enquiry no longer appears');
   await page.goBack({waitUntil:'networkidle'});
+  assert.equal(await page.locator('main h1').textContent(),'Growth Intelligence');
+  await page.goBack({waitUntil:'networkidle'});
   assert.equal(await page.locator('main h1').textContent(),'Revenue');
   await page.goBack({waitUntil:'networkidle'});
   assert.equal(await page.locator('main h1').textContent(),'Products','Browser Back must restore Products');
@@ -186,6 +203,19 @@ try{
   assert.ok(overflow<=5,'Unexpected horizontal overflow '+overflow+' at width '+width);
   assert.deepEqual(errors,[],'Browser JS exceptions at '+width);
   console.log('PASS four-button HQ '+width+'px: navigation, signed-in simulated API, back, no overflow/errors');
+  // Growth has its own endpoint and must survive a missing general report.
+  await page.route('**/api/report',route=>route.fulfill({status:503,contentType:'application/json',body:'{"error":"isolated report unavailable"}'}));
+  await page.goto(origin+'/#growth',{waitUntil:'networkidle'});
+  await page.reload({waitUntil:'networkidle'});
+  await page.locator('#growth-project').selectOption('taxpulse');
+  await page.getByText('Synthetic tax filing discussion').waitFor({timeout:10000});
+  assert.equal(await page.getByText('HQ report is not accessible.').count(),0);
+  await page.locator('nav button[data-tab="home"]').click();
+  await page.getByText('HQ report is not accessible.').waitFor();
+  await page.locator('nav button[data-tab="growth"]').click();
+  await page.locator('#growth-project').selectOption('taxpulse');
+  await page.getByText('Synthetic tax filing discussion').waitFor({timeout:10000});
+  assert.deepEqual(errors,[],'Report failure must not break Growth');
   await context.close();
  }
  assert.ok(requests.length>=12,'No substantive HTTP requests captured');
