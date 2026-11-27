@@ -20,7 +20,7 @@ const fetchFn=async(url,options)=>{
 };
 try{
  for(const hour of [2,8,14,20]){
-  await runProspectDiscovery({DB},base+hour*3600000+35*60000,{reserveFetch,fetchFn,crossCheck:true});
+  await runProspectDiscovery({DB},base+86400000+hour*3600000+35*60000,{reserveFetch,fetchFn,crossCheck:true});
   for(const day of [base,base+86400000])await runBusinessResearch({DB},day+hour*3600000+45*60000,{reserveFetch,fetchFn});
  }
  // Synthetic schedule instants only, never claimed as actual observation times.
