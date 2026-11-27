@@ -5,7 +5,7 @@
   "sourceWorkerVersion": "fdbef0dc-31ff-4428-854c-7852f27c9c65",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "658c9746d23d5c5103a33267a1f14d06a84c561f",
+    "hq-worker.mjs": "b2f9042823f91f9b7da7c1aab4bde02485409640",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
@@ -22,7 +22,7 @@
     "growth-integration-intelligence.mjs": "94abaa1ff7fe8215d980939ab6171722a3eb006a",
     "growth-outcome-intelligence.mjs": "1b27d36a1e0d966e83750a3bf6ae170141f01a5e",
     "growth-ranking-review.mjs": "f8676f796d842956d8f1dbdbdc82734e032d3efc",
-    "growth-ai.mjs": "f04c752993820316919499bac513da7c995d5fc1"
+    "growth-ai.mjs": "4e5e0be56051f124cd9260f6f9a8b1e34e2bb392"
   },
   "navigation": [
     "home",
