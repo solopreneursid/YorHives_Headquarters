@@ -92,3 +92,20 @@ Target: `yorphives-hq-growth-staging-db` (`0f7a97e7-7b22-4076-a116-e34595833cc5`
 - Production HQ was not modified. Read-only post-deploy check showed its active version `fdbef0dc-31ff-4428-854c-7852f27c9c65`, deployment `19f886c6-485c-42d1-b7d1-20d22b6b24e9`, existing AI binding and `*/5 * * * *` schedule unchanged.
 - Remaining manual gate: founder must open the preview URL in a browser, verify Access login and dashboard load, then verify that an unauthenticated/private session is denied. Do not enable AI until that check passes.
 
+
+
+## HQ reporting schema bootstrap (2026-11-27)
+
+The founder's authenticated staging-browser screenshots showed that Growth Intelligence loaded while Home, Health, Products, Revenue and HQconnect displayed the generic HQ-report-unavailable state. Diagnosis: the dedicated staging D1 database had the Growth schema but lacked the pre-existing HQ reporting tables queried by `/api/report`.
+
+- Read-only comparison of production and staging `sqlite_master` metadata identified 25 missing HQ tables and 36 missing indexes. Production row data was not queried or copied.
+- Added `migrations/0015_hq_reporting_schema.sql` to the candidate repository and applied it only to `yorphives-hq-growth-staging-db`.
+- Post-migration Time Travel bookmark: `0000000b-00000004-00005130-c480cbc0f5374163ea7b260a5f59a367`.
+- Staging now has 40 tables, 44 indexes and 9 Growth append-only/guard triggers. Every production HQ table/index object is present in staging; Growth-specific objects remain additional.
+- Executed 25 read-only SQL checks matching the report's table reads and joins: 25 passed, 0 failed.
+- Preserved staging row counts: `opportunities` 1, `growth_opportunities` 1, `status` 1, `quota` 0, `growth_ai_analyses` 0 and `growth_ai_claims` 0. No production records or founder evidence were imported; no inference was run.
+- Three pre-existing table-definition differences remain documented: staging `opportunities` has the same columns but looser nullability than production (its existing row has no null required values); staging `quota` enforces nonnegative usage more strictly; `status` differs only in SQL formatting.
+- Staging Worker remains version 6 and production Worker/deployment/schedule remain unchanged.
+- Staging intentionally has no production service bindings for HQconnect inbox, edge watchdog or perimeter monitor. Those optional panels must report their own unavailable/unverified status; staging must not read production inbox or monitoring services.
+
+Next verification: reload the authenticated staging dashboard and confirm the core report-backed sections now render. Then test anonymous denial separately. Do not enable Workers AI until the browser and API checks pass.
