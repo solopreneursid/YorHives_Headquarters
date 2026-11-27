@@ -32,6 +32,7 @@ jobs:
           node --check src/growth-intelligence-adapter.mjs
           node --check src/growth-intelligence-store.mjs
           node --check src/growth-prospect-discovery.mjs
+          node --check src/growth-intelligence-review.mjs
           node --check tests/growth-intelligence.test.mjs
       - name: Run deterministic qualification and governance tests
         run: node --test tests/growth-intelligence*.test.mjs
