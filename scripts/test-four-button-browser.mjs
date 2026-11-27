@@ -203,6 +203,18 @@ try{
   assert.ok(overflow<=5,'Unexpected horizontal overflow '+overflow+' at width '+width);
   assert.deepEqual(errors,[],'Browser JS exceptions at '+width);
   console.log('PASS four-button HQ '+width+'px: navigation, signed-in simulated API, back, no overflow/errors');
+  // Growth has its own endpoint and must survive a missing general report.
+  await page.route('**/api/report',route=>route.fulfill({status:503,contentType:'application/json',body:'{"error":"isolated report unavailable"}'}));
+  await page.goto(origin+'/#growth',{waitUntil:'networkidle'});
+  await page.locator('#growth-project').selectOption('taxpulse');
+  await page.getByText('Synthetic tax filing discussion').waitFor({timeout:10000});
+  assert.equal(await page.getByText('HQ report is not accessible.').count(),0);
+  await page.locator('nav button[data-tab="home"]').click();
+  await page.getByText('HQ report is not accessible.').waitFor();
+  await page.locator('nav button[data-tab="growth"]').click();
+  await page.locator('#growth-project').selectOption('taxpulse');
+  await page.getByText('Synthetic tax filing discussion').waitFor({timeout:10000});
+  assert.deepEqual(errors,[],'Report failure must not break Growth');
   await context.close();
  }
  assert.ok(requests.length>=12,'No substantive HTTP requests captured');
