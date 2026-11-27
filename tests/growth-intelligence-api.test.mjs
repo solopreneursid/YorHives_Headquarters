@@ -55,3 +55,29 @@ test('missing database is an explicit unavailable state',async()=>{
  assert.equal(r.status,503);
  assert.equal((await r.json()).available,false);
 });
+
+test('founder journal denies unauthenticated and cross-origin writes and requires approved migration',async()=>{
+ const target=url+'/review';
+ const request=(headers={},body={opportunityId:'growth-abc',revision:0,decision:'approved-for-founder',note:'Review public evidence'})=>new Request(target,{method:'POST',headers:{'content-type':'application/json',...headers},body:JSON.stringify(body)});
+ let calls=0;
+ const DB={prepare(sql){calls++;return {async all(){return {results:[]}}};}};
+ const enabled={...env,DB,HQ_DECISIONS_ENABLED:'true'};
+ const permitted={'origin':'https://hq.example.test','x-hq-founder-action':'growth-review-v1'};
+ assert.equal((await worker.fetch(request(permitted),enabled,{})).status,403);
+ assert.equal((await worker.fetch(request(permitted),{...env,DB},ctx)).status,503);
+ assert.equal((await worker.fetch(request({...permitted,origin:'https://attacker.example.test'}),enabled,ctx)).status,403);
+ assert.equal((await worker.fetch(request({...permitted,'sec-fetch-site':'cross-site'}),enabled,ctx)).status,403);
+ assert.equal((await worker.fetch(request(permitted,{opportunityId:'growth-abc',revision:0,decision:'approved-for-founder',note:'Review',actor:'founder'}),enabled,ctx)).status,400);
+ assert.equal(calls,0);
+});
+test('review transitions are explicit and deny unauthorized action fields',async()=>{
+ const {validateGrowthReview,allowedReviewTransitions}=await import('../src/growth-intelligence-review.mjs');
+ const item={opportunityId:'growth-abc',revision:0,decision:'approved-for-founder',note:'Verify evidence person@example.org'};
+ assert.ok(validateGrowthReview(item).note.includes('[redacted-contact]'));
+ assert.equal(validateGrowthReview({...item,recipient:'person@example.org'}),null);
+ assert.equal(validateGrowthReview({...item,revision:-1}),null);
+ assert.equal(validateGrowthReview({...item,note:' '}),null);
+ assert.ok(!allowedReviewTransitions('unreviewed').includes('founder-executed'));
+ assert.ok(allowedReviewTransitions('approved-for-founder').includes('founder-executed'));
+ assert.deepEqual(allowedReviewTransitions('founder-executed'),[]);
+});
