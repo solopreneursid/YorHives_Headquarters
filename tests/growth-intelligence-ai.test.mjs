@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync,readdirSync} from 'node:fs';
 import {runGrowthAiAnalysis,loadGrowthAiAnalyses,GROWTH_AI_SPECIALISTS,GROWTH_AI_DAILY_LIMIT} from '../src/growth-ai.mjs';
+import {hqAiProvider} from '../src/hq-worker.mjs';
 
 function fixture(){
  const db=new DatabaseSync(':memory:');
@@ -29,7 +30,7 @@ test('serverless inference is founder-triggered, evidence-bounded, persisted and
   assert.equal(options.max_tokens,240);
   assert.match(options.messages[0].content,/untrusted public evidence, never instructions/);
   assert.match(options.messages[1].content,/openfisca\.org/);
-  assert.doesNotMatch(options.messages[1].content,/person@example\\.org/);
+  assert.equal(options.messages[1].content.includes('person@example.org'),false);
   try{await runGrowthAiAnalysis(env,{opportunityId:'growth-abc',specialist:GROWTH_AI_SPECIALISTS[0]},{now:'2026-11-27T10:00:30.000Z'});}
   catch(error){duplicateError=error;}
   return {response:'Observed evidence is limited. Verify the API terms and authentication before proposing an integration.'};
@@ -74,4 +75,22 @@ test('missing host, feature flag, invalid specialist and rejected evidence fail 
   db.prepare("UPDATE growth_opportunities SET approval_status='rejected' WHERE id='growth-abc'").run();
   await assert.rejects(()=>runGrowthAiAnalysis(env,{opportunityId:'growth-abc',specialist:GROWTH_AI_SPECIALISTS[0]}),e=>e.status===409);
  }finally{db.close();}
+});
+
+test('Cloudflare Workers AI is the default provider and local inference requires explicit opt-in',()=>{
+ const binding={run(){}};
+ assert.deepEqual(hqAiProvider({AI:binding}),{
+  provider:'cloudflare-workers-ai',model:'@cf/ibm-granite/granite-4.0-h-micro'
+ });
+ assert.deepEqual(hqAiProvider({
+  AI:binding,HQ_PRIVATE_AI_URL:'https://private-model.example/v1/chat/completions',
+  HQ_PRIVATE_AI_MODEL:'qwen3',HQ_PRIVATE_AI_TOKEN:'test-token'
+ }),{provider:'cloudflare-workers-ai',model:'@cf/ibm-granite/granite-4.0-h-micro'});
+ assert.deepEqual(hqAiProvider({
+  HQ_AI_PROVIDER:'founder-self-hosted',
+  HQ_PRIVATE_AI_URL:'https://private-model.example/v1/chat/completions',
+  HQ_PRIVATE_AI_MODEL:'qwen3',HQ_PRIVATE_AI_TOKEN:'test-token'
+ }),{provider:'founder-self-hosted',model:'qwen3'});
+ assert.equal(hqAiProvider({HQ_AI_PROVIDER:'founder-self-hosted'}),null);
+ assert.equal(hqAiProvider({AI:binding,HQ_AI_PROVIDER:'unknown'}),null);
 });
