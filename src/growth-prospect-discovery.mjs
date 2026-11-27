@@ -64,7 +64,7 @@ async function save(db,id,data){
  await db.prepare('INSERT INTO status(key,value,checked_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,checked_at=excluded.checked_at')
   .bind(key(id),value,data.checkedAt).run();
 }
-export async function runProspectDiscovery(env,time,{reserveFetch,fetchFn=fetch}={}){
+export async function runProspectDiscovery(env,time,{reserveFetch,fetchFn=fetch,crossCheck=false}={}){
  const spec=discoveryWindow(time);
  if(!spec)return 'outside-window';
  if(!env?.DB||typeof reserveFetch!=='function')throw Error('missing-evidence-storage');
@@ -85,6 +85,21 @@ export async function runProspectDiscovery(env,time,{reserveFetch,fetchFn=fetch}
    const raw=await boundedJson(r);
    if(raw.incomplete_results===true)throw Error('incomplete-public-search');
    const records=normalizeOrganizationRepositories(raw,spec.id,at);
+   if(crossCheck&&records.length){
+    const candidate=records[0];
+    candidate.organizationCrossCheck='unavailable';
+    try{
+     if(await reserveFetch(env)){
+      const orgUrl='https://api.github.com/orgs/'+encodeURIComponent(candidate.organization);
+      const org=await boundedJson(await fetchFn(orgUrl,{method:'GET',redirect:'error',cache:'no-store',
+       headers:{accept:'application/vnd.github+json','user-agent':'YorpHivesHQ-ReadOnly'},signal:AbortSignal.timeout(4500)}));
+      const valid=typeof org.login==='string'&&org.login.toLowerCase()===candidate.organization.toLowerCase()&&org.type==='Organization'&&org.html_url==='https://github.com/'+org.login;
+      candidate.organizationCrossCheck=valid?'github-account-confirmed':'identity-mismatch';
+      candidate.organizationAccountCrossChecked=valid;
+      if(valid)candidate.organizationEvidenceUrl=org.html_url;
+     }
+    }catch{}
+   }
    data={...data,state:records.length?'observed':'checked-no-match',records};
   }finally{clearTimeout(timer);}
  }catch{data={...data,state:'unavailable',records:[]};}
