@@ -19,7 +19,9 @@ on:
       - 'scripts/test-four-button-browser.mjs'
       - 'tests/growth-intelligence*.test.mjs'
       - 'migrations/growth/**'
+      - 'migrations/0015_hq_reporting_schema.sql'
       - 'scripts/verify-growth-schema.py'
+      - 'scripts/verify-hq-staging-schema.py'
       - '.github/workflows/growth-intelligence-ci.yml'
   workflow_dispatch:
 permissions:
@@ -59,6 +61,8 @@ jobs:
         run: node --test tests/growth-intelligence*.test.mjs
       - name: Validate migration idempotence and integrity
         run: python3 scripts/verify-growth-schema.py
+      - name: Validate HQ reporting schema bootstrap and report query contract
+        run: python3 scripts/verify-hq-staging-schema.py
       - name: Exercise disposable SQLite backup, restore and rollback
         run: python3 scripts/verify-growth-recovery.py
       - name: Verify candidate source lock, retained live inventory and six-tab contract
