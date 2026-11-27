@@ -25,9 +25,9 @@ export function validateGrowthReview(value){
 }
 export async function growthReviewReady(db){
  try{
-  const r=await db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name IN ('growth_review_guard','growth_review_projection','growth_review_no_update')").all();
+  const r=await db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name IN ('growth_review_guard','growth_review_projection','growth_review_no_update','growth_review_no_delete')").all();
   const names=new Set((r.results||[]).map(x=>x.name));
-  return ['growth_review_guard','growth_review_projection','growth_review_no_update'].every(n=>names.has(n));
+  return ['growth_review_guard','growth_review_projection','growth_review_no_update','growth_review_no_delete'].every(n=>names.has(n));
  }catch{return false;}
 }
 export async function loadGrowthReviewStates(db,opportunities){
