@@ -64,7 +64,10 @@ export async function persistGrowthEvidence(db,dossiers,{observedAt=new Date().t
     'INSERT INTO growth_opportunities(id,project_id,source_id,title,summary,relevance_score,'+
     'audience_hypothesis,discovered_at) VALUES (?,?,?,?,?,?,?,?) '+
     'ON CONFLICT(id) DO UPDATE SET title=excluded.title,summary=excluded.summary,'+
-    'relevance_score=excluded.relevance_score,updated_at=excluded.updated_at'
+    'relevance_score=excluded.relevance_score,source_id=excluded.source_id,updated_at=excluded.updated_at '+
+    'WHERE growth_opportunities.project_id=excluded.project_id AND growth_opportunities.title=excluded.title '+
+    'AND (SELECT source_url FROM growth_sources WHERE id=growth_opportunities.source_id)='+
+    '(SELECT source_url FROM growth_sources WHERE id=excluded.source_id)'
    ).bind(card.id,p.id,sourceId,card.title,card.summary,card.relevanceScore,
     card.audienceHypothesis,card.observedAt));
   }
