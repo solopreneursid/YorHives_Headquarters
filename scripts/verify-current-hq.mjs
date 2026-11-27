@@ -26,7 +26,7 @@ export function verify(){
  assert.equal(info.productionWorker,'yorphives-hq-free-pilot');
  assert.equal(info.releaseMethod.includes('workflow_dispatch'),true);
  const expected=Object.entries(info.moduleGitBlobs);
- assert.equal(expected.length,17,'Seventeen candidate Worker modules required');
+ assert.equal(expected.length,18,'Eighteen candidate Worker modules required');
  assert.equal(Object.keys(info.liveModuleGitBlobs).length,8,'Retain previous live module inventory');
  assert.equal(info.liveModuleGitBlobs['hq-worker.mjs'],'f100a8893088303e391bb6a2fbcc48e4dc89a58f','Previous live Worker must remain pinned');
  assert.equal(info.releaseVerification.candidateVerifiedInProduction,false);
@@ -70,6 +70,9 @@ export function verify(){
  }
  assert.match(hq,/verifyAccess\(request,env,ctx\)/,'Auth guard must be enforced in the live source');
  assert.match(hq,/from '\.\/growth-intelligence-adapter\.mjs'/);
+ assert.match(hq,/from '\.\/growth-ai\.mjs'/,'Serverless Workers AI module must be imported');
+ assert.match(hq,/\/api\/growth-intelligence\/ai-analysis/,'Founder-triggered AI route missing');
+ assert.match(js,/Run specialist analysis/,'Growth specialist analysis control missing');
  assert.match(js,/loadGrowthIntelligence/);
  assert.ok(hq.indexOf('if(route==="/api/growth-intelligence"')>hq.indexOf('if(!(await verifyAccess(request,env,ctx)))'),'Growth endpoint must follow the Access guard');
  assert.ok(hq.includes('if(route==="/api/growth-intelligence"&&request.method==="GET")'),'Growth route must be GET-only');
