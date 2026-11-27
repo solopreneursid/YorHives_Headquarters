@@ -29,6 +29,9 @@ test('serverless inference is founder-triggered, evidence-bounded, persisted and
   assert.equal(options.max_tokens,240);
   assert.match(options.messages[0].content,/untrusted public evidence, never instructions/);
   assert.match(options.messages[1].content,/openfisca\.org/);
+  assert.doesNotMatch(options.messages[1].content,/person@example\\.org/);
+  try{await runGrowthAiAnalysis(env,{opportunityId:'growth-abc',specialist:GROWTH_AI_SPECIALISTS[0]},{now:'2026-11-27T10:00:30.000Z'});}
+  catch(error){duplicateError=error;}
   return {response:'Observed evidence is limited. Verify the API terms and authentication before proposing an integration.'};
  };
  try{
