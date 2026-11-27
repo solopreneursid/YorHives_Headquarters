@@ -26,7 +26,7 @@ test('founder receives evidence-only dossiers through actual route with read-onl
   return new Response('not connected',{status:503});
  };
  try{
-  const DB={prepare(sql){queries.push(sql);return {async all(){
+  const DB={prepare(sql){queries.push(sql);return {bind(){return this;},async all(){
    if(sql.includes("kind IN ('revenue-research'"))return {results:[tax]};
    if(sql.includes("FROM status"))return {results:[{key:'revenue_research_hn_pricing',value:'ok:1',checked_at:now}]};
    return {results:[]};
@@ -45,7 +45,7 @@ test('founder receives evidence-only dossiers through actual route with read-onl
   assert.equal(card.communicationDraft.recipient,null);
   assert.equal(card.verifiedRevenue,null);
   assert.equal(data.dossiers.find(d=>d.project.id==='yorphives').analytics.available,false);
-  assert.equal(queries.length,4);
+  assert.equal(queries.length,5);
   assert.ok(queries.every(q=>q.startsWith('SELECT ')));
   assert.deepEqual(requests,[{url:'https://yorphives.com/api/insights/growth',method:'GET'}]);
  }finally{globalThis.fetch=oldFetch}
