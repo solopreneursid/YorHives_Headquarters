@@ -26,7 +26,7 @@ export function verify(){
  assert.equal(info.productionWorker,'yorphives-hq-free-pilot');
  assert.equal(info.releaseMethod.includes('workflow_dispatch'),true);
  const expected=Object.entries(info.moduleGitBlobs);
- assert.equal(expected.length,13,'Thirteen candidate Worker modules required');
+ assert.equal(expected.length,16,'Sixteen candidate Worker modules required');
  assert.equal(Object.keys(info.liveModuleGitBlobs).length,8,'Retain previous live module inventory');
  assert.equal(info.liveModuleGitBlobs['hq-worker.mjs'],'f100a8893088303e391bb6a2fbcc48e4dc89a58f','Previous live Worker must remain pinned');
  assert.equal(info.releaseVerification.candidateVerifiedInProduction,false);
