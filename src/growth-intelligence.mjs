@@ -6,7 +6,7 @@
 export const PROJECTS=Object.freeze([
   {id:'yorphives',name:'YorpHives',stage:'active',
    audience:['Visitors seeking private browser tools','Independent makers'],
-   keywords:['pdf','image','file','document','browser tool','privacy','converter','free tool','calculator']},
+   keywords:['pdf','image','file','document','browser tool','privacy','converter','free tool']},
   {id:'globalgov',name:'globalGOV',stage:'research',
    audience:['Public-sector jobseekers','Students researching government careers'],
    keywords:['government job','public sector','jobseeker','recruitment','vacancy','civil service','career','exam','job']},
