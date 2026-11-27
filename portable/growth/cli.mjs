@@ -2,7 +2,8 @@
 import {readFileSync,lstatSync,writeFileSync} from 'node:fs';
 import {openCustomerWorkspace,readBoundedDossier,runSpecialists} from './local-runtime.mjs';
 import {signDossier,verifyDossier,keyFingerprint} from './evidence-exchange.mjs';
-import {verifyEntitlement} from './entitlement.mjs';
+import {verifyEntitlement,issueEntitlement} from './entitlement.mjs';
+import {checkCapturedContract,readContractFixture} from './contract-fixture.mjs';
 const [action,tenant,file,output]=process.argv.slice(2);
 const root=process.env.GROWTH_PRIVATE_ROOT,model=process.env.GROWTH_LOCAL_MODEL;
 function keyFile(path,secret=false){
@@ -13,7 +14,15 @@ function keyFile(path,secret=false){
 }
 let workspace;
 try{
- if(action==='fingerprint'){console.log(keyFingerprint(keyFile(process.env.GROWTH_SIGN_PUBLIC_KEY)));}
+ if(action==='check-contract'){
+  if(!tenant||!file)throw Error('Usage: check-contract contract.json captured-response.json');
+  const result=checkCapturedContract(readContractFixture(tenant),readContractFixture(file));console.log(JSON.stringify(result,null,2));if(!result.passed)process.exitCode=1;
+ }else if(action==='issue-license'){
+  if(!tenant||!file)throw Error('Usage: issue-license entitlement-record.json signed-license.json');
+  const record=issueEntitlement(readBoundedDossier(tenant),keyFile(process.env.GROWTH_LICENSE_PRIVATE_KEY,true));
+  writeFileSync(file,JSON.stringify(record,null,2),{mode:0o600,flag:'wx'});
+  console.log(JSON.stringify({issued:true,customerId:record.customerId,plan:record.plan,expiresAt:record.expiresAt,paidSubscriptionVerified:false}));
+ }else if(action==='fingerprint'){console.log(keyFingerprint(keyFile(process.env.GROWTH_SIGN_PUBLIC_KEY)));}
  else if(action==='sign'){
   if(!tenant||!file||!output)throw Error('Usage: sign tenant-id dossier.json signed.json');
   const signed=signDossier(readBoundedDossier(file),{tenant,privateKey:keyFile(process.env.GROWTH_SIGN_PRIVATE_KEY,true)});
