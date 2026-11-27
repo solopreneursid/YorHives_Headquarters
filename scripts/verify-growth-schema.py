@@ -6,11 +6,14 @@ import sqlite3
 ROOT = Path(__file__).resolve().parent.parent
 SQL = (ROOT / "migrations/growth/0001_growth_intelligence.sql").read_text()
 REVIEW_SQL = (ROOT / "migrations/growth/0002_founder_review_journal.sql").read_text()
+OUTCOME_SQL = (ROOT / "migrations/growth/0003_founder_outcomes.sql").read_text()
 with sqlite3.connect(":memory:") as db:
     db.executescript(SQL)
     db.executescript(SQL)  # idempotent
     db.executescript(REVIEW_SQL)
     db.executescript(REVIEW_SQL)
+    db.executescript(OUTCOME_SQL)
+    db.executescript(OUTCOME_SQL)
     names = {
         row[0] for row in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table'"
@@ -19,7 +22,7 @@ with sqlite3.connect(":memory:") as db:
     required = {
         "growth_projects", "growth_audiences", "growth_sources",
         "growth_opportunities", "growth_reviews", "growth_drafts",
-        "growth_outcomes",
+        "growth_outcomes", "growth_intent_events",
     }
     assert required <= names, required - names
     assert db.execute("PRAGMA foreign_keys").fetchone() == (1,)
@@ -97,4 +100,13 @@ with sqlite3.connect(":memory:") as db:
         except sqlite3.IntegrityError:
             pass
     assert db.execute("SELECT approval_status FROM growth_opportunities WHERE id='g1'").fetchone() == ("founder-executed",)
+    db.execute("INSERT INTO growth_intent_events(opportunity_id,event_key,outcome,occurred_at,recorded_at) VALUES (?,?,?,?,?)",
+               ("g1","11111111-1111-4111-8111-111111111111","requested-demo","2026-11-27T07:00:00Z","2026-11-27T07:00:00Z"))
+    assert db.execute("SELECT source_type FROM growth_intent_events").fetchone() == ("founder-attested",)
+    for q in ["UPDATE growth_intent_events SET outcome='declined'", "DELETE FROM growth_intent_events"]:
+        try:
+            db.execute(q)
+            raise AssertionError("Intent journal modified")
+        except sqlite3.IntegrityError:
+            pass
 print("PASS growth schema: idempotent, relational integrity, revenue provenance, review revision and append-only projection")
