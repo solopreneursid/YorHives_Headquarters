@@ -6,13 +6,22 @@
 export const PROJECTS=Object.freeze([
   {id:'yorphives',name:'YorpHives',stage:'active',
    audience:['Visitors seeking private browser tools','Independent makers'],
-   keywords:['pdf','image','file','document','browser tool','privacy','converter','free tool']},
+   keywords:['pdf','image','file','document','browser tool','privacy','converter','free tool'],
+   productProfile:{offer:'Free browser-based utility workflows',value:'Help users complete routine file and document tasks with less friction.',
+    integration:'Evaluate resource-directory inclusion, documentation references or compatible utility workflows.',
+    partners:['Public software projects','Educational and resource directories','Relevant tool communities']}},
   {id:'globalgov',name:'globalGOV',stage:'research',
    audience:['Public-sector jobseekers','Students researching government careers'],
-   keywords:['government job','public sector','jobseeker','recruitment','vacancy','civil service','career','exam','job']},
+   keywords:['government job','public sector','jobseeker','recruitment','vacancy','civil service','career','exam','job'],
+   productProfile:{offer:'Government employment discovery and career information',value:'Help jobseekers locate relevant public-sector opportunities.',
+    integration:'Assess links from career resource pages, official-source references and educational guidance resources.',
+    partners:['Educational institutions','Career resource publishers','Public-sector job information communities']}},
   {id:'taxpulse',name:'TaxPulse',stage:'research',
    audience:['Taxpayers seeking reliable calculations','Accountants and finance professionals'],
-   keywords:['tax','income tax','taxpayer','statutory','filing','deduction','tax calculator','accountant']}
+   keywords:['tax','income tax','taxpayer','statutory','filing','deduction','tax calculator','accountant'],
+   productProfile:{offer:'Tax calculation and financial planning research',value:'Help taxpayers and finance professionals investigate calculation workflows.',
+    integration:'Assess educational resource references, calculation verification and documented integration requirements.',
+    partners:['Accounting educators','Finance resource publishers','Public financial software projects']}}
 ]);
 export const SOURCE_HOSTS=Object.freeze([
   'news.ycombinator.com','hn.algolia.com','github.com','dev.to',
@@ -64,10 +73,29 @@ export function configureProjects(projects=PROJECTS){
    throw new TypeError('Invalid or duplicate project configuration');
   if([...p.audience,...p.keywords].some(v=>typeof v!=='string'||v.length<2||v.length>100||
      !/^[\p{L}\p{N} .&/-]+$/u.test(v)))throw new TypeError('Unsafe project metadata');
+  const profile=p.productProfile;
+  if(profile!==undefined&&(!profile||typeof profile!=='object'||!['offer','value','integration'].every(k=>typeof profile[k]==='string'&&profile[k].trim().length>0&&profile[k].length<=240)||!Array.isArray(profile.partners)||profile.partners.length<1||profile.partners.length>12||profile.partners.some(x=>typeof x!=='string'||!x.trim()||x.length>100)))throw new TypeError('Invalid product profile');
   seen.add(p.id);
   return {id:p.id,name:clean(p.name,100),stage:clean(p.stage||'research',24),
-    audience:p.audience.map(x=>clean(x,100)),keywords:p.keywords.map(x=>x.toLowerCase())};
+    audience:p.audience.map(x=>clean(x,100)),keywords:p.keywords.map(x=>x.toLowerCase()),
+    productProfile:profile?{offer:clean(profile.offer,240),value:clean(profile.value,240),integration:clean(profile.integration,240),partners:profile.partners.map(x=>clean(x,100))}:null};
  });
+}
+export function assessBusinessFit(project,{sourceType,matchedKeywords=[]}={}){
+ const profile=project.productProfile;
+ const categories={'public-repository':'software-integration','community-partner-mention':'partnership',
+  'community-sponsorship-mention':'sponsorship','public-client-intent':'public-request',
+  'official-tender-listing':'procurement-research','public-discussion':'community-research',
+  'public-demand-signal':'audience-research','first-party-aggregate':'adoption-research'};
+ const kind=categories[sourceType]||'unclassified';
+ return {kind,productOffer:profile?.offer||null,valueHypothesis:profile?.value||null,
+  integrationHypothesis:profile?.integration||null,possiblePartnerTypes:profile?.partners||[],
+  supportingTopics:matchedKeywords.slice(0,8),
+  qualification:'topic-match-only',organizationVerified:false,commercialIntentVerified:false,
+  contactPermissionVerified:false,
+  nextValidation:kind==='procurement-research'?'Verify official notice, deadline, procurement eligibility and scope; no outreach or bid by HQ.':
+    'Verify the organization or community, its actual need, the product capability, and permitted communication or listing process.',
+  handoff:'founder-research-review',autoExecute:false};
 }
 export function qualifyOpportunity(project,signal,{now=new Date().toISOString()}={}){
  const current=clock(now);
@@ -89,6 +117,7 @@ export function qualifyOpportunity(project,signal,{now=new Date().toISOString()}
  return {id:'growth-'+stableId(p.id+'|'+link+'|'+title),projectId:p.id,
   title,summary,sourceUrl:link,sourceType:kind,observedAt:new Date(timestamp).toISOString(),
   relevanceScore:score,matchedKeywords:matches,
+  businessFit:assessBusinessFit(p,{sourceType:kind,matchedKeywords:matches}),
   audienceHypothesis:p.audience[0],confidence:'unverified-public-signal',
   demandVerified:false,contactPermissionVerified:false,attributedUsers:null,verifiedRevenue:null,
   approvalStatus:'unreviewed',nextAction:'Founder: inspect the source and verify fit, consent and timing before any contact.',
@@ -118,7 +147,7 @@ export function buildGrowthIntelligence({projects=PROJECTS,signals=[],now=new Da
     clock(m.observedAt)<=at&&at-clock(m.observedAt)<=36*3600000&&
     validMetric(m.pageViews7d)&&validMetric(m.completedActions7d);
   return {project:{id:project.id,name:project.name,stage:project.stage,
-    audiences:project.audience},opportunities:opportunities.slice(0,maxPerProject),
+    audiences:project.audience,productProfile:project.productProfile},opportunities:opportunities.slice(0,maxPerProject),
     qualifiedPublicSignals:opportunities.length,analytics:{
       available:Boolean(measured),source:measured?clean(m.source,250)||null:null,
       observedAt:measured?m.observedAt:null,
@@ -152,15 +181,18 @@ export function prepareCommunicationDraft(opportunity,{channel='partnership',pro
     !['partnership','community'].includes(channel)||!safeLink(opportunity.sourceUrl))
   throw new TypeError('Verified public evidence reference required');
  const name=clean(projectName,100)||clean(opportunity.projectId,100);
+ const topic=clean(opportunity.title,150);
+ const fit=opportunity.businessFit;
+ const proposed=clean(fit?.integrationHypothesis,240);
  const subject=channel==='partnership'?'Possible collaboration related to '+name:
   'A potentially useful resource from '+name;
  const body=channel==='partnership'?
   'Hello,\n\nI am researching whether '+name+
   ' could help with the topic discussed at the public source below. I would welcome a conversation only if it is relevant to your work.\n\nSource: '+
-  opportunity.sourceUrl+'\n\nPlease disregard if this is not appropriate.\n':
+  opportunity.sourceUrl+'\n\nTopic: '+topic+'\n'+(proposed?'Possible area to explore: '+proposed+'\n':'')+'\nPlease disregard if this is not appropriate.\n':
   'I found this discussion relevant to '+name+
   '. A resource may be useful here, subject to the community rules and moderator approval.\n\nSource: '+
-  opportunity.sourceUrl+'\n';
+  opportunity.sourceUrl+'\n\nTopic: '+topic+'\n'+(proposed?'Possible area to explore: '+proposed+'\n':'');
  return {schemaVersion:1,id:'draft-'+opportunity.id,projectId:opportunity.projectId,
   opportunityId:opportunity.id,channel,subject,body,recipient:null,
   status:'requires-founder-review',sent:false,published:false,autoExecute:false};
