@@ -12,8 +12,7 @@ growth-intelligence-store.mjs (optional internal D1 evidence persistence).
 Existing first-party aggregate Growth Evidence -> read-only metric adapter.
 Optional future D1 persistence -> migrations/growth/0001_growth_intelligence.sql.
 
-No independent application, email service, vendor data warehouse, paid API, new cron,
-model credentials, sales CRM or mutable web/repository permissions are required.
+No independent application, email service, vendor data warehouse, paid API, additional Cron, model API credentials, sales CRM or mutable web/repository permissions are required. Managed Workers AI is optional and founder-triggered; deterministic evidence and scoring remain authoritative.
 
 PROJECTS config initially contains yorphives, globalgov and taxpulse. New
 projects supply the same typed configuration (id, name, audiences, keywords), not a
@@ -31,10 +30,12 @@ boundary; **project IDs alone are not a tenant-security mechanism**.
 - Pure founder review state machine and unsent, recipient-free communication drafts.
 - Adapter from existing Revenue Intelligence and first-party Growth Evidence response shapes.
 - Analytics that explicitly leave unique users, customers and revenue **null** when unknown.
-- Additive seven-table D1/SQLite schema (projects, audiences, sources, opportunities,
-  reviews, drafts and outcomes) and offline migration constraint check.
+- Additive Growth D1/SQLite schema for projects, audiences, sources, opportunities,
+  reviews, drafts, outcomes, founder intent and optional serverless AI usage/analysis journals.
 - Bounded parameterized internal D1 research upserts and project-scoped reads. The
   store retains existing founder approval statuses when evidence is refreshed.
+- Optional Cloudflare Workers AI specialist analysis with a two-new-request UTC-day cap,
+  evidence fingerprint caching, idempotent daily claims and append-only advisory history.
 - Isolated Node regression suite and workflow. The candidate Worker and manifest are updated; previous live hashes and release metadata are retained separately.
 
 ## Boundaries
@@ -136,14 +137,26 @@ Technical diligence derives interface, format, authentication and licensing sign
 
 Migration 0003 adds a structured, append-only founder response journal. Recording a response requires an already recorded manual founder action, valid authenticated same-origin submission and the existing founder decision flag. No message bodies, contact addresses or revenue amounts are stored. Idempotent event IDs distinguish retries. Intent classifications and the latest 100-opportunity learning summary are founder attestations, not confirmed sales. A do-not-contact event suppresses intent for that opportunity; cross-organization suppression and automated ranking changes are not implemented.
 
-### Portable local specialist runtime
+### Optional local/customer-hosted specialist runtime
 
-The dashboard's public evidence export supplies a bounded JSON dossier without review notes or responses. On a private Linux host running Node 22+ and a locally installed Ollama model, execute:
+The HQ itself does not require a personal Linux server, an always-on device, Ollama, a GPU or a locally hosted model. The hosted HQ uses Cloudflare Workers AI through a managed binding when the founder explicitly requests a specialist assessment.
+
+The six specialist roles are available in the Growth Intelligence interface. Each request:
+- analyzes one existing, allowlisted public-evidence opportunity;
+- requires an authenticated, same-origin founder action;
+- uses no model tools, browsing, external communications or write/deploy permissions;
+- is limited to two new analyses per UTC day;
+- is cached by opportunity, specialist and evidence fingerprint;
+- is stored in an append-only D1 journal as an unverified advisory.
+
+The optional portable CLI below remains available for customers who explicitly require local/offline inference. It is a separate deployment mode, not an HQ dependency or a production-readiness blocker.
+
+On a private Linux host running Node 22+ and a locally installed Ollama model, execute:
 ```sh
 GROWTH_PRIVATE_ROOT=/private/customer-data GROWTH_LOCAL_MODEL=<installed-local-model> node portable/growth/cli.mjs analyze customer-a growth-public-evidence-taxpulse.json
 GROWTH_PRIVATE_ROOT=/private/customer-data node portable/growth/cli.mjs list customer-a
 ```
-Replace the model tag and directory with your real installation configuration. The runner calls only 127.0.0.1:11434, with no model tools, validates evidence references and keeps all model output explicitly unverified. Four sequential roles collaborate on evidence and prior unverified findings. Missing or invalid model responses are marked unavailable. No model is installed or running as part of this PR. Real model accuracy, prompt-injection resilience, availability, and resource consumption require testing.
+The runner calls only 127.0.0.1:11434, with no model tools, validates evidence references and keeps all model output explicitly unverified. Four sequential roles collaborate on evidence and prior unverified findings. Missing or invalid model responses are marked unavailable. Model accuracy, prompt-injection resilience, availability and resource consumption still require testing before offering the local edition.
 
 ### Commercial deployment boundary
 
