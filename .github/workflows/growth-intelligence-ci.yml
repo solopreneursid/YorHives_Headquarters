@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'src/growth-intelligence*.mjs'
+      - 'src/growth-ai.mjs'
       - 'src/growth-prospect-discovery.mjs'
       - 'src/growth-business-research.mjs'
       - 'src/growth-integration-intelligence.mjs'
@@ -39,6 +40,8 @@ jobs:
         run: |
           node --check src/hq-worker.mjs
           node --check src/growth-intelligence.mjs
+          node --check src/growth-ai.mjs
+          node --check src/staging-entry.mjs
           node --check src/growth-intelligence-adapter.mjs
           node --check src/growth-intelligence-store.mjs
           node --check src/growth-prospect-discovery.mjs
