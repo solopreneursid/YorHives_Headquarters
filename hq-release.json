@@ -5,7 +5,7 @@
   "sourceWorkerVersion": "fdbef0dc-31ff-4428-854c-7852f27c9c65",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "1d7ced58cd343a4df959522caba3a2066a3d8780",
+    "hq-worker.mjs": "516e86b02cfb16c6c4eb0d7fbbe2ea429a15a2d4",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
@@ -21,7 +21,8 @@
     "growth-business-research.mjs": "37f2eea00f0d697d0fb4226397e3b57c71e101fc",
     "growth-integration-intelligence.mjs": "94abaa1ff7fe8215d980939ab6171722a3eb006a",
     "growth-outcome-intelligence.mjs": "1b27d36a1e0d966e83750a3bf6ae170141f01a5e",
-    "growth-ranking-review.mjs": "f8676f796d842956d8f1dbdbdc82734e032d3efc"
+    "growth-ranking-review.mjs": "f8676f796d842956d8f1dbdbdc82734e032d3efc",
+    "growth-ai.mjs": "f04c752993820316919499bac513da7c995d5fc1"
   },
   "navigation": [
     "home",
@@ -116,7 +117,8 @@
     "Advanced growth candidate adds three runtime modules; 16 pinned candidate modules; retains prior live module inventory. Three additive migrations require explicit staging/release approval.",
     "Readiness candidate adds at most four additional account metadata checks/day subject to existing quota; no changes to production Worker or D1. Shadow ranking is never applied automatically.",
     "GitHub source-wide cooldown honors documented rate-limit hints and pauses ordinary 403 responses; no credentials, proxy bypass or retry loop. Billing scope unavailable; no staging cloud resources provisioned.",
-    "Staging feedback: Growth tab loads its independent authenticated API even when the general HQ report is unavailable. No synthetic general report or production DB connection."
+    "Staging feedback: Growth tab loads its independent authenticated API even when the general HQ report is unavailable. No synthetic general report or production DB connection.",
+    "Serverless Growth AI adds an append-only D1 analysis journal, idempotent daily request claims and a two-new-analysis UTC-day limit. Cloudflare Workers AI runs only after an authenticated founder action; outputs remain unverified advisory material. No personal always-on server, automatic outreach, repository writes or deployment."
   ],
   "previousWorkerVersion": "935960d8-a6d4-41a5-a464-37a9f9c5655b",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
@@ -145,7 +147,7 @@
     "revenue-intelligence.mjs": "2644dae372695729d43b6f4945f93e156036e223",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "Draft candidate: 17 runtime modules with organization account cross-checks and founder-reviewed shadow scoring; offline signed evidence, entitlement and recovery tools remain separate. No deployment or migration.",
+  "candidateStatus": "Draft candidate: 18 runtime modules with bounded founder-triggered Cloudflare Workers AI for six specialist roles; local Linux inference is optional and not an HQ dependency. Production release and migration remain unapproved.",
   "previousReleaseVerification": {
     "githubWorkflowRun": null,
     "acceptedAt": "2026-11-22T11:11:02.604409Z",
