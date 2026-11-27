@@ -55,4 +55,15 @@ with sqlite3.connect(":memory:") as db:
         except sqlite3.IntegrityError:
             continue
         raise AssertionError("Expected schema constraint: " + query)
-print("PASS growth schema: idempotent, relational integrity, bounds and unknown revenue")
+    db.execute(
+        """INSERT INTO growth_outcomes
+           (id,project_id,period_start,period_end,source_label,source_type,
+            verified_revenue_minor,currency)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        ("ledger1", "taxpulse", "2026-11-01", "2026-11-27", "Verified ledger",
+         "verified-payout-ledger", 100, "INR"),
+    )
+    assert db.execute(
+        "SELECT verified_revenue_minor FROM growth_outcomes WHERE id='ledger1'"
+    ).fetchone() == (100,)
+print("PASS growth schema: idempotent, relational integrity, revenue provenance and bounds")
