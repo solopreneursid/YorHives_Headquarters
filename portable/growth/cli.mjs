@@ -2,6 +2,7 @@
 import {readFileSync,lstatSync,writeFileSync} from 'node:fs';
 import {openCustomerWorkspace,readBoundedDossier,runSpecialists} from './local-runtime.mjs';
 import {signDossier,verifyDossier,keyFingerprint} from './evidence-exchange.mjs';
+import {verifyEntitlement} from './entitlement.mjs';
 const [action,tenant,file,output]=process.argv.slice(2);
 const root=process.env.GROWTH_PRIVATE_ROOT,model=process.env.GROWTH_LOCAL_MODEL;
 function keyFile(path,secret=false){
@@ -22,6 +23,12 @@ try{
   if(!root||!tenant||!['analyze','list','import','benchmark'].includes(action)||action!=='list'&&(!file||!model))throw Error('Usage: analyze|import|benchmark tenant-id dossier.json; list tenant-id; sign tenant-id dossier.json signed.json; fingerprint');
   if(process.env.GROWTH_CUSTOMER_ID&&process.env.GROWTH_CUSTOMER_ID!==tenant)throw Error('Customer installation identity mismatch');
   if(process.env.GROWTH_REQUIRE_SIGNED==='true'&&!['import','list'].includes(action))throw Error('Signed evidence import required by installation policy');
+  if(process.env.GROWTH_COMMERCIAL==='true'){
+   if(process.env.GROWTH_CUSTOMER_ID!==tenant||process.env.GROWTH_REQUIRE_SIGNED!=='true')throw Error('Commercial installation identity and signed-import policy required');
+   const pub=keyFile(process.env.GROWTH_LICENSE_PUBLIC_KEY);
+   if(keyFingerprint(pub)!==process.env.GROWTH_LICENSE_KEY_ID)throw Error('Untrusted entitlement issuer');
+   if(action!=='list')verifyEntitlement(readBoundedDossier(process.env.GROWTH_LICENSE_FILE),{customerId:tenant,publicKey:pub});
+  }
   workspace=openCustomerWorkspace(root,tenant);
   let result;
   if(action==='list')result=workspace.list();
