@@ -21,7 +21,13 @@ export const PROJECTS=Object.freeze([
    keywords:['tax','income tax','taxpayer','statutory','filing','deduction','tax calculator','accountant'],
    productProfile:{offer:'Tax calculation and financial planning research',value:'Help taxpayers and finance professionals investigate calculation workflows.',
     integration:'Assess educational resource references, calculation verification and documented integration requirements.',
-    partners:['Accounting educators','Finance resource publishers','Public financial software projects']}}
+    partners:['Accounting educators','Finance resource publishers','Public financial software projects']}},
+  {id:'hqventures',name:'HQventures',stage:'research',
+   audience:['Organizations evaluating software workflows','Business process operators'],
+   keywords:['workflow automation','business automation','business process','software development','workflow integration','enterprise software'],
+   productProfile:{offer:'Founder-approved software product and service research',value:'Investigate software solutions for evidenced operational problems; delivery capability is not assumed.',
+    integration:'Evaluate documented workflow requirements and feasibility before any founder-approved proposal.',
+    partners:['Public software organizations','Businesses with documented workflow needs','Technology integration partners']}}
 ]);
 export const SOURCE_HOSTS=Object.freeze([
   'news.ycombinator.com','hn.algolia.com','github.com','dev.to',
@@ -107,7 +113,9 @@ export function qualifyOpportunity(project,signal,{now=new Date().toISOString()}
  const summary=clean(signal?.summary||signal?.description,600);
  if(!link||timestamp===null||timestamp>current+300000||current-timestamp>90*86400000||
     !TYPE_ALLOW.has(kind)||title.length<8||summary.length<12)return null;
- const p=configureProjects([project])[0],body=(title+' '+summary).toLowerCase();
+ const p=configureProjects([project])[0];
+ if(signal?.projectId!==undefined&&signal.projectId!==p.id)return null;
+ const body=(title+' '+summary).toLowerCase();
  const matches=p.keywords.filter(word=>tokenize(body,word)).slice(0,8);
  if(matches.length===0)return null;
  const ageDays=Math.max(0,Math.floor((current-timestamp)/86400000));
@@ -118,6 +126,7 @@ export function qualifyOpportunity(project,signal,{now=new Date().toISOString()}
   title,summary,sourceUrl:link,sourceType:kind,observedAt:new Date(timestamp).toISOString(),
   relevanceScore:score,matchedKeywords:matches,
   businessFit:assessBusinessFit(p,{sourceType:kind,matchedKeywords:matches}),
+  prospect:kind==='public-repository'&&signal?.provenance==='github-public-repository-search'&&/^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/.test(signal.organization||'')&&/^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/.test(signal.repository||'')&&link==='https://github.com/'+signal.organization+'/'+signal.repository?{organization:signal.organization,repository:signal.repository,organizationUrl:'https://github.com/'+signal.organization,organizationAccountObserved:true,legalEntityVerified:false,needVerified:false,contactPermissionVerified:false}:null,
   audienceHypothesis:p.audience[0],confidence:'unverified-public-signal',
   demandVerified:false,contactPermissionVerified:false,attributedUsers:null,verifiedRevenue:null,
   approvalStatus:'unreviewed',nextAction:'Founder: inspect the source and verify fit, consent and timing before any contact.',
