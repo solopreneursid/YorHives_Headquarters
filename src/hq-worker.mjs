@@ -9,7 +9,7 @@ import {outcomeReady,recordFounderOutcome,loadOutcomeHistory,summarizeOutcomeLea
 import {shadowRanking} from './growth-ranking-review.mjs';
 import {growthReviewReady,loadGrowthReviewStates,recordGrowthReview,validateGrowthReview,allowedReviewTransitions} from './growth-intelligence-review.mjs';
 import {growthFromExistingEvidence} from './growth-intelligence-adapter.mjs';
-import {runGrowthAiAnalysis,loadGrowthAiAnalyses,GROWTH_AI_SPECIALISTS} from './growth-ai.mjs';
+import {runGrowthAiAnalysis,loadGrowthAiAnalyses,GROWTH_AI_SPECIALISTS,GROWTH_AI_DAILY_LIMIT} from './growth-ai.mjs';
 import {prepareCommunicationDraft} from './growth-intelligence.mjs';
 import {runRevenueResearch} from './revenue-research.mjs';
 import {loadGrowthEvidence} from './growth-evidence.mjs';
@@ -4332,7 +4332,7 @@ function privateAiConfig(env){
  return {url:url.href,model,token};
 }
 const HQ_CF_MODEL="@cf/ibm-granite/granite-4.0-h-micro";
-const HQ_CF_DAILY_LIMIT=2; // Bounded requests; Cloudflare enforces the account-wide free Neuron limit.
+const HQ_CF_DAILY_LIMIT=GROWTH_AI_DAILY_LIMIT; // Shared two-new-request daily cap across HQ AI routes.
 export function hqAiProvider(env){
  const selected=String(env?.HQ_AI_PROVIDER||"cloudflare-workers-ai");
  if(selected==="cloudflare-workers-ai")
