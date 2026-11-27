@@ -1,0 +1,46 @@
+-- Optional serverless AI inference journal for Growth Intelligence.
+-- Workers AI is founder-triggered only; no model calls occur during migrations.
+PRAGMA foreign_keys=ON;
+
+CREATE TABLE IF NOT EXISTS growth_ai_usage (
+  utc_day TEXT PRIMARY KEY CHECK(length(utc_day)=10),
+  used INTEGER NOT NULL CHECK(used BETWEEN 1 AND 2),
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS growth_ai_analyses (
+  id TEXT PRIMARY KEY CHECK(length(id)=36),
+  opportunity_id TEXT NOT NULL REFERENCES growth_opportunities(id) ON DELETE RESTRICT,
+  specialist TEXT NOT NULL CHECK(specialist IN (
+    'Engineering & Operations',
+    'Research & Innovation',
+    'Global Market Intelligence',
+    'Product & Growth',
+    'Revenue & Business',
+    'Security & Independent QA'
+  )),
+  provider TEXT NOT NULL CHECK(provider='cloudflare-workers-ai'),
+  model TEXT NOT NULL CHECK(length(model) BETWEEN 1 AND 120),
+  evidence_sha256 TEXT NOT NULL CHECK(length(evidence_sha256)=64),
+  analysis TEXT NOT NULL CHECK(length(analysis) BETWEEN 1 AND 2400),
+  status TEXT NOT NULL CHECK(status='unverified-advisory'),
+  generated_at TEXT NOT NULL,
+  UNIQUE(opportunity_id,specialist,evidence_sha256)
+);
+
+CREATE INDEX IF NOT EXISTS idx_growth_ai_opportunity
+ ON growth_ai_analyses(opportunity_id,generated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_growth_ai_daily_usage
+ ON growth_ai_usage(utc_day,used);
+
+CREATE TRIGGER IF NOT EXISTS growth_ai_analyses_no_update
+BEFORE UPDATE ON growth_ai_analyses
+BEGIN
+  SELECT RAISE(ABORT,'AI analysis history is append-only');
+END;
+
+CREATE TRIGGER IF NOT EXISTS growth_ai_analyses_no_delete
+BEFORE DELETE ON growth_ai_analyses
+BEGIN
+  SELECT RAISE(ABORT,'AI analysis history is append-only');
+END;
