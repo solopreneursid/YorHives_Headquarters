@@ -118,3 +118,21 @@ test('expired evidence and inconsistent stored records fail closed',async()=>{
  const invalid=await loadProspectDiscovery(DB,{now:Date.parse(NOW)});
  assert.equal(invalid.find(x=>x.projectId==='taxpulse').records.length,0);
 });
+
+test('independent public organization account cross-check consumes one additional budgeted request only',async()=>{
+ const DB=dbMock(),calls=[];let budget=0;
+ const result=await runProspectDiscovery({DB},Date.parse(NOW),{crossCheck:true,reserveFetch:async()=>++budget<=2,fetchFn:async(url,options)=>{
+  calls.push({url,method:options.method});
+  if(url.startsWith('https://api.github.com/search/repositories?'))return reply([repoFixture]);
+  assert.equal(url,'https://api.github.com/orgs/ExampleTaxOrg');
+  return new Response(JSON.stringify({login:'ExampleTaxOrg',type:'Organization',html_url:'https://github.com/ExampleTaxOrg',email:'never-store@example.test'}),{headers:{'content-type':'application/json'}});
+ }});
+ assert.equal(result,'taxpulse:observed');assert.equal(calls.length,2);
+ const scans=await loadProspectDiscovery(DB,{now:Date.parse(NOW)});
+ const record=scans.find(x=>x.projectId==='taxpulse').records[0];
+ assert.equal(record.organizationAccountCrossChecked,true);
+ assert.equal(record.legalEntityVerified,false);
+ assert.equal(record.email,undefined);
+ const feed=growthFromExistingEvidence({prospectScans:scans,now:NOW});
+ assert.equal(feed.dossiers.find(x=>x.project.id==='taxpulse').opportunities[0].prospect.organizationAccountCrossChecked,true);
+});
