@@ -5,10 +5,10 @@
  * One bounded scheduled GET per project/day, through HQ's shared fetch budget.
  */
 const SPECS=Object.freeze([
- {id:'yorphives',hour:2,query:'topic:pdf OR topic:browser-tools'},
- {id:'globalgov',hour:8,query:'"government jobs" OR "public sector jobs" in:name,description'},
- {id:'taxpulse',hour:14,query:'"tax calculator" OR "income tax" in:name,description'},
- {id:'hqventures',hour:20,query:'topic:workflow-automation OR topic:business-automation'}
+ {id:'yorphives',hour:2,query:'topic:pdf'},
+ {id:'globalgov',hour:8,query:'government jobs in:name,description'},
+ {id:'taxpulse',hour:14,query:'"tax calculator" in:name,description'},
+ {id:'hqventures',hour:20,query:'topic:workflow-automation'}
 ]);
 const HOST='https://api.github.com/search/repositories';
 const MAX_BYTES=180000,MAX_ROWS=8,MAX_AGE=36*3600000;
@@ -49,7 +49,7 @@ export function normalizeOrganizationRepositories(payload,projectId,observedAt){
 async function boundedJson(response){
  if(!response.ok||!String(response.headers.get('content-type')).includes('application/json')||
     Number(response.headers.get('content-length')||0)>MAX_BYTES||!response.body)
-  throw Error('public-source-unavailable');
+  throw Error(response.status!==200?'source-http-'+response.status:'invalid-or-oversized-source');
  const reader=response.body.getReader(),decoder=new TextDecoder();
  let total=0,body='';
  try{while(true){const x=await reader.read();if(x.done)break;
@@ -102,7 +102,7 @@ export async function runProspectDiscovery(env,time,{reserveFetch,fetchFn=fetch,
    }
    data={...data,state:records.length?'observed':'checked-no-match',records};
   }finally{clearTimeout(timer);}
- }catch{data={...data,state:'unavailable',records:[]};}
+ }catch(error){data={...data,state:'unavailable',records:[],reason:/^(?:source-http-\d{3}|invalid-or-oversized-source|public-source-oversized|incomplete-public-search|shared-fetch-budget-exhausted)$/.test(error?.message||'')?error.message:'transport-or-parse-failure'};}
  await save(env.DB,spec.id,data);
  return spec.id+':'+data.state;
 }
@@ -121,7 +121,7 @@ export async function loadProspectDiscovery(db,{now=Date.now()}={}){
    const records=x.state==='observed'?x.records.filter(r=>r.projectId===spec.id&&r.provenance==='github-public-repository-search'&&
     slug.test(r.organization||'')&&slug.test(r.repository||'')&&r.sourceUrl==='https://github.com/'+r.organization+'/'+r.repository&&
     typeof r.summary==='string'&&r.summary.length<=380):[];
-   return {projectId:spec.id,state:x.state,checkedAt:x.checkedAt,records};
+   return {projectId:spec.id,state:x.state,checkedAt:x.checkedAt,records,reason:typeof x.reason==='string'?x.reason.slice(0,80):null};
   }catch{return {projectId:spec.id,state:'invalid-snapshot',checkedAt:row.checked_at,records:[]};}
  });
 }
