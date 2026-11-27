@@ -5,7 +5,7 @@
   "sourceWorkerVersion": "fdbef0dc-31ff-4428-854c-7852f27c9c65",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "efdbf73fb5480de48360d34079b796ccf69eec70",
+    "hq-worker.mjs": "c6d8c4a98dd7fd24a6917ca1d95a146e5877f5f9",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
@@ -13,7 +13,7 @@
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
     "revenue-intelligence.mjs": "ef4464f71119cf9df14c6b5b3c85daaf56b0af07",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba",
-    "growth-intelligence.mjs": "6e8f33b99181bb3bee9233d3ca877d509df0baeb",
+    "growth-intelligence.mjs": "c6646926c739a49104599e69790400ca2fb2ab1e",
     "growth-intelligence-adapter.mjs": "cf2eca7eb3e4aa38d58acab19c531f6c97732259"
   },
   "navigation": [
@@ -132,7 +132,7 @@
     "revenue-intelligence.mjs": "2644dae372695729d43b6f4945f93e156036e223",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "Draft candidate 2026-11-27: adds private Growth Intelligence read-only API and sixth dashboard tab. Live Worker and liveModuleGitBlobs unchanged. No D1 growth migration or new binding. Founder authorization and independent verification required.",
+  "candidateStatus": "Draft candidate 2026-11-27: BizBot-inspired portfolio business-fit hypotheses, private Growth Intelligence API and sixth dashboard tab. Prior live snapshot unchanged; no production migration, autonomous outreach or new bindings.",
   "previousReleaseVerification": {
     "githubWorkflowRun": null,
     "acceptedAt": "2026-11-22T11:11:02.604409Z",
