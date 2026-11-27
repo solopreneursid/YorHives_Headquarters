@@ -67,3 +67,14 @@ test('actual Worker founder review and response routes execute on real isolated 
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM growth_intent_events').get().n,1);
  }finally{globalThis.fetch=oldFetch;db.close();}
 });
+
+test('offline interface contract distinguishes fixture compatibility from live integration approval',async()=>{
+ const {checkCapturedContract}=await import('../portable/growth/contract-fixture.mjs');
+ const contract={interface:'Synthetic tax response',version:'1',expectedStatus:200,fields:[{path:'result.total',type:'integer'},{path:'result.currency',type:'string'}]};
+ const sample={status:200,contentType:'application/json; charset=utf-8',body:{result:{total:100,currency:'INR'}}};
+ const result=checkCapturedContract(contract,sample);
+ assert.equal(result.passed,true);assert.equal(result.liveCompatibilityVerified,false);assert.equal(result.licenseCompatibilityVerified,false);
+ assert.equal(checkCapturedContract(contract,{...sample,body:{result:{total:'100',currency:'INR'}}}).passed,false);
+ assert.equal(checkCapturedContract(contract,{...sample,contentType:'text/html'}).passed,false);
+ assert.throws(()=>checkCapturedContract({...contract,fields:[{path:'__proto__.polluted',type:'object'}]},sample));
+});
