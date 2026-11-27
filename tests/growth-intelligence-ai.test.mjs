@@ -7,7 +7,7 @@ import {hqAiProvider} from '../src/hq-worker.mjs';
 
 function fixture(){
  const db=new DatabaseSync(':memory:');
- db.exec('PRAGMA foreign_keys=ON; CREATE TABLE growth_projects(id TEXT PRIMARY KEY,name TEXT NOT NULL,stage TEXT NOT NULL DEFAULT \'research\',created_at TEXT,updated_at TEXT); CREATE TABLE growth_sources(id TEXT PRIMARY KEY,source_url TEXT NOT NULL,source_type TEXT NOT NULL,observed_at TEXT,fetched_at TEXT,status TEXT NOT NULL); CREATE TABLE growth_opportunities(id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES growth_projects(id),source_id TEXT NOT NULL REFERENCES growth_sources(id),title TEXT NOT NULL,summary TEXT NOT NULL,relevance_score INTEGER NOT NULL,audience_hypothesis TEXT NOT NULL,demand_verified INTEGER NOT NULL DEFAULT 0,approval_status TEXT NOT NULL DEFAULT \'unreviewed\',discovered_at TEXT,updated_at TEXT);');
+ db.exec('PRAGMA foreign_keys=ON; CREATE TABLE quota(day TEXT NOT NULL,kind TEXT NOT NULL,used INTEGER NOT NULL CHECK(used>=0),PRIMARY KEY(day,kind)); CREATE TABLE growth_projects(id TEXT PRIMARY KEY,name TEXT NOT NULL,stage TEXT NOT NULL DEFAULT \'research\',created_at TEXT,updated_at TEXT); CREATE TABLE growth_sources(id TEXT PRIMARY KEY,source_url TEXT NOT NULL,source_type TEXT NOT NULL,observed_at TEXT,fetched_at TEXT,status TEXT NOT NULL); CREATE TABLE growth_opportunities(id TEXT PRIMARY KEY,project_id TEXT NOT NULL REFERENCES growth_projects(id),source_id TEXT NOT NULL REFERENCES growth_sources(id),title TEXT NOT NULL,summary TEXT NOT NULL,relevance_score INTEGER NOT NULL,audience_hypothesis TEXT NOT NULL,demand_verified INTEGER NOT NULL DEFAULT 0,approval_status TEXT NOT NULL DEFAULT \'unreviewed\',discovered_at TEXT,updated_at TEXT);');
  for(const name of readdirSync(new URL('../migrations/growth/',import.meta.url)).filter(x=>/^000[1-4]_.*\.sql$/.test(x)).sort()){
   db.exec(readFileSync(new URL('../migrations/growth/'+name,import.meta.url),'utf8'));
  }
@@ -58,7 +58,7 @@ test('daily inference budget is atomic and capped at two new analyses',async()=>
   await runGrowthAiAnalysis(env,{opportunityId:'growth-abc',specialist:GROWTH_AI_SPECIALISTS[1]},{now:'2026-11-27T10:01:00Z'});
   await assert.rejects(()=>runGrowthAiAnalysis(env,{opportunityId:'growth-abc',specialist:GROWTH_AI_SPECIALISTS[2]},{now:'2026-11-27T10:02:00Z'}),e=>e.status===429);
   assert.equal(calls,2);
-  assert.equal(db.prepare('SELECT used FROM growth_ai_usage WHERE utc_day=?').get('2026-11-27').used,GROWTH_AI_DAILY_LIMIT);
+  assert.equal(db.prepare("SELECT used FROM quota WHERE day=? AND kind='hq_workers_ai_requests'").get('2026-11-27').used,GROWTH_AI_DAILY_LIMIT);
  }finally{db.close();}
 });
 
