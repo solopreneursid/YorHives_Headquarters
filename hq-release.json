@@ -5,7 +5,7 @@
   "sourceWorkerVersion": "fdbef0dc-31ff-4428-854c-7852f27c9c65",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "20644b15ee4edfdf93176fa34bca55add616fa04",
+    "hq-worker.mjs": "08ac6ce608dabd319f8b181319bdfd002a3d0d9c",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
@@ -115,7 +115,8 @@
     "Growth founder review is an internal audit-only POST with existing founder decisions flag, Access and same-origin guard. Requires explicit migration 0001/0002; no automated external execution.",
     "Advanced growth candidate adds three runtime modules; 16 pinned candidate modules; retains prior live module inventory. Three additive migrations require explicit staging/release approval.",
     "Readiness candidate adds at most four additional account metadata checks/day subject to existing quota; no changes to production Worker or D1. Shadow ranking is never applied automatically.",
-    "GitHub source-wide cooldown honors documented rate-limit hints and pauses ordinary 403 responses; no credentials, proxy bypass or retry loop. Billing scope unavailable; no staging cloud resources provisioned."
+    "GitHub source-wide cooldown honors documented rate-limit hints and pauses ordinary 403 responses; no credentials, proxy bypass or retry loop. Billing scope unavailable; no staging cloud resources provisioned.",
+    "Staging feedback: Growth tab loads its independent authenticated API even when the general HQ report is unavailable. No synthetic general report or production DB connection."
   ],
   "previousWorkerVersion": "935960d8-a6d4-41a5-a464-37a9f9c5655b",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
