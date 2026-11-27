@@ -206,6 +206,7 @@ try{
   // Growth has its own endpoint and must survive a missing general report.
   await page.route('**/api/report',route=>route.fulfill({status:503,contentType:'application/json',body:'{"error":"isolated report unavailable"}'}));
   await page.goto(origin+'/#growth',{waitUntil:'networkidle'});
+  await page.reload({waitUntil:'networkidle'});
   await page.locator('#growth-project').selectOption('taxpulse');
   await page.getByText('Synthetic tax filing discussion').waitFor({timeout:10000});
   assert.equal(await page.getByText('HQ report is not accessible.').count(),0);
