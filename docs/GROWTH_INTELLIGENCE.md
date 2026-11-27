@@ -1,6 +1,6 @@
 # Growth Intelligence — implementation and release plan
 
-Status: **candidate foundation only; not deployed, not connected to the live five-tab dashboard**.
+Status: **integrated six-tab candidate; not deployed to the live five-tab dashboard**.
 Source of truth remains the current five-tab HQ release lock in hq-release.json. The separate
 liveModuleGitBlobs map must not be rewritten to describe an unverified candidate.
 
@@ -35,8 +35,7 @@ boundary; **project IDs alone are not a tenant-security mechanism**.
   reviews, drafts and outcomes) and offline migration constraint check.
 - Bounded parameterized internal D1 research upserts and project-scoped reads. The
   store retains existing founder approval statuses when evidence is refreshed.
-- Isolated Node regression suite and workflow. The current Worker source and manual
-  deployment manifest are deliberately unchanged.
+- Isolated Node regression suite and workflow. The candidate Worker and manifest are updated; previous live hashes and release metadata are retained separately.
 
 ## Boundaries
 
@@ -55,9 +54,9 @@ Revenue remains null absent an authenticated verified accounting source.
 
 1. **P0 (candidate implemented):** approve model, schema, source allowlist, and
    project registry. Validate migration against a disposable D1 database only.
-2. **P1 (candidate partially implemented):** connect the new evidence adapter to
+2. **P1 (implemented in candidate):** the evidence adapter is connected to
    a **GET-only** /api/growth-intelligence endpoint behind Cloudflare Access.
-   Add a Growth Intelligence view to the **current** five-tab UI, making six tabs.
+   Growth Intelligence is the sixth tab in the current UI.
    Do not restore the retired HQpulse layout or its six-page assets.
 3. **P1 (pending):** source-by-source public permissions/robots, evidence expiry,
    bounded research schedules, fail-closed source health and project-specific queries.
@@ -78,19 +77,16 @@ Revenue remains null absent an authenticated verified accounting source.
 
 ## Release procedure
 
-- Run node --test tests/growth-intelligence.test.mjs.
+- Run node --test tests/growth-intelligence*.test.mjs.
 - Run python3 scripts/verify-growth-schema.py.
-- Run node scripts/verify-current-hq.mjs to establish that the current release
-  remains byte-for-byte pinned while this candidate foundation is reviewed.
-- Do **not** run the growth migration on production or update hq-release.json
-  during this isolated candidate review.
-- For eventual integration, produce a new reviewed candidate release snapshot,
-  explicitly distinguish it from the retained live snapshot, and test full
+- Run node scripts/verify-current-hq.mjs to verify candidate source pins, the retained prior live module map, and the six-tab contract.
+- Do **not** run the growth migration on production during this candidate review. The candidate manifest pins updated source without changing the prior live module map.
+- For eventual release, review the pinned candidate against the retained live snapshot and test full
   desktop/mobile browser navigation, API authorization and rollback.
 - Deploy only through the founder-approved HQ production release action after
   CI, Access checks, D1 backup/restore validation and environment approvals.
 
-## Expected user experience (not yet connected)
+## Candidate user experience (not yet deployed)
 
 Growth Intelligence > project selector > audience hypotheses > evidence-ranked
 opportunities > partnership/promotion suggestions > draft preparation > founder
