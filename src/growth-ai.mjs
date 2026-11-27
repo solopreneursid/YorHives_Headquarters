@@ -126,7 +126,7 @@ export async function runGrowthAiAnalysis(env,input,{now=new Date().toISOString(
    "SELECT ?,'hq_workers_ai_requests',1 WHERE EXISTS(SELECT 1 FROM growth_ai_claims WHERE utc_day=? AND opportunity_id=? "+
    "AND specialist=? AND evidence_sha256=? AND claim_id=? AND state='reserved') "+
    'ON CONFLICT(day,kind) DO UPDATE SET used=used+1 WHERE quota.used<2 RETURNING used'
-  ).bind(utcDay,utcDay,opportunityId,specialist,evidenceSha256,claimId).first();
+  ).bind(utcDay,utcDay,opportunityId,specialist,evidenceSha256,claimId,GROWTH_AI_DAILY_LIMIT).first();
  }catch{
   await env.DB.prepare("UPDATE growth_ai_claims SET state='failed',updated_at=? WHERE claim_id=?").bind(generatedAt,claimId).run().catch(()=>{});
   fail('AI usage ledger is unavailable; inference was not started.',503);
