@@ -175,3 +175,23 @@ test('read model stays project-scoped and never returns earnings guesses',async(
  assert.match(prepared[1].sql,/WHERE o.project_id=\?/);
  await assert.rejects(()=>readGrowthProject(db,'invalid!'));
 });
+
+test('BizBot-style product fit remains an evidence-linked hypothesis, not a verified prospect',()=>{
+ const signal={...taxSignal,sourceType:'public-repository'};
+ const card=qualifyOpportunity(PROJECTS[2],signal,{now:NOW});
+ assert.equal(card.businessFit.kind,'software-integration');
+ assert.match(card.businessFit.productOffer,/Tax calculation/);
+ assert.match(card.businessFit.integrationHypothesis,/verification/);
+ assert.equal(card.businessFit.organizationVerified,false);
+ assert.equal(card.businessFit.commercialIntentVerified,false);
+ assert.equal(card.businessFit.contactPermissionVerified,false);
+ assert.equal(card.businessFit.handoff,'founder-research-review');
+ assert.equal(card.businessFit.autoExecute,false);
+ const draft=prepareCommunicationDraft(card,{channel:'partnership',projectName:'TaxPulse'});
+ assert.ok(draft.body.includes(card.title));
+ assert.ok(draft.body.includes(card.sourceUrl));
+ assert.match(draft.body,/Possible area to explore/);
+ assert.equal(draft.sent,false);
+ assert.equal(draft.recipient,null);
+ assert.throws(()=>configureProjects([{...PROJECTS[2],productProfile:{offer:'invalid'}}]),/Invalid product profile/);
+});
