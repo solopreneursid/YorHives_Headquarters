@@ -85,7 +85,7 @@ with sqlite3.connect(":memory:") as db:
     assert required_tables <= tables, required_tables - tables
 
     expected_indexes = set(re.findall(
-        r"CREATE INDEX IF NOT EXISTS\\s+([A-Za-z_][A-Za-z0-9_]*)", MIGRATION, re.I
+        r"CREATE INDEX IF NOT EXISTS\s+([A-Za-z_][A-Za-z0-9_]*)", MIGRATION, re.I
     ))
     actual_indexes = {
         row[0] for row in db.execute(
