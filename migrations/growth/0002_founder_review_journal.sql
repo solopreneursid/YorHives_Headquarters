@@ -34,3 +34,9 @@ END;
 
 CREATE INDEX IF NOT EXISTS idx_growth_review_revision
  ON growth_reviews(opportunity_id,id DESC);
+
+CREATE TRIGGER IF NOT EXISTS growth_review_no_delete
+BEFORE DELETE ON growth_reviews
+BEGIN
+  SELECT RAISE(ABORT,'growth review events are append-only');
+END;
