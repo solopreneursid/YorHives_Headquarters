@@ -5,7 +5,7 @@
   "sourceWorkerVersion": "fdbef0dc-31ff-4428-854c-7852f27c9c65",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "c6d8c4a98dd7fd24a6917ca1d95a146e5877f5f9",
+    "hq-worker.mjs": "02ccb10bc32f9a0d1e882f2418b5c2ec6071ed49",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
@@ -13,8 +13,9 @@
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
     "revenue-intelligence.mjs": "ef4464f71119cf9df14c6b5b3c85daaf56b0af07",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba",
-    "growth-intelligence.mjs": "c6646926c739a49104599e69790400ca2fb2ab1e",
-    "growth-intelligence-adapter.mjs": "cf2eca7eb3e4aa38d58acab19c531f6c97732259"
+    "growth-intelligence.mjs": "90a1d322264b4fb13d70ec5b75ced17cdd3fdb21",
+    "growth-intelligence-adapter.mjs": "ffa635f1fdd9046c549ac0ac322138c50ce372bd",
+    "growth-prospect-discovery.mjs": "a3e867a67ba85728fe1eeada6d89388d35ac3ab0"
   },
   "navigation": [
     "home",
@@ -103,7 +104,8 @@
     "Notification health records only generic scheduler and transport-check status; no enquiry content or counts are exposed. Email acceptance is not delivery verification.",
     "2026-11-22: HQconnect separate private fifth tab; only founder-confirmed DELETE of one message is permitted through authenticated same-origin HQ proxy to private service Worker; no authority to alter site, products or infrastructure.",
     "Release 2026-11-22: founder-requested, connector-mediated controlled manual Cloudflare version deployments were used instead of the usual GitHub manual release workflow. Future upgrades should return to the workflow_dispatch approval gate.",
-    "Growth candidate adds two runtime modules, a GET-only private research view and no additional scheduled collection, credentials or production database changes."
+    "Growth candidate adds two runtime modules, a GET-only private research view and no additional scheduled collection, credentials or production database changes.",
+    "Growth organization scout uses four fixed daily public GitHub repository queries, subject to existing shared request budget. No contact harvesting or messaging."
   ],
   "previousWorkerVersion": "935960d8-a6d4-41a5-a464-37a9f9c5655b",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
@@ -132,7 +134,7 @@
     "revenue-intelligence.mjs": "2644dae372695729d43b6f4945f93e156036e223",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "Draft candidate 2026-11-27: BizBot-inspired portfolio business-fit hypotheses, private Growth Intelligence API and sixth dashboard tab. Prior live snapshot unchanged; no production migration, autonomous outreach or new bindings.",
+  "candidateStatus": "Draft candidate 2026-11-27: four-project BizBot-inspired discovery, public organization repository scout, private Growth Intelligence API and sixth dashboard tab. Prior live snapshot retained; no deployment, new binding or autonomous outreach.",
   "previousReleaseVerification": {
     "githubWorkflowRun": null,
     "acceptedAt": "2026-11-22T11:11:02.604409Z",
