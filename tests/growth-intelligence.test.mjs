@@ -16,8 +16,8 @@ const jobSignal={title:'Government job vacancies for students',
  sourceType:'public-demand-signal',observedAt:'2026-11-26T06:00:00.000Z'};
 
 test('project registration validates uniqueness and metadata',()=>{
- assert.equal(configureProjects().length,3);
- assert.deepEqual(PROJECTS.map(x=>x.id),['yorphives','globalgov','taxpulse']);
+ assert.equal(configureProjects().length,4);
+ assert.deepEqual(PROJECTS.map(x=>x.id),['yorphives','globalgov','taxpulse','hqventures']);
  assert.throws(()=>configureProjects([PROJECTS[0],PROJECTS[0]]),/Invalid or duplicate/);
  assert.throws(()=>configureProjects([{id:'x',name:'A',audience:[],keywords:[]}])); 
 });
@@ -148,7 +148,7 @@ test('bounded D1 storage writes only research tables with parameterized SQL',asy
   async batch(stmts){calls.push(...stmts);return stmts.map(()=>({success:true}))}
  };
  const result=await persistGrowthEvidence(db,snapshot.dossiers,{observedAt:NOW});
- assert.equal(result.storedProjects,3);
+ assert.equal(result.storedProjects,4);
  assert.ok(result.statements>=7);
  assert.ok(calls.every(x=>/^INSERT INTO growth_(?:projects|audiences|sources|opportunities)/.test(x.sql)));
  assert.ok(calls.every(x=>!x.sql.includes('approval_status')&&!x.sql.includes('DELETE ')));
