@@ -122,19 +122,18 @@ export async function runGrowthAiAnalysis(env,input,{now=new Date().toISOString(
  let reservation;
  try{
   reservation=await env.DB.prepare(
-   'INSERT INTO growth_ai_usage(utc_day,used,updated_at) '+
-   'SELECT ?,1,? WHERE EXISTS(SELECT 1 FROM growth_ai_claims WHERE utc_day=? AND opportunity_id=? '+
+   'INSERT INTO quota(day,kind,used) '+
+   "SELECT ?,'hq_workers_ai_requests',1 WHERE EXISTS(SELECT 1 FROM growth_ai_claims WHERE utc_day=? AND opportunity_id=? "+
    "AND specialist=? AND evidence_sha256=? AND claim_id=? AND state='reserved') "+
-   'ON CONFLICT(utc_day) DO UPDATE SET used=used+1,updated_at=excluded.updated_at '+
-   'WHERE growth_ai_usage.used<? RETURNING used'
-  ).bind(utcDay,generatedAt,utcDay,opportunityId,specialist,evidenceSha256,claimId,GROWTH_AI_DAILY_LIMIT).first();
+   'ON CONFLICT(day,kind) DO UPDATE SET used=used+1 WHERE quota.used<2 RETURNING used'
+  ).bind(utcDay,utcDay,opportunityId,specialist,evidenceSha256,claimId).first();
  }catch{
   await env.DB.prepare("UPDATE growth_ai_claims SET state='failed',updated_at=? WHERE claim_id=?").bind(generatedAt,claimId).run().catch(()=>{});
   fail('AI usage ledger is unavailable; inference was not started.',503);
  }
  if(!reservation){
   await env.DB.prepare("UPDATE growth_ai_claims SET state='budget-exhausted',updated_at=? WHERE claim_id=?").bind(generatedAt,claimId).run().catch(()=>{});
-  fail('Daily HQ AI safety budget reached. Try again tomorrow.',429);
+  fail('Daily shared HQ AI safety budget reached. Try again tomorrow.',429);
  }
 
  const system=[
