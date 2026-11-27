@@ -139,3 +139,39 @@ test('bounds protect the API from oversized candidate data',()=>{
  assert.throws(()=>buildGrowthIntelligence({maxPerProject:0,now:NOW}));
  assert.throws(()=>buildGrowthIntelligence({now:'not-a-date'}));
 });
+
+test('bounded D1 storage writes only research tables with parameterized SQL',async()=>{
+ const {persistGrowthEvidence}=await import('../src/growth-intelligence-store.mjs');
+ const snapshot=buildGrowthIntelligence({signals:[taxSignal],now:NOW});
+ const calls=[],db={
+  prepare(sql){return {bind(...args){return {sql,args}}}},
+  async batch(stmts){calls.push(...stmts);return stmts.map(()=>({success:true}))}
+ };
+ const result=await persistGrowthEvidence(db,snapshot.dossiers,{observedAt:NOW});
+ assert.equal(result.storedProjects,3);
+ assert.ok(result.statements>=7);
+ assert.ok(calls.every(x=>/^INSERT INTO growth_(?:projects|audiences|sources|opportunities)/.test(x.sql)));
+ assert.ok(calls.every(x=>!x.sql.includes('approval_status')&&!x.sql.includes('DELETE ')));
+ assert.ok(calls.every(x=>!x.sql.includes('mailto:')&&!x.sql.includes('http:')));
+ await assert.rejects(()=>persistGrowthEvidence(db,[{project:{id:'invalid!'}}],{observedAt:NOW}));
+});
+test('read model stays project-scoped and never returns earnings guesses',async()=>{
+ const {readGrowthProject}=await import('../src/growth-intelligence-store.mjs');
+ const prepared=[];
+ const db={prepare(sql){const record={sql,bind(...args){record.args=args;return record},
+  async first(){return {id:'taxpulse',name:'TaxPulse',stage:'research'}},
+  async all(){return {results:[{id:'growth-a',title:'Tax calculator research',
+   summary:'Public discussion with a public source',relevance_score:62,
+   audience_hypothesis:'Taxpayers',demand_verified:0,approval_status:'unreviewed',
+   discovered_at:NOW,source_url:taxSignal.sourceUrl,source_type:'public-discussion',
+   observed_at:taxSignal.observedAt}]}}};prepared.push(record);return record}};
+ const value=await readGrowthProject(db,'taxpulse');
+ assert.equal(value.available,true);
+ assert.equal(value.revenueVerified,false);
+ assert.equal(value.externalActionsAllowed,false);
+ assert.equal(value.opportunities[0].verifiedRevenue,null);
+ assert.equal(prepared.length,2);
+ assert.deepEqual(prepared[1].args,['taxpulse',30]);
+ assert.match(prepared[1].sql,/WHERE o.project_id=\?/);
+ await assert.rejects(()=>readGrowthProject(db,'invalid!'));
+});
