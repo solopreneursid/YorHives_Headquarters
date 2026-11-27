@@ -124,7 +124,7 @@ export async function runGrowthAiAnalysis(env,input,{now=new Date().toISOString(
   reservation=await env.DB.prepare(
    'INSERT INTO growth_ai_usage(utc_day,used,updated_at) '+
    'SELECT ?,1,? WHERE EXISTS(SELECT 1 FROM growth_ai_claims WHERE utc_day=? AND opportunity_id=? '+
-   'AND specialist=? AND evidence_sha256=? AND claim_id=? AND state=\\'reserved\\') '+
+   "AND specialist=? AND evidence_sha256=? AND claim_id=? AND state='reserved') "+
    'ON CONFLICT(utc_day) DO UPDATE SET used=used+1,updated_at=excluded.updated_at '+
    'WHERE growth_ai_usage.used<? RETURNING used'
   ).bind(utcDay,generatedAt,utcDay,opportunityId,specialist,evidenceSha256,claimId,GROWTH_AI_DAILY_LIMIT).first();
