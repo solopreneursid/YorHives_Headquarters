@@ -34,27 +34,26 @@ Proposed resources: Worker `yorphives-hq-growth-staging`; database `yorphives-hq
 
 The founder uses their own Cloudflare Access login/OTP; never disclose a password, session token or OTP. Open the verified staging URL and check the six tabs, Growth project selection, original evidence links, localized proposals and public-evidence export. Record a synthetic founder review and response, reload, verify persistence and shadow-only scoring. Verify desktop and mobile layout. Check signed-in session diagnostics; unrelated unbound production health services must not be misrepresented as healthy. Open a private browser session and confirm unauthenticated rejection. Report pass/fail, screenshots with private data hidden, and browser errors.
 
-## Gate 5 — private inference (manual host bootstrap)
+## Gate 5 — managed serverless inference (no personal host required)
 
-On the actual intended Linux machine (not a CI runner), run:
-```sh
-uname -m
-free -h
-lscpu | grep -E 'Model name|^CPU\(s\):'
-df -h /
-node --version
-command -v ollama && ollama --version
-```
+The HQ does not require a continuously running Linux machine. The production Worker already has a Cloudflare Workers AI binding; the isolated staging Worker must receive its own AI binding only after the founder completes the authenticated-browser and anonymous-denial checks in Gate 4.
 
-Provide the results without host credentials, public IPs or secrets. Choose a compatible model and model license based on real RAM, CPU/GPU and disk. Install the approved local runtime only after selection. Keep Ollama loopback-only; do not expose port 11434 to the internet. Clone/check out the candidate using your normal GitHub credentials on the host; do not paste credentials into chat.
+After Gate 4 passes:
+1. Take a new native D1 Time Travel checkpoint for the dedicated staging database.
+2. Apply `migrations/growth/0004_serverless_ai.sql` to staging only. Verify the three AI tables (`growth_ai_usage`, `growth_ai_analyses`, `growth_ai_claims`), foreign keys and append-only triggers.
+3. Add the Cloudflare Workers AI binding to the staging Worker and set `HQ_GROWTH_AI_ENABLED=true` for staging only. Do not add this flag to production.
+4. Keep all automatic AI scheduling disabled. Inference is triggered only by an authenticated, same-origin founder action from the Growth Intelligence page.
+5. Use one synthetic/public-observed opportunity to verify one real model response, the stored unverified advisory, the evidence fingerprint cache and the daily quota ledger. Confirm a repeated request returns the cached result without another inference.
+6. Verify that a third new analysis in the same UTC day is rejected, a rejected opportunity cannot be analyzed, unapproved source hosts are rejected, and an unauthenticated or cross-origin request is denied.
+7. Inspect Cloudflare Workers AI usage after the test. The HQ limit of two new analyses/day is an application safety cap, not a guarantee of zero provider charges. Do not raise it without reviewing actual usage and pricing.
 
-Run `node portable/growth/host-preflight.mjs` with GROWTH_LOCAL_MODEL and GROWTH_PRIVATE_ROOT set to the actual chosen installation. It reports loopback availability and installed model status without sending any data off-host. Use the existing signed-evidence enrollment/import workflow for actual research. Benchmark on synthetic or public evidence, record model tag, model-license review, elapsed time, actual host/model-server memory and accuracy against reviewed fixtures. The CLI's RSS alone is not model-server memory.
+The local Ollama/Node host-preflight procedure remains optional for a separately approved customer-hosted/offline edition. It is not a blocker for the hosted HQ and must not be used as a reason to provision personal hardware.
 
 ## Gate 6 — commercial release
 
-First customer pilot is a separate VM/OS service account with encrypted private volume, dedicated model endpoint, signed customer entitlements and recovery tests. Verify service sandboxing on the actual host and cross-customer denial before inviting a customer. Keep license-signing private keys off customer systems. No automatic payment until pricing, provider, merchant legal entity, tax/invoice requirements, cancellation/refund terms and webhooks are approved and independently tested.
+For a customer-hosted/offline edition only, a first pilot may use a separate VM/OS service account with encrypted private volume, dedicated model endpoint, signed customer entitlements and recovery tests. This is optional and separate from the Cloudflare-hosted HQ. Verify service sandboxing on the actual host and cross-customer denial before inviting a customer. Keep license-signing private keys off customer systems. No automatic payment until pricing, provider, merchant legal entity, tax/invoice requirements, cancellation/refund terms and webhooks are approved and independently tested.
 
-Production remains blocked until staging D1, founder browser, source failures, private model, security/recovery, and founder release approval are recorded. No live rollout, account upgrade, recurring charge or deletion is authorized by this runbook.
+Production remains blocked until staging D1 recovery, founder browser verification, public-source behavior, security/recovery and founder release approval are recorded. If managed AI is not approved for production, its feature flag must remain off; a personal model host is not a release requirement. No live rollout, account upgrade, recurring charge or deletion is authorized by this runbook.
 
 ## Staging execution record — 2026-11-27
 
