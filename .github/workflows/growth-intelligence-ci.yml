@@ -8,7 +8,7 @@ on:
       - 'hq-release.json'
       - 'scripts/verify-current-hq.mjs'
       - 'scripts/test-four-button-browser.mjs'
-      - 'tests/growth-intelligence.test.mjs'
+      - 'tests/growth-intelligence*.test.mjs'
       - 'migrations/growth/**'
       - 'scripts/verify-growth-schema.py'
       - '.github/workflows/growth-intelligence-ci.yml'
@@ -32,7 +32,7 @@ jobs:
           node --check src/growth-intelligence-store.mjs
           node --check tests/growth-intelligence.test.mjs
       - name: Run deterministic qualification and governance tests
-        run: node --test tests/growth-intelligence.test.mjs
+        run: node --test tests/growth-intelligence*.test.mjs
       - name: Validate migration idempotence and integrity
         run: python3 scripts/verify-growth-schema.py
       - name: Verify candidate source lock, retained live inventory and six-tab contract
