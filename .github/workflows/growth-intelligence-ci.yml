@@ -4,6 +4,10 @@ on:
     paths:
       - 'src/growth-intelligence*.mjs'
       - 'src/growth-prospect-discovery.mjs'
+      - 'src/growth-business-research.mjs'
+      - 'src/growth-integration-intelligence.mjs'
+      - 'src/growth-outcome-intelligence.mjs'
+      - 'portable/growth/**'
       - 'src/hq-worker.mjs'
       - 'src/revenue-intelligence.mjs'
       - 'hq-release.json'
@@ -33,6 +37,11 @@ jobs:
           node --check src/growth-intelligence-store.mjs
           node --check src/growth-prospect-discovery.mjs
           node --check src/growth-intelligence-review.mjs
+          node --check src/growth-business-research.mjs
+          node --check src/growth-integration-intelligence.mjs
+          node --check src/growth-outcome-intelligence.mjs
+          node --check portable/growth/local-runtime.mjs
+          node --check portable/growth/cli.mjs
           node --check tests/growth-intelligence.test.mjs
       - name: Run deterministic qualification and governance tests
         run: node --test tests/growth-intelligence*.test.mjs
