@@ -1,0 +1,35 @@
+# Install only on a customer-dedicated Linux VM. Root-controlled configuration
+# and a dedicated OS service account/volume are required. No public listener.
+[Unit]
+Description=Growth Intelligence signed offline research import
+After=network.target
+ConditionPathExists=/etc/growth-customer/instance.env
+
+[Service]
+Type=oneshot
+User=growth-customer
+Group=growth-customer
+UMask=0077
+EnvironmentFile=/etc/growth-customer/instance.env
+Environment=GROWTH_REQUIRE_SIGNED=true
+Environment=GROWTH_COMMERCIAL=true
+Environment=GROWTH_PRIVATE_ROOT=/var/lib/growth-customer
+ExecStart=/usr/bin/node /opt/growth/portable/growth/cli.mjs import ${GROWTH_CUSTOMER_ID} /var/lib/growth-customer/inbox/signed.json
+StateDirectory=growth-customer
+StateDirectoryMode=0700
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+ReadWritePaths=/var/lib/growth-customer
+TimeoutStartSec=420
