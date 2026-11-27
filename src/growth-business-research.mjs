@@ -52,7 +52,9 @@ async function boundedGet(env,url,kind,{reserveFetch,fetchFn}){
  const response=await fetchFn(url,{method:'GET',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(5000),
   headers:{'user-agent':AGENT,accept:kind==='package'?'application/json':kind==='robots'?'text/plain':'text/html'}});
  if(kind==='robots'&&response.status===404)return '';
- if(response.status!==200||!response.body||Number(response.headers.get('content-length')||0)>limit||
+ if(response.status!==200)throw Error('source-http-'+response.status);
+ if(Number(response.headers.get('content-length')||0)>limit)throw Error('oversized-source');
+ if(!response.body||
     !String(response.headers.get('content-type')).toLowerCase().includes(kind==='package'?'application/json':kind==='robots'?'text/plain':'text/html'))throw Error('public-source-unavailable');
  const reader=response.body.getReader(),decoder=new TextDecoder();let total=0,text='';
  try{for(;;){const v=await reader.read();if(v.done)break;total+=v.value.byteLength;if(total>limit)throw Error('oversized-source');text+=decoder.decode(v.value,{stream:true});}return text+decoder.decode();}
@@ -77,7 +79,7 @@ export async function runBusinessResearch(env,time,{reserveFetch,fetchFn=fetch}=
    records=normalizeProductPage(await boundedGet(env,spec.url,'website',{reserveFetch,fetchFn}),spec,at);
   }
   data={...base,state:records.length?'observed':'checked-no-match',records};
- }catch{}
+ }catch(error){data={...data,reason:/^(?:source-http-\d{3}|oversized-source|robots-denied|source-or-budget-denied|public-source-unavailable|invalid-document|invalid-package-search)$/.test(error?.message||'')?error.message:'transport-or-parse-failure'};}
  await env.DB.prepare('UPDATE status SET value=? WHERE key=? AND checked_at=?').bind(JSON.stringify(data),id,at).run();
  return spec.projectId+':'+spec.kind+':'+data.state;
 }
@@ -94,7 +96,7 @@ export async function loadBusinessResearch(db,{now=Date.now()}={}){
    if(x.schemaVersion!==1||x.projectId!==s.projectId||x.kind!==s.kind||x.checkedAt!==row.checked_at||!Number.isFinite(age)||age<0||age>60*3600000||!Array.isArray(x.records)||x.records.length>6||!['observed','started','unavailable','checked-no-match'].includes(x.state))throw Error('invalid');
    const records=x.state==='observed'?x.records.filter(r=>r.projectId===s.projectId&&r.observedAt===x.checkedAt&&typeof r.summary==='string'&&r.summary.length<=380&&
     (s.kind==='website'?r.sourceType==='official-product-page'&&r.sourceUrl===s.url&&r.organization===s.organization:r.sourceType==='public-package'&&packageName.test(r.packageName||'')&&r.sourceUrl==='https://www.npmjs.com/package/'+r.packageName)):[];
-   return {...base,state:x.state,records};
+   return {...base,state:x.state,records,reason:typeof x.reason==='string'?x.reason.slice(0,80):null};
   }catch{return {...base,state:'stale-or-invalid'};}
  });
 }
