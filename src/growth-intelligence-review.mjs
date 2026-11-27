@@ -69,8 +69,9 @@ export async function recordGrowthReview(db,dossier,opportunity,input,{at=new Da
   'INSERT INTO growth_reviews(opportunity_id,from_status,to_status,review_note,reviewed_at,reviewed_by) '+
   "SELECT o.id,o.approval_status,?,?,?,'founder' FROM growth_opportunities o "+
   'JOIN growth_sources s ON s.id=o.source_id WHERE o.id=? AND o.project_id=? AND o.title=? AND s.source_url=? '+
-  'AND o.approval_status=? AND COALESCE((SELECT MAX(id) FROM growth_reviews WHERE opportunity_id=o.id),0)=?'
- ).bind(v.decision,v.note,at,opportunity.id,opportunity.projectId,opportunity.title,opportunity.sourceUrl,state.status,v.revision).run();
- if(Number(r.meta?.changes||0)!==1)return {status:409,error:'Review changed; reload evidence'};
+  'AND o.approval_status=? AND COALESCE((SELECT MAX(id) FROM growth_reviews WHERE opportunity_id=o.id),0)=? RETURNING id'
+ ).bind(v.decision,v.note,at,opportunity.id,opportunity.projectId,opportunity.title,opportunity.sourceUrl,state.status,v.revision).all();
+ // D1 change counts can include trigger side effects. Confirm the inserted journal row itself.
+ if(!Array.isArray(r.results)||r.results.length!==1||!Number.isSafeInteger(r.results[0].id)||r.results[0].id<=v.revision)return {status:409,error:'Review changed; reload evidence'};
  return {status:200,recorded:true,decision:v.decision,externalActionsPerformed:false};
 }
