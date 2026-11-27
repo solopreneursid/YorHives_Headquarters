@@ -15,7 +15,7 @@
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba",
     "growth-intelligence.mjs": "2d03590c91c08676542e95f4f4be235b87af3bba",
     "growth-intelligence-adapter.mjs": "5c61dc6dc30e8d531fab4e6827ea034b7b0f5620",
-    "growth-prospect-discovery.mjs": "d58bf92c710d7f1105e35eb7ed128e863349f83b",
+    "growth-prospect-discovery.mjs": "3ecb70903e394810acd57b4df3a386b499dab549",
     "growth-intelligence-review.mjs": "085d30545d0a6021ed13d6d96cfcb107c2d571bb",
     "growth-intelligence-store.mjs": "dd72384348c4fc765ff37b0b4c4af5b70d869556",
     "growth-business-research.mjs": "37f2eea00f0d697d0fb4226397e3b57c71e101fc",
@@ -114,7 +114,8 @@
     "Growth organization scout uses four fixed daily public GitHub repository queries, subject to existing shared request budget. No contact harvesting or messaging.",
     "Growth founder review is an internal audit-only POST with existing founder decisions flag, Access and same-origin guard. Requires explicit migration 0001/0002; no automated external execution.",
     "Advanced growth candidate adds three runtime modules; 16 pinned candidate modules; retains prior live module inventory. Three additive migrations require explicit staging/release approval.",
-    "Readiness candidate adds at most four additional account metadata checks/day subject to existing quota; no changes to production Worker or D1. Shadow ranking is never applied automatically."
+    "Readiness candidate adds at most four additional account metadata checks/day subject to existing quota; no changes to production Worker or D1. Shadow ranking is never applied automatically.",
+    "GitHub source-wide cooldown honors documented rate-limit hints and pauses ordinary 403 responses; no credentials, proxy bypass or retry loop. Billing scope unavailable; no staging cloud resources provisioned."
   ],
   "previousWorkerVersion": "935960d8-a6d4-41a5-a464-37a9f9c5655b",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
