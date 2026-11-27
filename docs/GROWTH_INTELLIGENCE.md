@@ -127,3 +127,26 @@ Growth review now has a separate authenticated POST route `/api/growth-intellige
 **Deployment boundary:** neither migration has been applied to production. No scheduled discovery has executed from this candidate in production. Keep the eight-module previous live snapshot separate from the 13-module candidate. Run source integrity, all regression workflows, approved staging D1 migration/rollback and real authenticated browser verification before requesting release.
 
 **Remaining:** wider first-party organization/directory sources and independent entity verification, cross-project integration evidence, multilingual contextual proposals, feedback and outcome history beyond review events, intent assessment from founder-reported responses, local-model orchestration and tenant-isolated commercial packaging. Public repository discovery is a first source adapter, not complete BizBot parity.
+
+## Advanced BizBot-inspired candidate
+
+The advanced candidate adds four daily source windows at UTC 02:45, 08:45, 14:45 and 20:45, alternating public npm registry search and fixed official documentation (Apache PDFBox, USAJOBS, OpenFisca, n8n). Official URLs are reviewed references, not verified partnership prospects. Website requests are conditional on robots.txt, restricted to the exact configured origin/path and reject redirects, oversized responses or invalid content. No arbitrary user-supplied URL is fetched. The extra daily network allowance is bounded at four to eight requests, subject to HQ's existing quota. npm scope is not proof of company ownership. Actual hosted source access and relevance remain unverified.
+
+Technical diligence derives interface, format, authentication and licensing signals, then lists compatibility checks; it does not claim tested integration, commercial intent or license clearance. English, Hindi and Spanish proposal variants cite original evidence and remain unsent; language/context requires review. Source evidence is not translated by the deterministic templates.
+
+Migration 0003 adds a structured, append-only founder response journal. Recording a response requires an already recorded manual founder action, valid authenticated same-origin submission and the existing founder decision flag. No message bodies, contact addresses or revenue amounts are stored. Idempotent event IDs distinguish retries. Intent classifications and the latest 100-opportunity learning summary are founder attestations, not confirmed sales. A do-not-contact event suppresses intent for that opportunity; cross-organization suppression and automated ranking changes are not implemented.
+
+### Portable local specialist runtime
+
+The dashboard's public evidence export supplies a bounded JSON dossier without review notes or responses. On a private Linux host running Node 22+ and a locally installed Ollama model, execute:
+```sh
+GROWTH_PRIVATE_ROOT=/private/customer-data GROWTH_LOCAL_MODEL=<installed-local-model> node portable/growth/cli.mjs analyze customer-a growth-public-evidence-taxpulse.json
+GROWTH_PRIVATE_ROOT=/private/customer-data node portable/growth/cli.mjs list customer-a
+```
+Replace the model tag and directory with your real installation configuration. The runner calls only 127.0.0.1:11434, with no model tools, validates evidence references and keeps all model output explicitly unverified. Four sequential roles collaborate on evidence and prior unverified findings. Missing or invalid model responses are marked unavailable. No model is installed or running as part of this PR. Real model accuracy, prompt-injection resilience, availability, and resource consumption require testing.
+
+### Commercial deployment boundary
+
+The initial distribution model is one customer per private OS account/container and dedicated volume, with a distinct SQLite database, identity marker and private filesystem permissions. The CLI demonstrates separate databases and rejects tenant traversal, symlinks and mismatched records; same-process tests do not establish hostile-tenant isolation. Do not expose this CLI as an HTTP SaaS service. Never share a privileged process, filesystem root, model logs, tokens, or backup bucket across untrusted tenants. Production packaging needs per-customer authentication, process and network isolation, encrypted storage and backups, secret management, quotas, retention/export/deletion policies, upgrade/rollback tooling and independent security review. Existing HQ remains a single-founder deployment. No customer instance has been provisioned.
+
+**Release status:** sixteen candidate Worker modules, previous eight-module live snapshot retained, three additive migrations not applied. Local runtime is outside the Worker bundle. Full hosted source, physical device, authenticated review/outcome flow, restore, and real private-model tests remain release gates.
