@@ -100,3 +100,20 @@ A persistent private model may **summarize** already-qualified public source
 evidence later; it must not assign authoritative scores, learn from contact
 identities, or receive network/send/write capabilities. Deterministic scoring
 remains the default and fallback when model inference is unavailable.
+
+## BizBot-inspired business-development direction (2026-11-27)
+
+Reference: https://bizbot.zvo.cn/ and https://www.leimingyun.com/. Vendor-described workflows are research references, not verified product performance or authorization to reuse software. Implement independently.
+
+The subsystem must progress from general topic discovery to portfolio product knowledge, organization/project-level public research, evidence-backed product fit, technical integration assessment, specific proposal drafts, founder handover and outcome learning. Maintain product profiles as configuration, not per-project forks. The current candidate introduces product profiles, fit classifications and source-specific drafts; named organization verification and targeted source discovery are not yet implemented. A topical match is not a prospect, verified buying intent or permission to contact.
+
+Next engineering sequence:
+
+1. Add product profiles for HQventures and future offerings based on confirmed product inventory.
+2. Build bounded public organization/project discovery using authorized source adapters and existing scheduling budgets; prioritize public documentation, official organizational sites, and public software repositories. No contact harvesting or arbitrary crawling.
+3. Create organization-level evidence dossiers, deduplicate targets, verify actual product compatibility, record conflicting evidence and distinguish current needs from hypotheses.
+4. Produce a founder-ready proposal with source references, candidate integration, mutual benefit, risks, and a permitted channel; do not send it.
+5. Record founder decisions and manually reported responses, verified intent and outcomes in the internal journal; use feedback to improve ranking.
+6. Add private local model-assisted research only after deterministic evidence and security controls pass. No model gets outbound credentials or browser messaging authority.
+
+BizBot advertises automatic communication and follow-up. Those execution features are explicitly excluded from HQ under existing founder governance. No autonomous sending, automated contact or publishing is authorized. Founder remains the executor. No claims about sender authenticity, verified sales or actual BizBot effectiveness.
