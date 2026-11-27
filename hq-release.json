@@ -16,7 +16,7 @@
     "growth-intelligence.mjs": "2d03590c91c08676542e95f4f4be235b87af3bba",
     "growth-intelligence-adapter.mjs": "5c61dc6dc30e8d531fab4e6827ea034b7b0f5620",
     "growth-prospect-discovery.mjs": "3ecb70903e394810acd57b4df3a386b499dab549",
-    "growth-intelligence-review.mjs": "085d30545d0a6021ed13d6d96cfcb107c2d571bb",
+    "growth-intelligence-review.mjs": "6fa9970bda8ab8355fc8454e1105fbc4d302c3ea",
     "growth-intelligence-store.mjs": "dd72384348c4fc765ff37b0b4c4af5b70d869556",
     "growth-business-research.mjs": "37f2eea00f0d697d0fb4226397e3b57c71e101fc",
     "growth-integration-intelligence.mjs": "94abaa1ff7fe8215d980939ab6171722a3eb006a",
@@ -118,7 +118,8 @@
     "Readiness candidate adds at most four additional account metadata checks/day subject to existing quota; no changes to production Worker or D1. Shadow ranking is never applied automatically.",
     "GitHub source-wide cooldown honors documented rate-limit hints and pauses ordinary 403 responses; no credentials, proxy bypass or retry loop. Billing scope unavailable; no staging cloud resources provisioned.",
     "Staging feedback: Growth tab loads its independent authenticated API even when the general HQ report is unavailable. No synthetic general report or production DB connection.",
-    "Serverless Growth AI adds an append-only D1 analysis journal, idempotent daily request claims and a two-new-analysis UTC-day limit. Cloudflare Workers AI runs only after an authenticated founder action; outputs remain unverified advisory material. No personal always-on server, automatic outreach, repository writes or deployment."
+    "Serverless Growth AI adds an append-only D1 analysis journal, idempotent daily request claims and a two-new-analysis UTC-day limit. Cloudflare Workers AI runs only after an authenticated founder action; outputs remain unverified advisory material. No personal always-on server, automatic outreach, repository writes or deployment.",
+    "Hosted staging review persisted exactly once despite false conflict response; acknowledge inserted audit row with RETURNING id instead of D1 meta.changes."
   ],
   "previousWorkerVersion": "935960d8-a6d4-41a5-a464-37a9f9c5655b",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
