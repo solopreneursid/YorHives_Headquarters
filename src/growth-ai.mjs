@@ -108,15 +108,34 @@ export async function runGrowthAiAnalysis(env,input,{now=new Date().toISOString(
    externalActionsPerformed:false,founderReviewRequired:true};
  }
 
+ const claimId=crypto.randomUUID();
+ let claim;
+ try{
+  claim=await env.DB.prepare(
+   'INSERT INTO growth_ai_claims(utc_day,opportunity_id,specialist,evidence_sha256,claim_id,state,claimed_at,updated_at) '+
+   "VALUES(?,?,?,?,?,'reserved',?,?) ON CONFLICT(utc_day,opportunity_id,specialist,evidence_sha256) DO NOTHING"
+  ).bind(utcDay,opportunityId,specialist,evidenceSha256,claimId,generatedAt,generatedAt).run();
+ }catch{fail('AI request ledger is unavailable; inference was not started.',503);}
+ if(Number(claim.meta?.changes||0)!==1)
+  fail('This specialist has already been started or attempted for the same evidence today.',409);
+
  let reservation;
  try{
   reservation=await env.DB.prepare(
-   'INSERT INTO growth_ai_usage(utc_day,used,updated_at) VALUES(?,1,?) '+
+   'INSERT INTO growth_ai_usage(utc_day,used,updated_at) '+
+   'SELECT ?,1,? WHERE EXISTS(SELECT 1 FROM growth_ai_claims WHERE utc_day=? AND opportunity_id=? '+
+   'AND specialist=? AND evidence_sha256=? AND claim_id=? AND state=\\'reserved\\') '+
    'ON CONFLICT(utc_day) DO UPDATE SET used=used+1,updated_at=excluded.updated_at '+
    'WHERE growth_ai_usage.used<? RETURNING used'
-  ).bind(utcDay,generatedAt,GROWTH_AI_DAILY_LIMIT).first();
- }catch{fail('AI usage ledger is unavailable; inference was not started.',503);}
- if(!reservation)fail('Daily HQ AI safety budget reached. Try again tomorrow.',429);
+  ).bind(utcDay,generatedAt,utcDay,opportunityId,specialist,evidenceSha256,claimId,GROWTH_AI_DAILY_LIMIT).first();
+ }catch{
+  await env.DB.prepare("UPDATE growth_ai_claims SET state='failed',updated_at=? WHERE claim_id=?").bind(generatedAt,claimId).run().catch(()=>{});
+  fail('AI usage ledger is unavailable; inference was not started.',503);
+ }
+ if(!reservation){
+  await env.DB.prepare("UPDATE growth_ai_claims SET state='budget-exhausted',updated_at=? WHERE claim_id=?").bind(generatedAt,claimId).run().catch(()=>{});
+  fail('Daily HQ AI safety budget reached. Try again tomorrow.',429);
+ }
 
  const system=[
   'You are a read-only specialist advisor for YorpHives Headquarters.',
@@ -132,11 +151,20 @@ export async function runGrowthAiAnalysis(env,input,{now=new Date().toISOString(
    messages:[{role:'system',content:system},{role:'user',content:evidenceJson}],
    stream:false,max_tokens:240,temperature:0.1
   });
- }catch{fail('Cloudflare Workers AI is temporarily unavailable. The attempt remains counted against today’s safety budget.',503);}
+ }catch{
+  await env.DB.prepare("UPDATE growth_ai_claims SET state='failed',updated_at=? WHERE claim_id=?").bind(generatedAt,claimId).run().catch(()=>{});
+  fail('Cloudflare Workers AI is temporarily unavailable. The attempt remains counted against today’s safety budget.',503);
+ }
  const raw=extractText(response);
- if(!raw.trim())fail('Cloudflare Workers AI returned no usable analysis. The attempt remains counted.',502);
+ if(!raw.trim()){
+  await env.DB.prepare("UPDATE growth_ai_claims SET state='failed',updated_at=? WHERE claim_id=?").bind(generatedAt,claimId).run().catch(()=>{});
+  fail('Cloudflare Workers AI returned no usable analysis. The attempt remains counted.',502);
+ }
  const analysis=clean(raw,2400);
- if(!analysis)fail('Cloudflare Workers AI returned an invalid analysis.',502);
+ if(!analysis){
+  await env.DB.prepare("UPDATE growth_ai_claims SET state='failed',updated_at=? WHERE claim_id=?").bind(generatedAt,claimId).run().catch(()=>{});
+  fail('Cloudflare Workers AI returned an invalid analysis.',502);
+ }
 
  const id=crypto.randomUUID();
  try{
@@ -145,13 +173,20 @@ export async function runGrowthAiAnalysis(env,input,{now=new Date().toISOString(
    "VALUES(?,?,?,'cloudflare-workers-ai',?,?,?,'unverified-advisory',?) " +
    'ON CONFLICT(opportunity_id,specialist,evidence_sha256) DO NOTHING'
   ).bind(id,opportunityId,specialist,GROWTH_AI_MODEL,evidenceSha256,analysis,generatedAt).run();
- }catch{fail('Analysis completed but could not be saved to the evidence journal.',503);}
+ }catch{
+  await env.DB.prepare("UPDATE growth_ai_claims SET state='failed',updated_at=? WHERE claim_id=?").bind(generatedAt,claimId).run().catch(()=>{});
+  fail('Analysis completed but could not be saved to the evidence journal.',503);
+ }
 
  const stored=await env.DB.prepare(
   'SELECT specialist,provider,model,evidence_sha256,analysis,status,generated_at '+
   'FROM growth_ai_analyses WHERE opportunity_id=? AND specialist=? AND evidence_sha256=? LIMIT 1'
  ).bind(opportunityId,specialist,evidenceSha256).first();
- if(!stored)fail('Analysis persistence could not be verified.',503);
+ if(!stored){
+  await env.DB.prepare("UPDATE growth_ai_claims SET state='failed',updated_at=? WHERE claim_id=?").bind(generatedAt,claimId).run().catch(()=>{});
+  fail('Analysis persistence could not be verified.',503);
+ }
+ await env.DB.prepare("UPDATE growth_ai_claims SET state='completed',updated_at=? WHERE claim_id=?").bind(generatedAt,claimId).run();
  return {available:true,cached:false,opportunityId,specialist,provider:stored.provider,
   model:stored.model,analysis:stored.analysis,status:stored.status,generatedAt:stored.generated_at,
   budget:{requestsUsed:Number(reservation.used),requestsLimit:GROWTH_AI_DAILY_LIMIT},
