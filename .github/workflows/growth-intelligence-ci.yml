@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'src/growth-intelligence*.mjs'
+      - 'src/growth-prospect-discovery.mjs'
       - 'src/hq-worker.mjs'
       - 'src/revenue-intelligence.mjs'
       - 'hq-release.json'
@@ -30,6 +31,7 @@ jobs:
           node --check src/growth-intelligence.mjs
           node --check src/growth-intelligence-adapter.mjs
           node --check src/growth-intelligence-store.mjs
+          node --check src/growth-prospect-discovery.mjs
           node --check tests/growth-intelligence.test.mjs
       - name: Run deterministic qualification and governance tests
         run: node --test tests/growth-intelligence*.test.mjs
