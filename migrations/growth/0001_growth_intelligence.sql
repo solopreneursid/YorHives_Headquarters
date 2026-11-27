@@ -70,14 +70,14 @@ CREATE TABLE IF NOT EXISTS growth_outcomes (
   period_start TEXT NOT NULL,
   period_end TEXT NOT NULL,
   source_label TEXT NOT NULL,
-  source_type TEXT NOT NULL CHECK(source_type IN ('first-party-aggregate','founder-attested')),
+  source_type TEXT NOT NULL CHECK(source_type IN ('first-party-aggregate','founder-attested','verified-payout-ledger')),
   page_views INTEGER CHECK(page_views IS NULL OR page_views>=0),
   completed_actions INTEGER CHECK(completed_actions IS NULL OR completed_actions>=0),
   verified_revenue_minor INTEGER,
   currency TEXT,
   recorded_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   CHECK(period_start<=period_end),
-  CHECK(verified_revenue_minor IS NULL OR (verified_revenue_minor>=0 AND currency IS NOT NULL)),
+  CHECK(verified_revenue_minor IS NULL OR (verified_revenue_minor>=0 AND currency IS NOT NULL AND source_type='verified-payout-ledger')),
   CHECK(currency IS NULL OR (length(currency)=3 AND currency=upper(currency)))
 );
 CREATE INDEX IF NOT EXISTS idx_growth_opportunity_rank
