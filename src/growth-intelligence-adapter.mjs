@@ -35,16 +35,19 @@ export function existingGrowthMetrics(growth){
   observedAt:growth.generatedAt,pageViews7d:c.recent7dPageViews,
   completedActions7d:c.recent7dCompletedActions}};
 }
-export function growthFromExistingEvidence({revenue,growth,projects=PROJECTS,prospectScans=[],
+export function growthFromExistingEvidence({revenue,growth,projects=PROJECTS,prospectScans=[],businessScans=[],
   now=new Date().toISOString()}={}){
  const scans=Array.isArray(prospectScans)?prospectScans.slice(0,50):[];
  const prospectSignals=scans.flatMap(s=>s?.state==='observed'&&Array.isArray(s.records)?s.records.slice(0,8):[]);
- const result=buildGrowthIntelligence({projects,signals:[...existingRevenueSignals(revenue),...prospectSignals],
+ const business=Array.isArray(businessScans)?businessScans.slice(0,100):[];
+ const businessSignals=business.flatMap(s=>s?.state==='observed'&&Array.isArray(s.records)?s.records.slice(0,6):[]);
+ const result=buildGrowthIntelligence({projects,signals:[...existingRevenueSignals(revenue),...prospectSignals,...businessSignals],
   metrics:existingGrowthMetrics(growth),now});
  return {...result,integration:'existing-hq-revenue-evidence',
+  businessSources:business.map(({projectId,kind,state,checkedAt,records})=>({projectId,kind,state,checkedAt,observedCount:Array.isArray(records)?records.length:0})),
   prospectSources:scans.map(({projectId,state,checkedAt,records})=>({projectId,state,checkedAt,observedCount:Array.isArray(records)?records.length:0})),
   sourceStatuses:revenue?.readOnly===true&&Array.isArray(revenue.sources)?
     revenue.sources.map(x=>({name:String(x.name||'').slice(0,100),
       status:String(x.status||'not-checked').slice(0,80)})).slice(0,20):[],
-  caveat:'Public organization repository metadata and existing revenue research are limited source coverage. Topic matches do not establish buying intent or permission to contact.'};
+  caveat:'Public repository/package metadata, selected official documentation and revenue research are limited source coverage. Topic matches do not establish buying intent or permission to contact.'};
 }
