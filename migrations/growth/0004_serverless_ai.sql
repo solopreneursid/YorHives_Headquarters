@@ -44,3 +44,24 @@ BEFORE DELETE ON growth_ai_analyses
 BEGIN
   SELECT RAISE(ABORT,'AI analysis history is append-only');
 END;
+
+CREATE TABLE IF NOT EXISTS growth_ai_claims (
+  utc_day TEXT NOT NULL CHECK(length(utc_day)=10),
+  opportunity_id TEXT NOT NULL REFERENCES growth_opportunities(id) ON DELETE RESTRICT,
+  specialist TEXT NOT NULL CHECK(specialist IN (
+    'Engineering & Operations',
+    'Research & Innovation',
+    'Global Market Intelligence',
+    'Product & Growth',
+    'Revenue & Business',
+    'Security & Independent QA'
+  )),
+  evidence_sha256 TEXT NOT NULL CHECK(length(evidence_sha256)=64),
+  claim_id TEXT NOT NULL UNIQUE CHECK(length(claim_id)=36),
+  state TEXT NOT NULL CHECK(state IN ('reserved','completed','failed','budget-exhausted')),
+  claimed_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(utc_day,opportunity_id,specialist,evidence_sha256)
+);
+CREATE INDEX IF NOT EXISTS idx_growth_ai_claim_state
+ ON growth_ai_claims(utc_day,state,updated_at);
