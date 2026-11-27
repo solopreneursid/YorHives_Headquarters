@@ -2,10 +2,12 @@
 -- Workers AI is founder-triggered only; no model calls occur during migrations.
 PRAGMA foreign_keys=ON;
 
-CREATE TABLE IF NOT EXISTS growth_ai_usage (
-  utc_day TEXT PRIMARY KEY CHECK(length(utc_day)=10),
-  used INTEGER NOT NULL CHECK(used BETWEEN 1 AND 2),
-  updated_at TEXT NOT NULL
+-- Shared with the existing HQ AI request limiter (kind=hq_workers_ai_requests).
+CREATE TABLE IF NOT EXISTS quota (
+  day TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  used INTEGER NOT NULL CHECK(used>=0),
+  PRIMARY KEY(day,kind)
 );
 
 CREATE TABLE IF NOT EXISTS growth_ai_analyses (
@@ -30,8 +32,6 @@ CREATE TABLE IF NOT EXISTS growth_ai_analyses (
 
 CREATE INDEX IF NOT EXISTS idx_growth_ai_opportunity
  ON growth_ai_analyses(opportunity_id,generated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_growth_ai_daily_usage
- ON growth_ai_usage(utc_day,used);
 
 CREATE TRIGGER IF NOT EXISTS growth_ai_analyses_no_update
 BEFORE UPDATE ON growth_ai_analyses
