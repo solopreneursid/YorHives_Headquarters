@@ -44,8 +44,8 @@ export function growthFromExistingEvidence({revenue,growth,projects=PROJECTS,pro
  const result=buildGrowthIntelligence({projects,signals:[...existingRevenueSignals(revenue),...prospectSignals,...businessSignals],
   metrics:existingGrowthMetrics(growth),now});
  return {...result,integration:'existing-hq-revenue-evidence',
-  businessSources:business.map(({projectId,kind,state,checkedAt,records})=>({projectId,kind,state,checkedAt,observedCount:Array.isArray(records)?records.length:0})),
-  prospectSources:scans.map(({projectId,state,checkedAt,records})=>({projectId,state,checkedAt,observedCount:Array.isArray(records)?records.length:0})),
+  businessSources:business.map(({projectId,kind,state,checkedAt,records,reason})=>({projectId,kind,state,checkedAt,reason:reason||null,observedCount:Array.isArray(records)?records.length:0})),
+  prospectSources:scans.map(({projectId,state,checkedAt,records,reason})=>({projectId,state,checkedAt,reason:reason||null,observedCount:Array.isArray(records)?records.length:0})),
   sourceStatuses:revenue?.readOnly===true&&Array.isArray(revenue.sources)?
     revenue.sources.map(x=>({name:String(x.name||'').slice(0,100),
       status:String(x.status||'not-checked').slice(0,80)})).slice(0,20):[],
