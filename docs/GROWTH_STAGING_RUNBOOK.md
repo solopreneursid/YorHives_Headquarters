@@ -77,3 +77,18 @@ Target: `yorphives-hq-growth-staging-db` (`0f7a97e7-7b22-4076-a116-e34595833cc5`
 - AI analysis count 0; AI claim count 0; shared quota rows 0.
 - No inference was run. The staging Worker still requires the candidate code deployment, founder browser authentication check, and staging-only AI binding/feature-flag activation.
 
+
+
+## Serverless candidate Worker deployment record (2026-11-27)
+
+- Staging Worker: `yorphives-hq-growth-staging`.
+- Preview URL: `https://yorphives-hq-growth-staging.solopreneursid-proy.workers.dev`.
+- Candidate Worker version: `6` (`248ce559-b341-4eef-8bda-24d67929f7cf`).
+- Active staging deployment: `db9f385c-6a63-4837-8b23-dae698a40c65`, 100% on version 6.
+- Previous staging deployment: `6d5b7066-93b4-4ccd-b0ca-d471689169b3`, previous version `d514ddfa-154c-4ca4-b58e-081fb8927fe3` retained for rollback.
+- 19 modules uploaded (18 locked candidate modules plus `staging-entry.mjs`); all 18 source-module Git blob hashes verified before upload.
+- Existing Access and staging D1 bindings preserved. No AI binding and no `HQ_GROWTH_AI_ENABLED` flag were added; inference remains disabled.
+- Staging schedule list remains empty. No Queue or Workflow was created.
+- Production HQ was not modified. Read-only post-deploy check showed its active version `fdbef0dc-31ff-4428-854c-7852f27c9c65`, deployment `19f886c6-485c-42d1-b7d1-20d22b6b24e9`, existing AI binding and `*/5 * * * *` schedule unchanged.
+- Remaining manual gate: founder must open the preview URL in a browser, verify Access login and dashboard load, then verify that an unauthenticated/private session is denied. Do not enable AI until that check passes.
+
