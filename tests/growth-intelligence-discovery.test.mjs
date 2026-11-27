@@ -136,3 +136,25 @@ test('independent public organization account cross-check consumes one additiona
  const feed=growthFromExistingEvidence({prospectScans:scans,now:NOW});
  assert.equal(feed.dossiers.find(x=>x.project.id==='taxpulse').opportunities[0].prospect.organizationAccountCrossChecked,true);
 });
+
+test('GitHub access restrictions persist a shared cooldown without spending another fetch',async()=>{
+ const DB=dbMock();let requests=0,budget=0;
+ const options={reserveFetch:async()=>{budget++;return true;},fetchFn:async()=>{requests++;return new Response('{}',{status:403,headers:{'content-type':'application/json'}});}};
+ assert.equal(await runProspectDiscovery({DB},Date.parse('2026-11-27T02:35:00Z'),options),'yorphives:unavailable');
+ assert.equal(await runProspectDiscovery({DB},Date.parse('2026-11-27T08:35:00Z'),options),'globalgov:unavailable');
+ assert.equal(requests,1);assert.equal(budget,1);
+ const scans=await loadProspectDiscovery(DB,{now:Date.parse('2026-11-27T08:35:00Z')});
+ assert.equal(scans.find(x=>x.projectId==='yorphives').reason,'source-http-403');
+ assert.equal(scans.find(x=>x.projectId==='globalgov').reason,'github-source-cooldown');
+ assert.equal(await runProspectDiscovery({DB},Date.parse('2026-11-27T14:35:00Z'),options),'taxpulse:unavailable');
+ assert.equal(requests,2);
+});
+test('rate-limit hints are bounded and not confused with ordinary forbidden responses',async()=>{
+ const {githubCooldown}=await import('../src/growth-prospect-discovery.mjs');
+ const now=Date.parse(NOW);
+ assert.equal(githubCooldown(new Response('{}',{status:403}),now).reason,'source-http-403');
+ assert.deepEqual(githubCooldown(new Response('{}',{status:429,headers:{'retry-after':'120'}}),now),{reason:'github-rate-limited',durationMs:120000});
+ assert.equal(githubCooldown(new Response('{}',{status:403,headers:{'x-ratelimit-remaining':'0','x-ratelimit-reset':String(now/1000+3600)}}),now).durationMs,3600000);
+ assert.equal(githubCooldown(new Response('{}',{status:429,headers:{'retry-after':'9999999'}}),now).durationMs,86400000);
+ assert.equal(githubCooldown(new Response('{}',{status:200}),now),null);
+});
