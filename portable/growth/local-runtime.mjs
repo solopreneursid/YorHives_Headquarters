@@ -28,7 +28,7 @@ export function openCustomerWorkspace(root,tenant){
  if(!info.isFile()||info.nlink!==1||(info.mode&0o077)!==0||(typeof process.getuid==='function'&&info.uid!==process.getuid()))throw Error('Unsafe workspace database');
  const db=new DatabaseSync(dbPath);db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=DELETE; PRAGMA busy_timeout=5000;');
  try{
-  db.exec("CREATE TABLE IF NOT EXISTS workspace_identity(id INTEGER PRIMARY KEY CHECK(id=1),tenant TEXT NOT NULL); CREATE TABLE IF NOT EXISTS research_runs(id TEXT PRIMARY KEY,created_at TEXT NOT NULL,payload TEXT NOT NULL);");
+  db.exec("CREATE TABLE IF NOT EXISTS workspace_identity(id INTEGER PRIMARY KEY CHECK(id=1),tenant TEXT NOT NULL); CREATE TABLE IF NOT EXISTS research_runs(id TEXT PRIMARY KEY,created_at TEXT NOT NULL,payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS imported_envelopes(nonce TEXT PRIMARY KEY, key_id TEXT NOT NULL, imported_at TEXT NOT NULL);");
   db.prepare('INSERT OR IGNORE INTO workspace_identity(id,tenant) VALUES(1,?)').run(tenant);
   if(db.prepare('SELECT tenant FROM workspace_identity WHERE id=1').get()?.tenant!==tenant)throw Error('Customer identity mismatch');
   return Object.freeze({
@@ -36,6 +36,10 @@ export function openCustomerWorkspace(root,tenant){
    save(result){if(result?.tenant!==tenant||result.externalActionsPerformed!==false||result.modelVerified!==false)throw Error('Invalid result or tenant mismatch');
     const payload=JSON.stringify(result);if(Buffer.byteLength(payload)>100000)throw Error('Research result too large');
     const id=randomUUID();db.prepare('INSERT INTO research_runs(id,created_at,payload) VALUES(?,?,?)').run(id,new Date().toISOString(),payload);return id;},
+   claimEnvelope(nonce,keyId){if(!/^[a-f0-9-]{36}$/.test(nonce||'')||!/^[a-f0-9]{64}$/.test(keyId||''))throw Error('Invalid import identity');
+    const r=db.prepare('INSERT OR IGNORE INTO imported_envelopes(nonce,key_id,imported_at) VALUES(?,?,?)').run(nonce,keyId,new Date().toISOString());
+    if(Number(r.changes)!==1)throw Error('Evidence envelope already imported');
+   },
    list(){return db.prepare('SELECT id,created_at FROM research_runs ORDER BY created_at DESC LIMIT 100').all();},
    read(id){if(!/^[0-9a-f-]{36}$/i.test(id||''))return null;const r=db.prepare('SELECT payload FROM research_runs WHERE id=?').get(id);return r?JSON.parse(r.payload):null;},
    close(){db.close();}
@@ -81,8 +85,9 @@ export async function runSpecialists(workspace,dossier,{model,fetchFn=fetch}={})
  if(!packet.records.length)return {available:false,reason:'no-public-evidence',externalActionsPerformed:false,modelVerified:false};
  const stages=[];
  for(const role of ROLES){
-  try{const findings=await localModel(model,role,packet,stages,{fetchFn});stages.push({role,status:'unverified-model-output',findings});}
-  catch{stages.push({role,status:'unavailable-or-invalid',findings:[]});}
+  const started=performance.now();
+  try{const findings=await localModel(model,role,packet,stages,{fetchFn});stages.push({role,status:'unverified-model-output',findings,elapsedMs:Math.round(performance.now()-started)});}
+  catch{stages.push({role,status:'unavailable-or-invalid',findings:[],elapsedMs:Math.round(performance.now()-started)});}
  }
  const result={tenant:workspace.tenant,projectId:packet.project.id,model,stages,modelVerified:false,externalActionsPerformed:false,founderReviewRequired:true,
   available:stages.every(s=>s.status==='unverified-model-output'),evidence:packet.records.map(r=>({id:r.id,sourceUrl:r.sourceUrl}))};
