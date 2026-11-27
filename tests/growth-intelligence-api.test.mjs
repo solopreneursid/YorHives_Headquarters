@@ -81,3 +81,37 @@ test('review transitions are explicit and deny unauthorized action fields',async
  assert.ok(allowedReviewTransitions('approved-for-founder').includes('founder-executed'));
  assert.deepEqual(allowedReviewTransitions('founder-executed'),[]);
 });
+
+test('legacy signed Access JWT validates real RSA signatures and claims before accessing growth data',async()=>{
+ const {generateKeyPairSync,sign}=await import('node:crypto');
+ const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
+ const other=generateKeyPairSync('rsa',{modulusLength:2048});
+ const domain='https://growth-synthetic-test.cloudflareaccess.com',kid='synthetic-key';
+ const now=Math.floor(Date.now()/1000);
+ const jwk={...publicKey.export({format:'jwk'}),kid,alg:'RS256',use:'sig'};
+ const cfg={...env,ACCESS_TEAM_DOMAIN:domain};
+ const claims={iss:domain,aud:[cfg.ACCESS_AUD],email:cfg.ACCESS_OWNER_EMAIL,exp:now+300,nbf:now-1};
+ const enc=v=>Buffer.from(JSON.stringify(v)).toString('base64url');
+ const jwt=(c=claims,h={alg:'RS256',kid},key=privateKey)=>{
+  const base=enc(h)+'.'+enc(c);return base+'.'+sign('RSA-SHA256',Buffer.from(base),key).toString('base64url');
+ };
+ const original=globalThis.fetch;let network=0;
+ globalThis.fetch=async(input,opts)=>{assert.equal(input,domain+'/cdn-cgi/access/certs');assert.equal(opts.redirect,'error');network++;return Response.json({keys:[jwk]});};
+ const get=(token,extra={})=>worker.fetch(new Request(url,{headers:{...(token?{'Cf-Access-Jwt-Assertion':token}:{}),...extra}}),cfg,{});
+ try{
+  assert.equal((await get(null,{'Cf-Access-Authenticated-User-Email':claims.email})).status,403);
+  for(const token of [
+   jwt({...claims,aud:['other-audience']}),
+   jwt({...claims,iss:'https://other.cloudflareaccess.com'}),
+   jwt({...claims,email:'other@example.test'}),
+   jwt({...claims,exp:now-1}),
+   jwt({...claims,nbf:now+3600}),
+   jwt(claims,{alg:'none',kid}),
+   jwt(claims,{alg:'RS256',kid},other.privateKey),
+   'malformed'
+  ])assert.equal((await get(token)).status,403);
+  // A valid authenticated request reaches the missing-database guard, not the Access rejection.
+  assert.equal((await get(jwt())).status,503);
+  assert.equal(network,1);
+ }finally{globalThis.fetch=original;}
+});
