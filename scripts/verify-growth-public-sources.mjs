@@ -11,7 +11,7 @@ db.exec('CREATE TABLE status(key TEXT PRIMARY KEY,value TEXT NOT NULL,checked_at
 const DB={prepare(sql){let args=[];return {bind(...v){args=v;return this;},async first(){return db.prepare(sql).get(...args)||null;},async all(){return {results:db.prepare(sql).all(...args)};},async run(){return {meta:{changes:Number(db.prepare(sql).run(...args).changes)}};}};}};
 const now=Date.now(),base=Math.floor(now/86400000)*86400000-86400000;
 let budget=0;const requests=[];
-const reserveFetch=async()=>++budget<=16;
+const reserveFetch=async()=>++budget<=20;
 const fetchFn=async(url,options)=>{
  const u=new URL(url);
  const evidence={host:u.hostname,path:u.pathname,httpStatus:null};
@@ -20,7 +20,7 @@ const fetchFn=async(url,options)=>{
 };
 try{
  for(const hour of [2,8,14,20]){
-  await runProspectDiscovery({DB},base+hour*3600000+35*60000,{reserveFetch,fetchFn});
+  await runProspectDiscovery({DB},base+hour*3600000+35*60000,{reserveFetch,fetchFn,crossCheck:true});
   for(const day of [base,base+86400000])await runBusinessResearch({DB},day+hour*3600000+45*60000,{reserveFetch,fetchFn});
  }
  // Synthetic schedule instants only, never claimed as actual observation times.
@@ -31,9 +31,9 @@ try{
  const results=[...dossier.prospectSources.map(x=>({...x,kind:'repository'})),...dossier.businessSources];
  const report={checkedAt:new Date(now).toISOString(),environment:'disposable CI SQLite; real public HTTP; simulated cron clock',productionVerified:false,
   requests:requests.length,results:results.map(({projectId,kind,state,observedCount})=>({projectId,kind,state,observedCount})),
-  matchingOpportunities:dossier.dossiers.map(x=>({projectId:x.project.id,count:x.opportunities.length})),
+  matchingOpportunities:dossier.dossiers.map(x=>({projectId:x.project.id,count:x.opportunities.length,crossChecked:x.opportunities.filter(o=>o.prospect?.organizationAccountCrossChecked).length})),
   transport:requests,allSourcesReachable:results.every(x=>['observed','checked-no-match'].includes(x.state))};
  console.log('PUBLIC_SOURCE_REPORT '+JSON.stringify(report));
- if(requests.length>16)throw Error('Exceeded request budget');
+ if(requests.length>20)throw Error('Exceeded request budget');
  if(!results.some(x=>['observed','checked-no-match'].includes(x.state)))throw Error('No public source usable');
 }catch(e){console.error(e.message);process.exitCode=1;}finally{db.close();}
