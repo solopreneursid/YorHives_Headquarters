@@ -5,7 +5,7 @@
   "sourceWorkerVersion": "fdbef0dc-31ff-4428-854c-7852f27c9c65",
   "workerContentSha256": null,
   "moduleGitBlobs": {
-    "hq-worker.mjs": "8281ec86c4ac10e0e3632b886a13a03e7556e3a8",
+    "hq-worker.mjs": "dca8627bee13676f3b5b861ba14b89f27df0f762",
     "watchdog-evidence.mjs": "4ce7b6280c37068fd81318472b1d09a73a38ab77",
     "agent-demand-evidence.mjs": "17c4077b1f61db1a137ea6decc09b4578e7050a4",
     "growth-evidence.mjs": "e8f2f89fbe2f288755656ff59744db9a347e6eee",
@@ -13,14 +13,15 @@
     "products-ranker.mjs": "b1fb67d93a089df7c6f25866f7d744a310c279af",
     "revenue-intelligence.mjs": "ef4464f71119cf9df14c6b5b3c85daaf56b0af07",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba",
-    "growth-intelligence.mjs": "db6d7d500c42c6fa810fab6f9647d3c1fcbcb8f3",
+    "growth-intelligence.mjs": "2d03590c91c08676542e95f4f4be235b87af3bba",
     "growth-intelligence-adapter.mjs": "7120ffa726a3b3ae0da42e32634aa332cbac1946",
-    "growth-prospect-discovery.mjs": "a3e867a67ba85728fe1eeada6d89388d35ac3ab0",
+    "growth-prospect-discovery.mjs": "104085f22db2e8d6a7d37cede745a3776309ef12",
     "growth-intelligence-review.mjs": "085d30545d0a6021ed13d6d96cfcb107c2d571bb",
     "growth-intelligence-store.mjs": "dd72384348c4fc765ff37b0b4c4af5b70d869556",
     "growth-business-research.mjs": "bd51f0551ddcb5ee901236924f38fc1832c196cf",
     "growth-integration-intelligence.mjs": "94abaa1ff7fe8215d980939ab6171722a3eb006a",
-    "growth-outcome-intelligence.mjs": "1b27d36a1e0d966e83750a3bf6ae170141f01a5e"
+    "growth-outcome-intelligence.mjs": "1b27d36a1e0d966e83750a3bf6ae170141f01a5e",
+    "growth-ranking-review.mjs": "f8676f796d842956d8f1dbdbdc82734e032d3efc"
   },
   "navigation": [
     "home",
@@ -112,7 +113,8 @@
     "Growth candidate adds two runtime modules, a GET-only private research view and no additional scheduled collection, credentials or production database changes.",
     "Growth organization scout uses four fixed daily public GitHub repository queries, subject to existing shared request budget. No contact harvesting or messaging.",
     "Growth founder review is an internal audit-only POST with existing founder decisions flag, Access and same-origin guard. Requires explicit migration 0001/0002; no automated external execution.",
-    "Advanced growth candidate adds three runtime modules; 16 pinned candidate modules; retains prior live module inventory. Three additive migrations require explicit staging/release approval."
+    "Advanced growth candidate adds three runtime modules; 16 pinned candidate modules; retains prior live module inventory. Three additive migrations require explicit staging/release approval.",
+    "Readiness candidate adds at most four additional account metadata checks/day subject to existing quota; no changes to production Worker or D1. Shadow ranking is never applied automatically."
   ],
   "previousWorkerVersion": "935960d8-a6d4-41a5-a464-37a9f9c5655b",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
@@ -141,7 +143,7 @@
     "revenue-intelligence.mjs": "2644dae372695729d43b6f4945f93e156036e223",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "Draft candidate: bounded multi-source portfolio research, technical diligence, localized proposals, founder review and structured outcome journal. No production deployment or migration. Portable local specialist runtime separate from Worker.",
+  "candidateStatus": "Draft candidate: 17 runtime modules with organization account cross-checks and founder-reviewed shadow scoring; offline signed evidence, entitlement and recovery tools remain separate. No deployment or migration.",
   "previousReleaseVerification": {
     "githubWorkflowRun": null,
     "acceptedAt": "2026-11-22T11:11:02.604409Z",
