@@ -109,3 +109,13 @@ The founder's authenticated staging-browser screenshots showed that Growth Intel
 - Staging intentionally has no production service bindings for HQconnect inbox, edge watchdog or perimeter monitor. Those optional panels must report their own unavailable/unverified status; staging must not read production inbox or monitoring services.
 
 Next verification: reload the authenticated staging dashboard and confirm the core report-backed sections now render. Then test anonymous denial separately. Do not enable Workers AI until the browser and API checks pass.
+
+
+## Latest staging recovery and access verification (2026-11-27)
+
+- Candidate `e56cce7ab6087402677bd2b73846a92e87895ce1`: all four CI workflows succeeded; 41 deterministic tests passed; 25/25 HQ reporting queries passed. Actual CI public-source collection returned evidence from 11/12 configured checks; n8n documentation exceeded the response bound. These are not hosted Worker source observations.
+- Reverified the dedicated staging database and five-binding inventory, exact founder-only Access policy and separate audience. No AI binding or flag; no cron; production Worker version remained `fdbef0dc-31ff-4428-854c-7852f27c9c65`.
+- Native latest-schema Time Travel drill: temporarily disabled the staging workers.dev endpoint (previews already disabled), captured a bookmark, wrote one synthetic marker, restored the bookmark and compared the ordered schema objects and founder journal/opportunity records. All 91 schema objects matched; one saved founder review and one opportunity remained; zero outcome/AI analysis records; temporary marker absent. Restored staging endpoint. This verifies native staging recovery including the newer reporting and AI schemas, not production recovery or off-platform encrypted backups.
+- Independent anonymous Browser Run request to staging root displayed a Cloudflare Access challenge; HQ dashboard content was not returned. No authentication bypass or user credentials used. A single bounded Browser Run request may count toward existing plan usage.
+- Workers AI model catalog confirms `@cf/ibm-granite/granite-4.0-h-micro` exists as a text-generation model. No inference invoked; provider usage/quality still unverified.
+- Remaining manual gate: signed-in reload of all six tabs following the latest reporting-schema bootstrap; TaxPulse synthetic manual-completion and response recording must be performed by the founder, not fabricated by the development operator. Once this is verified, controlled staging-only AI activation and hosted collection verification can proceed. No production release authorized.
