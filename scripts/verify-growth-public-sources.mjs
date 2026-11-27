@@ -30,7 +30,7 @@ try{
  const dossier=growthFromExistingEvidence({prospectScans:prospects,businessScans:business,now:new Date(asOf).toISOString()});
  const results=[...dossier.prospectSources.map(x=>({...x,kind:'repository'})),...dossier.businessSources];
  const report={checkedAt:new Date(now).toISOString(),environment:'disposable CI SQLite; real public HTTP; simulated cron clock',productionVerified:false,
-  requests:requests.length,results:results.map(({projectId,kind,state,observedCount})=>({projectId,kind,state,observedCount})),
+  requests:requests.length,results:results.map(({projectId,kind,state,observedCount,reason})=>({projectId,kind,state,observedCount,reason:reason||null})),
   matchingOpportunities:dossier.dossiers.map(x=>({projectId:x.project.id,count:x.opportunities.length,crossChecked:x.opportunities.filter(o=>o.prospect?.organizationAccountCrossChecked).length})),
   transport:requests,allSourcesReachable:results.every(x=>['observed','checked-no-match'].includes(x.state))};
  console.log('PUBLIC_SOURCE_REPORT '+JSON.stringify(report));
