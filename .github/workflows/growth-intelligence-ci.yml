@@ -3,6 +3,11 @@ on:
   pull_request:
     paths:
       - 'src/growth-intelligence*.mjs'
+      - 'src/hq-worker.mjs'
+      - 'src/revenue-intelligence.mjs'
+      - 'hq-release.json'
+      - 'scripts/verify-current-hq.mjs'
+      - 'scripts/test-four-button-browser.mjs'
       - 'tests/growth-intelligence.test.mjs'
       - 'migrations/growth/**'
       - 'scripts/verify-growth-schema.py'
@@ -21,6 +26,7 @@ jobs:
           node-version: '22'
       - name: Check candidate JavaScript syntax
         run: |
+          node --check src/hq-worker.mjs
           node --check src/growth-intelligence.mjs
           node --check src/growth-intelligence-adapter.mjs
           node --check src/growth-intelligence-store.mjs
@@ -29,5 +35,5 @@ jobs:
         run: node --test tests/growth-intelligence.test.mjs
       - name: Validate migration idempotence and integrity
         run: python3 scripts/verify-growth-schema.py
-      - name: Protect the current live-source lock and five-tab contract
+      - name: Verify candidate source lock, retained live inventory and six-tab contract
         run: node scripts/verify-current-hq.mjs
