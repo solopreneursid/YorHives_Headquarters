@@ -119,7 +119,8 @@
     "GitHub source-wide cooldown honors documented rate-limit hints and pauses ordinary 403 responses; no credentials, proxy bypass or retry loop. Billing scope unavailable; no staging cloud resources provisioned.",
     "Staging feedback: Growth tab loads its independent authenticated API even when the general HQ report is unavailable. No synthetic general report or production DB connection.",
     "Serverless Growth AI adds an append-only D1 analysis journal, idempotent daily request claims and a two-new-analysis UTC-day limit. Cloudflare Workers AI runs only after an authenticated founder action; outputs remain unverified advisory material. No personal always-on server, automatic outreach, repository writes or deployment.",
-    "Hosted staging review persisted exactly once despite false conflict response; acknowledge inserted audit row with RETURNING id instead of D1 meta.changes."
+    "Hosted staging review persisted exactly once despite false conflict response; acknowledge inserted audit row with RETURNING id instead of D1 meta.changes.",
+    "Staging-only rollout record: D1 migration 0004 applied with pre/post Time Travel bookmarks; Worker version 6 is active at 100% on the dedicated staging Worker; 19 uploaded modules were source-hash verified. Staging has no AI binding or AI feature flag and no schedule. Production Worker, D1 and schedules remain unchanged."
   ],
   "previousWorkerVersion": "935960d8-a6d4-41a5-a464-37a9f9c5655b",
   "workerContentSha256Method": "SHA-256 of raw Cloudflare /content/v2 multipart at the private backup snapshot; exact snapshot response digest. Multipart boundaries vary between requests, so compare module Git blob hashes for current-source equivalence.",
@@ -148,7 +149,7 @@
     "revenue-intelligence.mjs": "2644dae372695729d43b6f4945f93e156036e223",
     "revenue-research.mjs": "36e67487cc39d29103ee2bf5855684bbf3c748ba"
   },
-  "candidateStatus": "Draft candidate: 18 runtime modules with bounded founder-triggered Cloudflare Workers AI for six specialist roles; local Linux inference is optional and not an HQ dependency. Production release and migration remain unapproved.",
+  "candidateStatus": "Draft candidate: 18 runtime modules; version 6 deployed to isolated Growth staging. Serverless Workers AI is the hosted default, but staging AI binding and feature flag remain disabled pending founder browser verification. No personal always-on host is required. Production release remains unapproved.",
   "previousReleaseVerification": {
     "githubWorkflowRun": null,
     "acceptedAt": "2026-11-22T11:11:02.604409Z",
