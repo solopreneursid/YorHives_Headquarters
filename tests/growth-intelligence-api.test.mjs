@@ -45,7 +45,7 @@ test('founder receives evidence-only dossiers through actual route with read-onl
   assert.equal(card.communicationDraft.recipient,null);
   assert.equal(card.verifiedRevenue,null);
   assert.equal(data.dossiers.find(d=>d.project.id==='yorphives').analytics.available,false);
-  assert.equal(queries.length,5);
+  assert.equal(queries.length,6);
   assert.ok(queries.every(q=>q.startsWith('SELECT ')));
   assert.deepEqual(requests,[{url:'https://yorphives.com/api/insights/growth',method:'GET'}]);
  }finally{globalThis.fetch=oldFetch}
