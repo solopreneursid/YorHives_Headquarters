@@ -62,3 +62,18 @@ Founder screenshot confirmed Workers Paid. D1 database `yorphives-hq-growth-stag
 Staging Worker `yorphives-hq-growth-staging` uploaded from the 17 locked modules at candidate commit `4f93dfe0315d87fad5bbbc0c8727328cb24b4724`, which passed all four CI workflows. Separate staging entrypoint (source in `src/staging-entry.mjs`) has no scheduled handler and denies unrelated mutation methods. Distinct worker-specific Access application and exact single founder email allow policy configured, and independent audience and five-binding inventory verified. No production services or inference bindings. workers.dev enabled after checks; preview URLs disabled. URL: https://yorphives-hq-growth-staging.solopreneursid-proy.workers.dev/
 
 Pending actual founder browser authentication, anonymous denial smoke test and real Cloudflare source collection. External unauthenticated network test was unavailable in the assistant environment; do not claim hosted access verified. Existing synthetic base tables are intentionally minimal, so unrelated HQ tabs may report unavailable. No production release, plan change, or commercial deployment performed. Usage-dependent charges remain possible under the existing paid plan.
+
+
+## Serverless AI staging migration record (2026-11-27)
+
+Target: `yorphives-hq-growth-staging-db` (`0f7a97e7-7b22-4076-a116-e34595833cc5`), APAC primary. The migration was applied only to this isolated staging database.
+
+- Pre-migration Time Travel bookmark: `00000008-00000000-00005130-4ddaba2569014c3f5222c3821a77eab3`.
+- Applied: `migrations/growth/0004_serverless_ai.sql`.
+- Post-migration Time Travel bookmark: `00000008-00000002-00005130-26d504663f39fceff9a7bfbe7f923ab0`.
+- Verified tables: `quota`, `growth_ai_analyses`, `growth_ai_claims`.
+- Verified triggers: `growth_ai_analyses_no_update`, `growth_ai_analyses_no_delete`.
+- Existing `growth_opportunities` count remained 1.
+- AI analysis count 0; AI claim count 0; shared quota rows 0.
+- No inference was run. The staging Worker still requires the candidate code deployment, founder browser authentication check, and staging-only AI binding/feature-flag activation.
+
