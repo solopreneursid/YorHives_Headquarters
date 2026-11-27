@@ -14,14 +14,14 @@ function fixture(){
  db.prepare('INSERT INTO growth_projects(id,name,stage) VALUES(?,?,?)').run('taxpulse','TaxPulse','research');
  db.prepare('INSERT INTO growth_sources(id,source_url,source_type,observed_at,status) VALUES(?,?,?,?,?)').run('gs-synthetic','https://openfisca.org/doc/openfisca-web-api/','official-product-page',at,'public-observed');
  db.prepare('INSERT INTO growth_opportunities(id,project_id,source_id,title,summary,relevance_score,audience_hypothesis,discovered_at) VALUES(?,?,?,?,?,?,?,?)')
-  .run('growth-abc','taxpulse','gs-synthetic','Public tax API documentation','A public API documents tax calculation fields and authentication requirements.',72,'Taxpayers and finance developers',at);
+  .run('growth-abc','taxpulse','gs-synthetic','Public tax API documentation','A public API documents tax calculation fields and authentication requirements. Contact person@example.org for details.',72,'Taxpayers and finance developers',at);
  const DB={prepare(sql){let values=[];return {bind(...args){values=args;return this;},async first(){return db.prepare(sql).get(...values)||null;},async all(){return {results:db.prepare(sql).all(...values)};},async run(){const r=db.prepare(sql).run(...values);return {meta:{changes:Number(r.changes)}};}};}};
  return {db,DB,env:{DB,AI:{async run(model,options){return {response:'Observed: public documentation describes an API. Unverified hypothesis: integration may be useful. Founder should verify authentication, terms and technical compatibility.'};}},HQ_GROWTH_AI_ENABLED:'true'}};
 }
 
 test('serverless inference is founder-triggered, evidence-bounded, persisted and cached',async()=>{
  const {db,DB,env}=fixture();
- let calls=0;
+ let calls=0,duplicateError=null;
  env.AI.run=async(model,options)=>{
   calls++;
   assert.equal(model,'@cf/ibm-granite/granite-4.0-h-micro');
@@ -36,6 +36,7 @@ test('serverless inference is founder-triggered, evidence-bounded, persisted and
   assert.equal(first.available,true);assert.equal(first.cached,false);assert.equal(first.budget.requestsUsed,1);
   assert.equal(first.externalActionsPerformed,false);assert.equal(first.founderReviewRequired,true);
   assert.equal(calls,1);
+  assert.equal(duplicateError?.status,409);
   const cached=await runGrowthAiAnalysis(env,{opportunityId:'growth-abc',specialist:GROWTH_AI_SPECIALISTS[0]},{now:'2026-11-27T10:01:00.000Z'});
   assert.equal(cached.cached,true);assert.equal(cached.analysis,first.analysis);assert.equal(calls,1);
   const history=await loadGrowthAiAnalyses(DB);
