@@ -44,7 +44,7 @@ export async function persistGrowthEvidence(db,dossiers,{observedAt=new Date().t
   ids.add(p.id);
   statements.push(db.prepare(
    'INSERT INTO growth_projects(id,name,stage) VALUES (?,?,?) '+
-   'ON CONFLICT(id) DO UPDATE SET name=excluded.name,stage=excluded.stage,updated_at=strftime("%Y-%m-%dT%H:%M:%fZ","now")'
+   'ON CONFLICT(id) DO UPDATE SET name=excluded.name,stage=excluded.stage,updated_at=excluded.updated_at'
   ).bind(p.id,p.name,String(p.stage||'research').slice(0,24)));
   for(let i=0;i<p.audiences.length;i++){
    if(!validText(p.audiences[i],100))throw new TypeError('Invalid audience');
@@ -64,7 +64,7 @@ export async function persistGrowthEvidence(db,dossiers,{observedAt=new Date().t
     'INSERT INTO growth_opportunities(id,project_id,source_id,title,summary,relevance_score,'+
     'audience_hypothesis,discovered_at) VALUES (?,?,?,?,?,?,?,?) '+
     'ON CONFLICT(id) DO UPDATE SET title=excluded.title,summary=excluded.summary,'+
-    'relevance_score=excluded.relevance_score,updated_at=strftime("%Y-%m-%dT%H:%M:%fZ","now")'
+    'relevance_score=excluded.relevance_score,updated_at=excluded.updated_at'
    ).bind(card.id,p.id,sourceId,card.title,card.summary,card.relevanceScore,
     card.audienceHypothesis,card.observedAt));
   }
