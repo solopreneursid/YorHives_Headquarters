@@ -96,11 +96,13 @@ not fictitious leads. No recipients or autonomous distribution controls.
 
 ## Operability
 
-Run the engine locally on Node 20+ or import it in the current Worker bundle.
-A persistent private model may **summarize** already-qualified public source
-evidence later; it must not assign authoritative scores, learn from contact
-identities, or receive network/send/write capabilities. Deterministic scoring
-remains the default and fallback when model inference is unavailable.
+The hosted engine executes in Cloudflare Workers. Node 22+ is needed only for
+local regression tests and the optional customer-hosted CLI; neither requires a
+resident process for the hosted HQ. Cloudflare Workers AI may **summarize** already-
+qualified public source evidence after an authenticated founder action. It must not
+assign authoritative scores, learn from contact identities, or receive model tools,
+outbound credentials or write/deploy capabilities. Deterministic scoring remains
+the default and fallback when model inference is unavailable.
 
 ## BizBot-inspired business-development direction (2026-11-27)
 
